@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "Plan de Ferme",
   "short_name": "Plan de Ferme",
   "description": "Données géospatiales en agriculture au Québec : sols, parcelles, relief, NDVI et coupes altimétriques.",

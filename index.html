@@ -1,3 +1,21 @@
+<!--
+  Plan de Ferme — Données géospatiales en agriculture.
+  Copyright (C) 2026 Cédric Bouffard
+
+  Ce programme est un logiciel libre : vous pouvez le redistribuer et/ou
+  le modifier selon les termes de la licence GNU General Public License
+  telle que publiée par la Free Software Foundation, version 3 ou (à votre
+  gré) toute version ultérieure.
+
+  Ce programme est distribué dans l'espoir qu'il sera utile, mais SANS
+  AUCUNE GARANTIE, sans même la garantie implicite de QUALITÉ MARCHANDE ou
+  d'ADÉQUATION À UN USAGE PARTICULIER. Voir la licence GNU General Public
+  License pour plus de détails.
+
+  Vous devriez avoir reçu une copie de la licence GNU General Public License
+  avec ce programme (fichier LICENSE). Sinon, voir :
+  <https://www.gnu.org/licenses/>.
+-->
 <!DOCTYPE html>
 <html lang="fr" class="portal-html">
 <head>
@@ -2315,6 +2333,51 @@
     .site-footer a:hover {
       text-decoration: underline;
     }
+
+    /* PWA Install Prompt */
+    .pwa-install-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 4000;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: #0f172a;
+      color: #ffffff;
+      box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.35);
+      font-size: 13px;
+      font-weight: 500;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+    .pwa-install-bar.visible { display: flex; }
+    .pwa-install-text { flex: 1; line-height: 1.35; }
+    .pwa-install-btn {
+      flex-shrink: 0;
+      background: #16a34a;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .pwa-install-btn:hover { background: #15803d; }
+    .pwa-install-dismiss {
+      flex-shrink: 0;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    .pwa-install-dismiss:hover { color: #ffffff; }
   </style>
 </head>
 <body>
@@ -2396,7 +2459,7 @@
         </div>
 
         <div style="font-size: 10.5px; color: #64748b; line-height: 1.35; margin-bottom: 7px;">
-          Flèches selon la pente et raster des dépressions (remplissage MNE 1m) calculés à la volée.
+          Flèches selon la pente et raster des zones plates (pente &lt; 0.1%) calculés à la volée.
         </div>
 
         <!-- Légende des flèches par pente -->
@@ -2410,13 +2473,11 @@
           </div>
         </div>
 
-        <!-- Légende des dépressions par profondeur -->
+        <!-- Légende des dépressions par pente -->
         <div style="margin-bottom: 7px;">
-          <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 3px;">Dépressions / cuvettes :</div>
+          <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 3px;">Dépressions / zones plates :</div>
           <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: #64748b; background: #f8fafc; padding: 4px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(103,232,249,0.75);"></span> 8–18 cm</span>
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(2,132,199,0.85);"></span> 18–35 cm</span>
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(29,78,216,0.92);"></span> &gt; 35 cm</span>
+            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(2,132,199,0.85);"></span> Pente &lt; 0.1%</span>
           </div>
         </div>
 
@@ -4512,7 +4573,7 @@
       }
     }
 
-    // Gestionnaire de l'hydrologie (écoulement à la volée & raster des dépressions par remplissage D8/Priority-Flood)
+    // Gestionnaire de l'hydrologie (écoulement à la volée & raster des zones plates par pente < 0.1%)
     class ParcelHydrologyManager {
       constructor(mapInstance) {
         this.map = mapInstance;
@@ -4561,7 +4622,7 @@
       }
 
       setupLayers() {
-        // 1. Source & Couche Raster pour les dépressions (MNE Fill - MNE Original)
+        // 1. Source & Couche Raster pour les zones plates (pente < 0.1%)
         if (!this.map.getSource("hydro-cuvettes-source")) {
           const dummyCanvas = document.createElement("canvas");
           dummyCanvas.width = 1; dummyCanvas.height = 1;
@@ -4636,11 +4697,11 @@
               "icon-image": "hydro-flow-arrow",
               "icon-size": [
                 "interpolate", ["linear"], ["get", "slopePct"],
-                0.8, 0.45,
-                2.5, 0.60,
-                5.0, 0.78,
-                10.0, 0.98,
-                18.0, 1.20
+                0.8, 0.72,
+                2.5, 0.88,
+                5.0, 1.02,
+                10.0, 1.20,
+                18.0, 1.40
               ],
               "icon-rotate": ["get", "angle"],
               "icon-rotation-alignment": "map",
@@ -4650,14 +4711,14 @@
             paint: {
               "icon-color": [
                 "interpolate", ["linear"], ["get", "slopePct"],
-                0.8, "#38bdf8",
-                2.5, "#0284c7",
+                0.8, "#0284c7",
+                2.5, "#0369a1",
                 5.0, "#1d4ed8",
                 10.0, "#4338ca",
                 18.0, "#6d28d9"
               ],
               "icon-halo-color": "#ffffff",
-              "icon-halo-width": 1.4,
+              "icon-halo-width": 1.8,
               "icon-opacity": 0.95
             }
           }, beforeLayer);
@@ -4731,190 +4792,129 @@
         return p;
       }
 
-      // Algorithme de remplissage de dépressions (Priority-Flood / Barnes 2014)
-      computeDepressionFill(elev, W, H) {
+      // Filtre gaussien séparable (lissage du MNE pour réduire le bruit)
+      gaussianBlur(elev, W, H, sigma) {
         const size = W * H;
-        const filled = new Float32Array(elev);
-        const visited = new Uint8Array(size);
+        const radius = Math.max(1, Math.ceil(sigma * 3));
+        const kernel = new Float32Array(2 * radius + 1);
+        let ksum = 0;
+        for (let i = -radius; i <= radius; i++) {
+          const v = Math.exp(-(i * i) / (2 * sigma * sigma));
+          kernel[i + radius] = v;
+          ksum += v;
+        }
+        for (let i = 0; i < kernel.length; i++) kernel[i] /= ksum;
 
-        class MinHeap {
-          constructor(cap) {
-            this.heap = new Int32Array(cap);
-            this.size = 0;
-          }
-          push(idx) {
-            let i = this.size++;
-            this.heap[i] = idx;
-            while (i > 0) {
-              const p = (i - 1) >> 1;
-              if (filled[this.heap[p]] <= filled[this.heap[i]]) break;
-              const tmp = this.heap[p];
-              this.heap[p] = this.heap[i];
-              this.heap[i] = tmp;
-              i = p;
+        const temp = new Float32Array(size);
+        const result = new Float32Array(size);
+
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            let acc = 0, wsum = 0;
+            for (let k = -radius; k <= radius; k++) {
+              const nx = x + k;
+              if (nx < 0 || nx >= W) continue;
+              const z = elev[y * W + nx];
+              if (!Number.isFinite(z) || z <= -1000 || z >= 9000) continue;
+              acc += z * kernel[k + radius];
+              wsum += kernel[k + radius];
             }
+            temp[y * W + x] = wsum > 0 ? acc / wsum : NaN;
           }
-          pop() {
-            if (this.size === 0) return -1;
-            const top = this.heap[0];
-            const last = this.heap[--this.size];
-            if (this.size > 0) {
-              this.heap[0] = last;
-              let i = 0;
-              while (true) {
-                let left = (i << 1) + 1;
-                let right = left + 1;
-                let smallest = i;
-                if (left < this.size && filled[this.heap[left]] < filled[this.heap[smallest]]) smallest = left;
-                if (right < this.size && filled[this.heap[right]] < filled[this.heap[smallest]]) smallest = right;
-                if (smallest === i) break;
-                const tmp = this.heap[i];
-                this.heap[i] = this.heap[smallest];
-                this.heap[smallest] = tmp;
-                i = smallest;
-              }
+        }
+
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            let acc = 0, wsum = 0;
+            for (let k = -radius; k <= radius; k++) {
+              const ny = y + k;
+              if (ny < 0 || ny >= H) continue;
+              const z = temp[ny * W + x];
+              if (!Number.isFinite(z) || z <= -1000 || z >= 9000) continue;
+              acc += z * kernel[k + radius];
+              wsum += kernel[k + radius];
             }
-            return top;
+            result[y * W + x] = wsum > 0 ? acc / wsum : NaN;
           }
         }
 
-        const heap = new MinHeap(size);
+        return result;
+      }
 
-        for (let x = 0; x < W; x++) {
-          visited[x] = 1;
-          heap.push(x);
-          const bIdx = (H - 1) * W + x;
-          visited[bIdx] = 1;
-          heap.push(bIdx);
-        }
-        for (let y = 1; y < H - 1; y++) {
-          const lIdx = y * W;
-          visited[lIdx] = 1;
-          heap.push(lIdx);
-          const rIdx = y * W + (W - 1);
-          visited[rIdx] = 1;
-          heap.push(rIdx);
-        }
-
-        for (let i = 0; i < size; i++) {
-          const z = elev[i];
-          if (!Number.isFinite(z) || z <= -1000 || z >= 9000) {
-            visited[i] = 1;
-            filled[i] = -9999;
-            heap.push(i);
-          }
-        }
-
-        const dx = [1, -1, 0, 0, 1, -1, 1, -1];
-        const dy = [0, 0, 1, -1, 1, 1, -1, -1];
-
-        while (heap.size > 0) {
-          const cIdx = heap.pop();
-          const cZ = filled[cIdx];
-          const cx = cIdx % W;
-          const cy = Math.floor(cIdx / W);
-
-          for (let d = 0; d < 8; d++) {
-            const nx = cx + dx[d];
-            const ny = cy + dy[d];
-            if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
-            const nIdx = ny * W + nx;
-            if (visited[nIdx]) continue;
-            visited[nIdx] = 1;
-
-            const nZ = elev[nIdx];
-            if (Number.isFinite(nZ) && nZ > -1000 && nZ < 9000) {
-              if (nZ < cZ) {
-                filled[nIdx] = cZ;
-              } else {
-                filled[nIdx] = nZ;
-              }
-              heap.push(nIdx);
-            }
-          }
-        }
-
+// Détection des dépressions par pente (zones plates : pente < 0.1%)
+      computeSlopeDepressions(elev, W, H, dxMetric, dyMetric) {
+        const size = W * H;
         const diff = new Float32Array(size);
         let maxDepth = 0;
         let countDepressions = 0;
         let sumDepth = 0;
 
-        for (let i = 0; i < size; i++) {
-          const z = elev[i];
-          if (Number.isFinite(z) && z > -1000 && z < 9000) {
-            const d = filled[i] - z;
-            if (d >= 0.08) { // Seuil minimal de 8 cm pour éliminer les micro-ornières et le bruit Lidar
-              diff[i] = d;
-              if (d > maxDepth) maxDepth = d;
-              countDepressions++;
-              sumDepth += d;
-            } else {
-              diff[i] = 0;
-            }
-          } else {
-            diff[i] = 0;
-          }
-        }
+        const SLOPE_THRESHOLD = 0.001; // 0.1% = 0.001 m/m
+        const sigma = 3; // lissage fixe en pixels (s'adapte naturellement au zoom)
 
-        // Filtre de bruit : éliminer les cellules isolées (1 seul pixel isolé sans voisin)
-        for (let y = 0; y < H; y++) {
-          for (let x = 0; x < W; x++) {
+        const smoothed = this.gaussianBlur(elev, W, H, sigma);
+
+        // Référence régionale (lissage large) pour distinguer un trou (minimum local) d'un sommet (maximum local)
+        const coarseSigma = 9;
+        const coarse = this.gaussianBlur(elev, W, H, coarseSigma);
+
+        for (let y = 1; y < H - 1; y++) {
+          for (let x = 1; x < W - 1; x++) {
             const idx = y * W + x;
-            if (diff[idx] <= 0 || diff[idx] >= 0.15) continue;
-            let neighbors = 0;
-            for (let d = 0; d < 8; d++) {
-              const nx = x + dx[d], ny = y + dy[d];
-              if (nx >= 0 && nx < W && ny >= 0 && ny < H) {
-                if (diff[ny * W + nx] > 0) neighbors++;
-              }
-            }
-            if (neighbors === 0) {
-              diff[idx] = 0;
-              countDepressions--;
+            const z = smoothed[idx];
+            if (!Number.isFinite(z) || z <= -1000 || z >= 9000) continue;
+
+            const zNW = smoothed[(y - 1) * W + (x - 1)];
+            const zN  = smoothed[(y - 1) * W + x];
+            const zNE = smoothed[(y - 1) * W + (x + 1)];
+            const zW  = smoothed[y * W + (x - 1)];
+            const zE  = smoothed[y * W + (x + 1)];
+            const zSW = smoothed[(y + 1) * W + (x - 1)];
+            const zS  = smoothed[(y + 1) * W + x];
+            const zSE = smoothed[(y + 1) * W + (x + 1)];
+
+            const nbrs = [zNW, zN, zNE, zW, zE, zSW, zS, zSE];
+            if (nbrs.some(n => !Number.isFinite(n) || n <= -1000 || n >= 9000)) continue;
+
+            const dzdx = ((zNW + 2 * zW + zSW) - (zNE + 2 * zE + zSE)) / (8 * dxMetric);
+            const dzdy = ((zNE + 2 * zN + zNW) - (zSE + 2 * zS + zSW)) / (8 * dyMetric);
+            const slope = Math.sqrt(dzdx * dzdx + dzdy * dzdy);
+
+            if (slope < SLOPE_THRESHOLD && z <= coarse[idx]) {
+              diff[idx] = slope;
+              if (slope > maxDepth) maxDepth = slope;
+              countDepressions++;
+              sumDepth += slope;
             }
           }
         }
 
-        return { diff, maxDepth, countDepressions, sumDepth, filled };
+        return { diff, maxDepth, countDepressions, sumDepth };
       }
 
-      // Génération du raster des dépressions avec palette progressive selon la profondeur
+      // Génération du raster des dépressions (zones plates : pente < 0.1%)
       renderCuvettesCanvas(diff, W, H) {
         this.canvasCuvettes.width = W;
         this.canvasCuvettes.height = H;
         const imgData = this.ctxCuvettes.createImageData(W, H);
         const px = imgData.data;
 
+        const SLOPE_THRESHOLD = 0.001; // 0.1%
+
         for (let i = 0; i < W * H; i++) {
           const pIdx = i * 4;
-          const depth = diff[i];
-          if (depth < 0.08) {
+          const slope = diff[i];
+          if (slope <= 0) {
             px[pIdx + 3] = 0;
             continue;
           }
 
-          if (depth < 0.18) {
-            // Faible stagnation (8 cm à 18 cm) : Cyan turquoise clair
-            const t = (depth - 0.08) / 0.10;
-            px[pIdx] = Math.round(103 + t * (2 - 103));
-            px[pIdx + 1] = Math.round(232 + t * (132 - 232));
-            px[pIdx + 2] = Math.round(249 + t * (199 - 249));
-            px[pIdx + 3] = Math.round(140 + t * 45); // ~55-72% opacité
-          } else if (depth < 0.35) {
-            // Dépression moyenne (18 cm à 35 cm) : Bleu océan vif
-            const t = (depth - 0.18) / 0.17;
-            px[pIdx] = Math.round(2 + t * (29 - 2));
-            px[pIdx + 1] = Math.round(132 + t * (78 - 132));
-            px[pIdx + 2] = Math.round(199 + t * (216 - 199));
-            px[pIdx + 3] = Math.round(185 + t * 35); // ~72-86% opacité
-          } else {
-            // Dépression profonde (> 35 cm) : Bleu roi profond à bleu nuit
-            const t = Math.min(1, (depth - 0.35) / 0.45);
-            px[pIdx] = Math.round(29 + t * (15 - 29));
-            px[pIdx + 1] = Math.round(78 + t * (23 - 78));
-            px[pIdx + 2] = Math.round(216 + t * (66 - 216));
-            px[pIdx + 3] = Math.round(220 + t * 30); // ~86-98% opacité
-          }
+          // Dégradé : plus la pente est faible, plus le bleu est intense
+          const t = Math.min(1, slope / SLOPE_THRESHOLD); // 0 = plat, 1 = seuil
+          px[pIdx] = Math.round(29 + t * (103 - 29));
+          px[pIdx + 1] = Math.round(78 + t * (232 - 78));
+          px[pIdx + 2] = Math.round(216 + t * (249 - 216));
+          px[pIdx + 3] = Math.round(220 - t * 80);
         }
 
         this.ctxCuvettes.putImageData(imgData, 0, 0);
@@ -5053,8 +5053,8 @@
             }
           }
 
-          // 1. Remplissage des dépressions & Raster des cuvettes (Priority-Flood)
-          const { diff, maxDepth, countDepressions, sumDepth } = this.computeDepressionFill(elev, W, H);
+          // 1. Détection des dépressions par pente & Raster des zones plates
+          const { diff, maxDepth, countDepressions, sumDepth } = this.computeSlopeDepressions(elev, W, H, dxMetric, dyMetric);
           const cuvettesDataUrl = this.renderCuvettesCanvas(diff, W, H);
 
           const cuvettesSrc = this.map.getSource("hydro-cuvettes-source");
@@ -5065,7 +5065,7 @@
             });
           }
 
-          // 2. Direction D8 et gradients
+          // 2. Direction D8 et gradients (sur MNE lissé pour un écoulement cohérent)
           const d8dx = [1, 1, 0, -1, -1, -1, 0, 1];
           const d8dy = [0, 1, 1, 1, 0, -1, -1, -1];
           const d8dist = [
@@ -5080,6 +5080,9 @@
           ];
           const d8Angle = [90, 135, 180, 225, 270, 315, 0, 45];
 
+          const flowSigma = 3;
+          const elevSmooth = this.gaussianBlur(elev, W, H, flowSigma);
+
           const flowTarget = new Int32Array(W * H).fill(-1);
           const flowAngle = new Float32Array(W * H).fill(0);
           const flowSlope = new Float32Array(W * H).fill(0);
@@ -5087,7 +5090,7 @@
           for (let y = 1; y < H - 1; y++) {
             for (let x = 1; x < W - 1; x++) {
               const idx = y * W + x;
-              const z = elev[idx];
+              const z = elevSmooth[idx];
               if (!Number.isFinite(z) || z <= -1000 || z >= 9000) continue;
 
               let maxDropSlope = 0;
@@ -5098,7 +5101,7 @@
                 const nx = x + d8dx[d];
                 const ny = y + d8dy[d];
                 const nidx = ny * W + nx;
-                const nz = elev[nidx];
+                const nz = elevSmooth[nidx];
                 if (!Number.isFinite(nz) || nz <= -1000 || nz >= 9000) continue;
 
                 const drop = (z - nz) / d8dist[d];
@@ -5109,7 +5112,7 @@
                 }
               }
 
-              if (bestTarget !== -1 && maxDropSlope >= 0.008) {
+              if (bestTarget !== -1 && maxDropSlope >= 0.001) {
                 flowTarget[idx] = bestTarget;
                 flowAngle[idx] = bestAngle;
                 flowSlope[idx] = maxDropSlope;
@@ -5120,11 +5123,11 @@
           // Flow accumulation (D8) pour identifier les thalwegs
           const cells = [];
           for (let i = 0; i < W * H; i++) {
-            if (Number.isFinite(elev[i]) && elev[i] > -1000 && elev[i] < 9000) {
+            if (Number.isFinite(elevSmooth[i]) && elevSmooth[i] > -1000 && elevSmooth[i] < 9000) {
               cells.push(i);
             }
           }
-          cells.sort((a, b) => elev[b] - elev[a]);
+          cells.sort((a, b) => elevSmooth[b] - elevSmooth[a]);
 
           const accumulation = new Int32Array(W * H).fill(1);
           for (const c of cells) {
@@ -5134,14 +5137,14 @@
             }
           }
 
-          // 3. Flèches de direction d'écoulement (espacées pour une lecture épurée : step = 8)
+          // 3. Flèches de direction d'écoulement (espacées pour une lecture épurée : step = 5)
           const arrowFeatures = [];
-          const step = 8;
+          const step = 5;
 
           for (let y = 2; y < H - 2; y += step) {
             for (let x = 2; x < W - 2; x += step) {
               const idx = y * W + x;
-              if (flowTarget[idx] === -1 || flowSlope[idx] < 0.008) continue;
+              if (flowTarget[idx] === -1 || flowSlope[idx] < 0.001) continue;
 
               const slopePct = Math.round(flowSlope[idx] * 1000) / 10;
 
@@ -5203,7 +5206,7 @@
           const cuvetteAreaM2 = Math.round(countDepressions * cellAreaMetric);
 
           if (this.statusBadgeEl) {
-            const cuvText = cuvetteAreaM2 > 0 ? `${cuvetteAreaM2.toLocaleString('fr-CA')} m² cuvettes` : `aucune stagnation`;
+            const cuvText = cuvetteAreaM2 > 0 ? `${cuvetteAreaM2.toLocaleString('fr-CA')} m² zones plates` : `aucune zone plate`;
             this.statusBadgeEl.textContent = `${arrowFeatures.length} flèches • ${cuvText}`;
             this.statusBadgeEl.className = "contour-status-badge active";
           }
@@ -8882,12 +8885,72 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         });
       });
     }
+
+    // PWA Install Prompt
+    let deferredInstallPrompt = null;
+    const pwaBar = document.getElementById("pwa-install-bar");
+    const pwaText = document.getElementById("pwa-install-text");
+    const pwaBtn = document.getElementById("pwa-install-btn");
+    const pwaDismiss = document.getElementById("pwa-install-dismiss");
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+
+    function showPwaBar(text, btnLabel) {
+      if (!pwaBar) return;
+      if (pwaText) pwaText.textContent = text;
+      if (pwaBtn && btnLabel) pwaBtn.textContent = btnLabel;
+      pwaBar.classList.add("visible");
+    }
+    function hidePwaBar() {
+      if (pwaBar) pwaBar.classList.remove("visible");
+    }
+
+    if (!isStandalone) {
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        showPwaBar("Installer Plan de Ferme sur votre appareil", "Installer");
+      });
+
+      window.addEventListener("appinstalled", () => {
+        deferredInstallPrompt = null;
+        hidePwaBar();
+      });
+
+      if (pwaBtn) {
+        pwaBtn.addEventListener("click", async () => {
+          hidePwaBar();
+          if (deferredInstallPrompt) {
+            deferredInstallPrompt.prompt();
+            try { await deferredInstallPrompt.userChoice; } catch (e) {}
+            deferredInstallPrompt = null;
+          }
+        });
+      }
+
+      if (pwaDismiss) {
+        pwaDismiss.addEventListener("click", hidePwaBar);
+      }
+
+      if (isIOS) {
+        setTimeout(() => {
+          showPwaBar("Ajoutez Plan de Ferme à l'écran d'accueil : bouton Partager puis « Sur l'écran d'accueil ».", "OK");
+        }, 3000);
+      }
+    }
   </script>
 
   <!-- Floating Toast Notification -->
   <div id="share-toast" class="share-toast" role="alert" aria-live="polite">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
     <span>Lien de la vue copié dans le presse-papier !</span>
+  </div>
+
+  <!-- PWA Install Prompt -->
+  <div id="pwa-install-bar" class="pwa-install-bar" role="dialog" aria-label="Installer l'application">
+    <div id="pwa-install-text" class="pwa-install-text">Installer Plan de Ferme sur votre appareil</div>
+    <button id="pwa-install-btn" class="pwa-install-btn" type="button">Installer</button>
+    <button id="pwa-install-dismiss" class="pwa-install-dismiss" type="button" aria-label="Fermer">&times;</button>
   </div>
 
   <!-- Site Footer -->
