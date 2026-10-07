@@ -1,0 +1,20 @@
+# Large GIS and data files
+*.pmtiles
+*.gpkg
+*.tif
+*.tiff
+*.zip
+*.tar.gz
+
+# Python
+__pycache__/
+*.py[cod]
+.env
+venv/
+.venv/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
