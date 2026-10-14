@@ -11876,9 +11876,11 @@ class ContourManager {
     __publicField(this, "statusListener", null);
     __publicField(this, "onMoveEnd", () => {
       var _a;
-      console.info("[geolibre-contour] moveend", { zoom: (_a = this.map) == null ? void 0 : _a.getZoom() });
       if (this.moveTimer) clearTimeout(this.moveTimer);
       this.moveTimer = null;
+      if (this.map && this.map.getLayer(MINOR_LAYER_ID) && this.map.getLayoutProperty(MINOR_LAYER_ID, "visibility") === "none") {
+        return;
+      }
       void this.generateForView().catch((error) => {
         this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`, "error");
         console.error("[geolibre-contour] moveend generation failed", error);
@@ -11886,10 +11888,12 @@ class ContourManager {
     });
     __publicField(this, "onMove", () => {
       var _a;
-      console.info("[geolibre-contour] move", { zoom: (_a = this.map) == null ? void 0 : _a.getZoom() });
       if (this.moveTimer) clearTimeout(this.moveTimer);
       this.moveTimer = setTimeout(() => {
         this.moveTimer = null;
+        if (this.map && this.map.getLayer(MINOR_LAYER_ID) && this.map.getLayoutProperty(MINOR_LAYER_ID, "visibility") === "none") {
+          return;
+        }
         void this.generateForView().catch((error) => {
           this.setStatus(`Error: ${error instanceof Error ? error.message : String(error)}`, "error");
           console.error("[geolibre-contour] move generation failed", error);
@@ -11925,7 +11929,7 @@ class ContourManager {
       zoom: map.getZoom()
     });
     this.teardown();
-    if (!this.config.cogUrl) return;
+    if (!this.config.cogUrl && !this.config.regionProvider) return;
     this.map = map;
     this.addMapLayers();
     this.map.on("moveend", this.onMoveEnd);
@@ -12033,7 +12037,7 @@ class ContourManager {
     });
   }
   async generateForView() {
-    if (!this.map || !this.config.cogUrl) return;
+    if (!this.map || (!this.config.cogUrl && !this.config.regionProvider)) return;
     const started = performance.now();
     const requestId = ++this.requestId;
     const zoom = this.map.getZoom();
@@ -12056,17 +12060,22 @@ class ContourManager {
       bounds.getNorth()
     ];
     const bbox = expandBbox(viewBbox, Math.max(0.015, 2 / this.config.gridSize));
-    this.setStatus(`Reading COG at zoom ${zoom.toFixed(1)}...`, "loading");
-    const cog = await this.getCogFile();
-    const region = await readCogRegion(
-      cog,
-      bbox,
-      this.config.gridSize,
-      this.config.nodata,
-      false,
-      AbortSignal.timeout(3e4),
-      this.config.resampling
-    );
+    this.setStatus(`Lecture du MNE...`, "loading");
+    let region = null;
+    if (typeof this.config.regionProvider === "function") {
+      region = await this.config.regionProvider(bbox, this.config.gridSize, AbortSignal.timeout(3e4));
+    } else {
+      const cog = await this.getCogFile();
+      region = await readCogRegion(
+        cog,
+        bbox,
+        this.config.gridSize,
+        this.config.nodata,
+        false,
+        AbortSignal.timeout(3e4),
+        this.config.resampling
+      );
+    }
     console.info("[geolibre-contour] COG region read", {
       requestId,
       zoom,
@@ -18011,7 +18020,9 @@ const GeoLibreContour = {
   ContourManager,
   readCogRegion,
   fromUrl,
-  proj4
+  proj4,
+  calculateContours,
+  WorkerWrapper
 };
 if (typeof window !== "undefined") {
   window.GeoLibreContour = GeoLibreContour;

@@ -1,13 +1,65 @@
+<!--
+  Plan de Ferme — Données géospatiales en agriculture.
+  Copyright (C) 2026 Cédric Bouffard
+
+  Ce programme est un logiciel libre : vous pouvez le redistribuer et/ou
+  le modifier selon les termes de la licence GNU General Public License
+  telle que publiée par la Free Software Foundation, version 3 ou (à votre
+  gré) toute version ultérieure.
+
+  Ce programme est distribué dans l'espoir qu'il sera utile, mais SANS
+  AUCUNE GARANTIE, sans même la garantie implicite de QUALITÉ MARCHANDE ou
+  d'ADÉQUATION À UN USAGE PARTICULIER. Voir la licence GNU General Public
+  License pour plus de détails.
+
+  Vous devriez avoir reçu une copie de la licence GNU General Public License
+  avec ce programme (fichier LICENSE). Sinon, voir :
+  <https://www.gnu.org/licenses/>.
+-->
 <!DOCTYPE html>
 <html lang="fr" class="portal-html">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Carte Pédologique &amp; Topographique — Inventaire Pédologique du Québec</title>
-  <meta name="description" content="Carte interactive vectorielle de la couverture pédologique officielle du Québec avec relief topographique MNE HRDEM (1m) et courbes de niveau dynamiques."/>
+  <title>Plan de Ferme — Données géospatiales en agriculture</title>
+  <meta name="description" content="Plan de Ferme : carte interactive de données géospatiales en agriculture au Québec. Sols, parcelles agricoles, relief topographique MNE 1m, courbes de niveau, NDVI Sentinel-2 et coupes altimétriques."/>
+  <meta name="keywords" content="plan de ferme, données géospatiales, agriculture, Québec, carte des sols, parcelles agricoles, NDVI, topographie, MNE, courbes de niveau, géomatique agricole"/>
+  <meta name="author" content="Plan de Ferme"/>
+  <meta name="robots" content="index, follow"/>
+  <meta name="theme-color" content="#1e4535"/>
+  <link rel="canonical" href="https://plandeferme.ca/"/>
+
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="Plan de Ferme"/>
+  <meta property="og:title" content="Plan de Ferme — Données géospatiales en agriculture"/>
+  <meta property="og:description" content="Carte interactive de données géospatiales en agriculture au Québec : sols, parcelles, relief, NDVI et coupes altimétriques."/>
+  <meta property="og:url" content="https://plandeferme.ca/"/>
+  <meta property="og:image" content="https://plandeferme.ca/logos/logo_plandeferme_v3_joyeux.png"/>
+  <meta property="og:locale" content="fr_CA"/>
+
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="Plan de Ferme — Données géospatiales en agriculture"/>
+  <meta name="twitter:description" content="Carte interactive de données géospatiales en agriculture au Québec."/>
+  <meta name="twitter:image" content="https://plandeferme.ca/logos/logo_plandeferme_v3_joyeux.png"/>
+
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
+
+  <link rel="icon" href="favicon/favicon.ico" sizes="any"/>
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16.png"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon/favicon-32.png"/>
+  <link rel="icon" type="image/png" sizes="48x48" href="favicon/favicon-48.png"/>
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon/favicon-64.png"/>
+  <link rel="icon" type="image/png" sizes="192x192" href="favicon/favicon-192.png"/>
+  <link rel="icon" type="image/png" sizes="512x512" href="favicon/favicon-512.png"/>
+  <link rel="apple-touch-icon" sizes="180x180" href="favicon/favicon-180.png"/>
+
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Plan de Ferme"/>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -64,6 +116,12 @@
       gap: 10px;
       text-decoration: none;
       color: var(--ink, #1f1d1a);
+    }
+    .nav-brand-logo {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+      flex-shrink: 0;
     }
     .nav-titles {
       display: flex;
@@ -127,21 +185,21 @@
     /* Map container */
     #map {
       width: 100%;
-      height: calc(100% - 54px);
+      height: 100%;
       position: absolute;
-      top: 54px;
+      top: 0;
       left: 0;
     }
 
     /* Floating control panel (desktop) */
     .map-controls-panel {
       position: absolute;
-      top: 68px;
+      top: 14px;
       left: 14px;
       z-index: 100;
       width: 350px;
       max-width: calc(100vw - 28px);
-      max-height: calc(100vh - 84px);
+      max-height: calc(100vh - 28px);
       background: rgba(255, 255, 255, 0.97);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
@@ -191,7 +249,7 @@
     /* Floating Profile Toolbar on Map */
     .map-profile-toolbar {
       position: absolute;
-      top: 66px;
+      top: 14px;
       right: 58px;
       z-index: 100;
       display: inline-flex;
@@ -248,6 +306,43 @@
     }
     .floating-profile-btn svg {
       flex-shrink: 0;
+    }
+
+    /* Floating Search Panel on Map */
+    .map-search-panel {
+      position: absolute;
+      top: 60px;
+      right: 14px;
+      z-index: 110;
+      width: 320px;
+      max-width: calc(100vw - 28px);
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.18), 0 4px 10px -2px rgba(0, 0, 0, 0.08);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      padding: 8px;
+    }
+    .map-search-panel .search-input {
+      width: 100%;
+      padding: 9px 30px 9px 32px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #1e293b;
+      background: #f8fafc;
+      outline: none;
+    }
+    .map-search-panel .search-input:focus {
+      background: #ffffff;
+      border-color: #204838;
+      box-shadow: 0 0 0 2px rgba(32, 72, 56, 0.15);
+    }
+    .map-search-panel .search-suggestions {
+      position: static;
+      margin-top: 6px;
+      max-height: 260px;
     }
 
     .profile-dock-header-right {
@@ -452,6 +547,94 @@
     }
     .tool-card-title svg {
       color: #1e4535;
+    }
+
+    /* Couches grisées / hors du niveau de zoom actuel */
+    .tool-card.layer-out-of-zoom {
+      opacity: 0.50;
+      background: #f1f5f9 !important;
+      border-color: #cbd5e1 !important;
+      filter: grayscale(0.85);
+      transition: opacity 0.22s ease, filter 0.22s ease, background 0.22s ease, border-color 0.22s ease;
+    }
+    .tool-card.layer-out-of-zoom .tool-card-title {
+      color: #94a3b8 !important;
+    }
+    .tool-card.layer-out-of-zoom svg {
+      color: #94a3b8 !important;
+      stroke: #94a3b8 !important;
+    }
+    .tool-card.layer-out-of-zoom .slider {
+      opacity: 0.40;
+      pointer-events: none;
+    }
+    .tool-card.layer-out-of-zoom .pills-group {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .tool-card.layer-out-of-zoom .segmented-control {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .tool-card.layer-out-of-zoom .topo-gradient-bar,
+    .tool-card.layer-out-of-zoom .topo-gradient-labels {
+      opacity: 0.35;
+    }
+
+    .wms-layer-item.layer-out-of-zoom {
+      opacity: 0.50;
+      background: #f1f5f9 !important;
+      border-color: #e2e8f0 !important;
+      filter: grayscale(0.85);
+      transition: opacity 0.22s ease, filter 0.22s ease, background 0.22s ease;
+    }
+    .wms-layer-item.layer-out-of-zoom .wms-item-title span,
+    .wms-layer-item.layer-out-of-zoom .wms-item-subtitle {
+      color: #94a3b8 !important;
+    }
+    .wms-layer-item.layer-out-of-zoom .wms-item-icon {
+      background: #e2e8f0 !important;
+      color: #94a3b8 !important;
+    }
+    .wms-layer-item.layer-out-of-zoom .wms-item-icon svg {
+      stroke: #94a3b8 !important;
+    }
+
+    /* Badge indicatif discret de zoom requis */
+    .layer-zoom-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1.5px 6px;
+      border-radius: 4px;
+      background: #e2e8f0;
+      color: #64748b;
+      margin-left: 6px;
+      letter-spacing: 0.02em;
+      vertical-align: middle;
+      line-height: 1.25;
+      text-transform: none;
+      flex-shrink: 0;
+    }
+    .layer-zoom-badge::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+    .layer-zoom-badge.visible-now {
+      display: none !important;
+    }
+
+    .floating-profile-btn.btn-out-of-zoom {
+      opacity: 0.50;
+      color: #94a3b8;
+      background: #f8fafc;
+      border-color: #e2e8f0;
     }
 
     /* Modern Switch Toggle */
@@ -990,7 +1173,7 @@
     }
     .ndvi-dock {
       max-height: 540px;
-      border-top: 3.5px solid #16a34a;
+      border-top: 2.5px solid #16a34a;
       transition: max-height 0.25s ease, padding 0.2s ease;
       overflow: hidden;
     }
@@ -1112,31 +1295,40 @@
     .raster-profile-grid { stroke: #e2e8f0; stroke-width: 0.8; stroke-dasharray: 2 3; }
     .ndvi-active-controls {
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 6px 12px;
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
       border-radius: 8px;
       margin-top: 2px;
     }
+    .ndvi-controls-main-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
     .ndvi-date-badge {
-      font-size: 11.5px;
-      font-weight: 700;
-      color: #14532d;
+      font-size: 11px;
+      font-weight: 600;
+      color: #0f172a;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
     .ndvi-controls-row {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
     }
     .ndvi-stretch-group {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 5px;
       flex-wrap: wrap;
     }
     .ndvi-sliders-inline {
@@ -1146,24 +1338,24 @@
       font-size: 10.5px;
       color: #334155;
     }
-    @media (max-width: 900px) {
-      .ndvi-controls-row {
-        flex-direction: column;
-        align-items: stretch !important;
-      }
-      .ndvi-controls-row > div:last-child {
-        margin-left: 0 !important;
-        justify-content: space-between;
-      }
+    .ndvi-custom-sliders-box {
+      display: none;
+      width: 100%;
+      padding-top: 4px;
+      margin-top: 3px;
+      border-top: 1px dashed #cbd5e1;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
     }
     .ndvi-nav-buttons {
       display: flex;
-      gap: 4px;
+      gap: 3px;
     }
     .ndvi-nav-btn {
       background: #ffffff;
       border: 1px solid #cbd5e1;
-      padding: 3px 9px;
+      padding: 2px 7px;
       border-radius: 5px;
       font-size: 11px;
       font-weight: 600;
@@ -1177,28 +1369,28 @@
       border-color: #16a34a;
     }
     .ndvi-nav-btn:disabled {
-      opacity: 0.4;
+      opacity: 0.35;
       cursor: not-allowed;
     }
     .ndvi-opacity-wrap {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       font-size: 11px;
-      color: #334155;
+      color: #475569;
     }
     .ndvi-legend-mini {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 10.5px;
+      gap: 5px;
+      font-size: 10px;
       color: #475569;
     }
     .ndvi-grad-sample {
       display: inline-block;
-      width: 48px;
-      height: 8px;
-      border-radius: 3px;
+      width: 38px;
+      height: 7px;
+      border-radius: 2px;
       background: linear-gradient(90deg, #d73027 0%, #ffffbf 50%, #1a9850 100%);
       border: 1px solid rgba(0,0,0,0.15);
     }
@@ -1209,6 +1401,185 @@
     }
     .floating-profile-btn.btn-ndvi-mode.active svg {
       stroke: #ffffff;
+    }
+    .floating-profile-btn.btn-rag-mode.active {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #1d4ed8;
+    }
+    .floating-profile-btn.btn-rag-mode.active svg {
+      stroke: #ffffff;
+    }
+
+    /* Agri-Réseau Slide-Over Drawer */
+    .rag-dock {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      bottom: 14px;
+      width: 500px;
+      max-width: calc(100vw - 28px);
+      background: #ffffff;
+      border: 1px solid rgba(226, 232, 240, 0.95);
+      border-radius: 14px;
+      box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.22), 0 4px 15px rgba(0, 0, 0, 0.08);
+      z-index: 2100;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateX(calc(100% + 24px));
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), width 0.22s ease;
+      pointer-events: auto;
+    }
+    .rag-dock.open {
+      display: flex;
+      transform: translateX(0);
+    }
+    .rag-dock.expanded {
+      width: 780px;
+    }
+    .rag-dock-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #0f172a;
+      color: #ffffff;
+      border-bottom: 1px solid #1e293b;
+      flex-shrink: 0;
+    }
+    .rag-dock-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .rag-dock-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: rgba(37, 99, 235, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #60a5fa;
+      flex-shrink: 0;
+    }
+    .rag-dock-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #f8fafc;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+    .rag-dock-subtitle {
+      font-size: 10px;
+      color: #94a3b8;
+      font-weight: 400;
+      line-height: 1.2;
+    }
+    .rag-dock-actions {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+    .rag-icon-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .rag-icon-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.12);
+    }
+    .rag-dock-body {
+      flex: 1;
+      position: relative;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+    .rag-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+    .rag-loading {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(4px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 500;
+      z-index: 2;
+      transition: opacity 0.2s ease;
+    }
+    .rag-loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .rag-spinner {
+      width: 26px;
+      height: 26px;
+      border: 2.5px solid #e2e8f0;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .btn-popup-rag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      margin-top: 8px;
+      padding: 6px 12px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      box-sizing: border-box;
+    }
+    .btn-popup-rag:hover {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #1d4ed8;
+    }
+    @media (max-width: 768px) {
+      .rag-dock {
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100% !important;
+        max-width: 100vw;
+        border-radius: 0;
+        border: none;
+        z-index: 3500;
+      }
     }
     .ndvi-chart-point {
       cursor: pointer;
@@ -1491,7 +1862,7 @@
     /* Share Toast Notification */
     .share-toast {
       position: fixed;
-      top: 66px;
+      top: 14px;
       left: 50%;
       transform: translateX(-50%) translateY(-20px);
       background: #0f172a;
@@ -2008,38 +2379,19 @@
 
     /* Mobile Responsive Rules */
     @media (max-width: 768px) {
-      .nav-brand-sub { display: none; }
-      .nav-btn span { font-size: 0.76rem; }
-      .nav-btn { padding: 5px 8px; }
-
       .map-controls-panel {
         display: contents;
       }
-      .panel-header {
-        display: none;
+
+      .map-profile-toolbar {
+        display: none !important;
       }
 
-      .search-and-toggle-row {
-        position: fixed;
-        top: 62px;
+      .map-search-panel {
+        top: 10px;
         left: 10px;
         right: 10px;
         width: auto;
-        z-index: 1000;
-        pointer-events: auto;
-      }
-      .search-input {
-        background: rgba(255, 255, 255, 0.98);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-        padding: 10px 30px 10px 34px;
-        font-size: 13px;
-        border: 1px solid rgba(203, 213, 225, 0.8);
-      }
-      .mobile-tools-toggle {
-        display: none !important;
-      }
-      .map-profile-toolbar {
-        display: none !important;
       }
 
       .mobile-bottom-bar {
@@ -2229,75 +2581,85 @@
         border-radius: 16px !important;
       }
     }
+
+    /* Site Footer */
+    .site-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 30px;
+      z-index: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-top: 1px solid var(--border, #e2e8f0);
+      font-size: 0.72rem;
+      color: #64748b;
+    }
+    .site-footer a {
+      color: #1e4535;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .site-footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* PWA Install Prompt */
+    .pwa-install-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 4000;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: #0f172a;
+      color: #ffffff;
+      box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.35);
+      font-size: 13px;
+      font-weight: 500;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+    .pwa-install-bar.visible { display: flex; }
+    .pwa-install-text { flex: 1; line-height: 1.35; }
+    .pwa-install-btn {
+      flex-shrink: 0;
+      background: #16a34a;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .pwa-install-btn:hover { background: #15803d; }
+    .pwa-install-dismiss {
+      flex-shrink: 0;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    .pwa-install-dismiss:hover { color: #ffffff; }
   </style>
 </head>
 <body>
 
-  <!-- Navigation principale du portail -->
-  <nav class="portal-navbar" aria-label="Navigation principale">
-    <div class="navbar-content">
-      <a href="index.html" class="nav-brand">
-        <div class="nav-titles">
-          <span class="nav-brand-title">Inventaire Pédologique du Québec</span>
-          <span class="nav-brand-sub">Archives agronomiques &amp; cartographiques • 1936–2017</span>
-        </div>
-      </a>
-      <div class="nav-actions">
-        <a href="index.html" class="nav-btn" title="Accueil du portail">
-          <span>Accueil</span>
-        </a>
-        <a href="carte.html" class="nav-btn active" title="Carte interactive des sols du Québec">
-          <span>Carte</span>
-        </a>
-        <a href="etudes.html" class="nav-btn" title="Consulter les 79 mémoires d'inventaire pédologique régionaux">
-          <span>Études</span>
-        </a>
-        <a href="series/index.html" class="nav-btn" title="Consulter le répertoire des séries de sols du Québec">
-          <span>Séries de Sols</span>
-        </a>
-        <a href="glossaire.html" class="nav-btn" title="Consulter le glossaire pédologique officiel">
-          <span>Glossaire</span>
-        </a>
-        <button id="btn-share-view" class="nav-btn nav-btn-share" type="button" title="Partager cette vue (copie le lien avec l'emplacement et les couches)">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-          <span>Partager</span>
-        </button>
-      </div>
-    </div>
-  </nav>
-
   <!-- Floating Control Panel -->
   <div class="map-controls-panel">
-    <div class="panel-header">
-      <div class="panel-title">Couverture Pédologique &amp; Topographie</div>
-      <div class="panel-subtitle">Sols du Québec, relief MNE 1m &amp; courbes de niveau</div>
-    </div>
-
-    <!-- Search Box and Mobile Toggle -->
-    <div class="search-and-toggle-row">
-      <div class="search-box">
-        <div class="search-input-wrapper">
-          <svg class="search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input type="text" id="address-input" class="search-input" placeholder="Rechercher une adresse, ville..." autocomplete="off" />
-          <button id="clear-search" class="clear-btn" style="display:none;" title="Effacer">&times;</button>
-        </div>
-        <div id="search-suggestions" class="search-suggestions" style="display:none;"></div>
-      </div>
-
-      <!-- Mobile Toggle Button -->
-      <button id="btn-toggle-tools" class="mobile-tools-toggle" type="button" aria-label="Couches et relief" title="Contrôles des couches">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-          <polyline points="2 17 12 22 22 17"></polyline>
-          <polyline points="2 12 12 17 22 12"></polyline>
-        </svg>
-        <span class="mobile-toggle-label">Couches</span>
-      </button>
-    </div>
-
     <!-- Tools Panel / Drawer -->
     <div class="panel-tools" id="panel-tools">
       <div class="tools-drawer-header">
@@ -2318,13 +2680,13 @@
       </div>
 
       <!-- 2. Carte pédologique -->
-      <div class="tool-card">
+      <div class="tool-card" id="card-pedo">
         <div class="tool-card-header">
           <div class="tool-card-title">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-            <span>Carte pédologique</span>
+            <span>Carte des sols</span>
           </div>
-          <label class="switch-label" title="Afficher/Masquer la carte pédologique">
+          <label class="switch-label" title="Afficher/Masquer la carte des sols">
             <input type="checkbox" id="toggle-pedo" />
             <span class="switch-slider"></span>
           </label>
@@ -2337,7 +2699,7 @@
       </div>
 
       <!-- 2b. Parcelles agricoles BDPPAD -->
-      <div class="tool-card">
+      <div class="tool-card" id="card-parcelles">
         <div class="tool-card-header">
           <div class="tool-card-title">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line></svg>
@@ -2360,7 +2722,7 @@
       </div>
 
       <!-- 2c. Écoulement & Dépressions (au-dessus des courbes de niveau) -->
-      <div class="tool-card">
+      <div class="tool-card" id="card-hydro-parcelle">
         <div class="tool-card-header">
           <div class="tool-card-title">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
@@ -2373,7 +2735,7 @@
         </div>
 
         <div style="font-size: 10.5px; color: #64748b; line-height: 1.35; margin-bottom: 7px;">
-          Flèches selon la pente et raster des dépressions (remplissage MNE 1m) calculés à la volée.
+          Flèches selon la pente et raster des zones plates (pente &lt; 0.1%) calculés à la volée.
         </div>
 
         <!-- Légende des flèches par pente -->
@@ -2387,13 +2749,11 @@
           </div>
         </div>
 
-        <!-- Légende des dépressions par profondeur -->
+        <!-- Légende des dépressions par pente -->
         <div style="margin-bottom: 7px;">
-          <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 3px;">Dépressions / cuvettes :</div>
+          <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 3px;">Dépressions / zones plates :</div>
           <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: #64748b; background: #f8fafc; padding: 4px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(103,232,249,0.75);"></span> 8–18 cm</span>
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(2,132,199,0.85);"></span> 18–35 cm</span>
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(29,78,216,0.92);"></span> &gt; 35 cm</span>
+            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(2,132,199,0.85);"></span> Pente &lt; 0.1%</span>
           </div>
         </div>
 
@@ -2403,7 +2763,7 @@
       </div>
 
       <!-- 3. Courbes de niveau dynamiques (au-dessus de la topographie) -->
-      <div class="tool-card">
+      <div class="tool-card" id="card-contours">
         <div class="tool-card-header">
           <div class="tool-card-title">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12c3-4 6-4 9 0s6 4 9 0"></path><path d="M3 6c3-4 6-4 9 0s6 4 9 0"></path><path d="M3 18c3-4 6-4 9 0s6 4 9 0"></path></svg>
@@ -2431,7 +2791,7 @@
       </div>
 
       <!-- 4. Topographie MNE (HRDEM 1m) -->
-      <div class="tool-card">
+      <div class="tool-card" id="card-topo">
         <div class="tool-card-header">
           <div class="tool-card-title">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
@@ -2519,6 +2879,20 @@
         </div>
       </div>
 
+      <!-- 6. Documentation Agri-Réseau (RAG) -->
+      <div class="tool-card">
+        <div class="tool-card-header">
+          <div class="tool-card-title">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            <span>Documentation Agri-Réseau</span>
+          </div>
+          <button id="btn-panel-open-rag" class="profile-dock-btn" type="button" style="padding: 2px 8px; font-size: 11px; font-weight: 600; color: #1e4535; background: #f0fdf4; border-color: #86efac;" title="Consulter la base documentaire">Ouvrir</button>
+        </div>
+        <div class="tool-sublabel" style="line-height: 1.4;">
+          Synthèses agronomiques et recherche documentaire (IRDA, MAPAQ, CRAAQ) via l'assistant RAG.
+        </div>
+      </div>
+
       <!-- Bouton Partager la vue -->
       <div style="padding-top: 2px;">
         <button id="btn-panel-share" type="button" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 12px; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: #166534; cursor: pointer; transition: all 0.15s ease;">
@@ -2564,30 +2938,30 @@
     <div id="profile-chart-container" class="profile-chart-container" data-raster-profile-chart></div>
   </div>
 
-  <!-- Floating NDVI Sentinel-2 Bottom Dock -->
+  <!-- Floating NDVI Sentinel-2 Bottom Dock (Épuré) -->
   <div id="ndvi-dock" class="elevation-profile-dock ndvi-dock">
     <div class="profile-dock-header">
       <div class="profile-dock-title" id="ndvi-dock-title-wrap" title="Cliquer pour réduire ou agrandir">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>
-        <span id="ndvi-dock-title">Série NDVI — Sentinel-2 L2A (Saison de croissance)</span>
-        <span id="ndvi-collapsed-summary" class="stat-chip" style="display:none; margin-left: 8px; font-weight:600; color:#14532d; background:#dcfce7; border-color:#86efac;"></span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>
+        <span id="ndvi-dock-title">NDVI Sentinel-2</span>
+        <span id="ndvi-collapsed-summary" class="stat-chip" style="display:none; margin-left: 6px; font-weight:600; color:#14532d; background:#dcfce7; border-color:#86efac;"></span>
       </div>
       <div class="profile-dock-header-right">
-        <label class="profile-precision-label" title="Année de la saison de croissance au Québec (mars à décembre)">
-          <span>Année :</span>
-          <select id="ndvi-year-select" class="tool-select">
-            <option value="2026" selected>2026</option>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-            <option value="2023">2023</option>
-            <option value="2022">2022</option>
-            <option value="2021">2021</option>
-            <option value="2020">2020</option>
-            <option value="2019">2019</option>
-            <option value="2018">2018</option>
-          </select>
-        </label>
-        <button id="btn-dock-clear-ndvi" class="profile-dock-btn" type="button" title="Masquer la tuile satellite sur la carte">Masquer tuile</button>
+        <select id="ndvi-year-select" class="tool-select" title="Année de la saison de croissance au Québec" style="font-size: 11px; padding: 2px 6px;">
+          <option value="2026" selected>2026</option>
+          <option value="2025">2025</option>
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+          <option value="2022">2022</option>
+          <option value="2021">2021</option>
+          <option value="2020">2020</option>
+          <option value="2019">2019</option>
+          <option value="2018">2018</option>
+        </select>
+        <button id="btn-dock-clear-ndvi" class="profile-dock-btn" type="button" title="Masquer la couche satellite sur la carte" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+          <span>Masquer</span>
+        </button>
         <button id="btn-collapse-ndvi-dock" class="btn-dock-collapse" type="button" title="Réduire / Agrandir le panneau NDVI" aria-label="Réduire ou agrandir">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
@@ -2598,57 +2972,61 @@
     <div class="ndvi-dock-body" id="ndvi-dock-body">
       <div id="ndvi-stats-bar" class="profile-stats-bar"></div>
 
-      <div id="ndvi-hover-info" class="profile-hover-info">
-        Cliquez sur une date du graphique ci-dessous pour afficher la tuile satellite NDVI correspondante
+      <div id="ndvi-hover-info" class="profile-hover-info" style="font-size: 10.5px; color: #64748b; font-style: italic; min-height: 15px;">
+        Cliquez sur une date du graphique pour afficher la tuile satellite correspondante
       </div>
 
       <!-- Active date banner & layer controls -->
       <div id="ndvi-active-controls" class="ndvi-active-controls" style="display: none;">
-        <div class="ndvi-header-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 8px;">
-          <div class="ndvi-date-badge" id="ndvi-selected-date-badge">Date sélectionnée : —</div>
-          <div class="ndvi-nav-buttons">
-            <button id="btn-ndvi-prev" class="ndvi-nav-btn" type="button" title="Acquisition précédente">&larr; Précédente</button>
-            <button id="btn-ndvi-next" class="ndvi-nav-btn" type="button" title="Acquisition suivante">Suivante &rarr;</button>
+        <div class="ndvi-controls-main-bar">
+          <!-- Left: Compact Date Navigation -->
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <button id="btn-ndvi-prev" class="ndvi-nav-btn" type="button" title="Date précédente" style="padding: 2px 6px;">&larr;</button>
+            <div class="ndvi-date-badge" id="ndvi-selected-date-badge">Date sélectionnée : —</div>
+            <button id="btn-ndvi-next" class="ndvi-nav-btn" type="button" title="Date suivante" style="padding: 2px 6px;">&rarr;</button>
+          </div>
+
+          <!-- Right: Sleek Opacity, Preset & Contrast Controls -->
+          <div style="display: flex; align-items: center; gap: 9px; margin-left: auto; flex-wrap: wrap;">
+            <div class="ndvi-opacity-wrap">
+              <span>Opacité :</span>
+              <input type="range" id="ndvi-tile-opacity" min="0" max="100" value="85" class="slider" style="width: 55px;" />
+              <span id="ndvi-opacity-val" class="val-badge">85%</span>
+            </div>
+
+            <div class="ndvi-stretch-group">
+              <span style="font-size: 11px; color: #475569;">Nuancier :</span>
+              <select id="ndvi-stretch-preset" class="tool-select" style="font-size: 11px; padding: 2px 5px;">
+                <option value="standard" selected>Standard</option>
+                <option value="contrast">Contraste élevé</option>
+                <option value="dense">Canopée dense</option>
+                <option value="emergence">Émergence / Sol</option>
+                <option value="auto">Auto centré</option>
+                <option value="custom">Manuel...</option>
+              </select>
+              <button id="btn-ndvi-auto-stretch" class="profile-dock-btn" type="button" title="Ajuster automatiquement les bornes pour révéler les variations intra-parcelle" style="padding: 2px 6px; color: #166534; font-weight: 600; background: #dcfce7; border-color: #86efac; cursor: pointer;">Auto</button>
+              <button id="btn-ndvi-toggle-custom" class="profile-dock-btn" type="button" title="Afficher les réglages manuels min/max" style="padding: 2px 6px; color: #475569;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+              </button>
+            </div>
+
+            <div class="ndvi-legend-mini">
+              <span class="ndvi-grad-sample"></span>
+              <span id="ndvi-legend-stretch-label" style="font-weight: 600; font-size: 10px;">-0.05 &rarr; 0.85</span>
+            </div>
           </div>
         </div>
 
-        <div class="ndvi-controls-row" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding-top: 5px; border-top: 1px dashed rgba(22, 163, 74, 0.25);">
-          <!-- Stretch Controls -->
-          <div class="ndvi-stretch-group" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span style="font-size: 11px; font-weight: 600; color: #166534;">Étirement couleurs (Stretch) :</span>
-            <select id="ndvi-stretch-preset" class="tool-select" style="font-size: 11px; padding: 2px 6px;">
-              <option value="standard" selected>Standard (-0.05 à 0.85)</option>
-              <option value="contrast">Fort contraste (0.25 à 0.85)</option>
-              <option value="dense">Canopée dense (0.50 à 0.90)</option>
-              <option value="emergence">Émergence / Sol (0.00 à 0.45)</option>
-              <option value="auto">Auto (centré parcelle)</option>
-              <option value="custom">Personnalisé</option>
-            </select>
+        <!-- Optional Collapsible Manual Sliders Box -->
+        <div id="ndvi-custom-sliders-box" class="ndvi-custom-sliders-box">
+          <div class="ndvi-sliders-inline">
+            <span>Min :</span>
+            <input type="range" id="ndvi-stretch-min" min="-20" max="70" step="5" value="-5" class="slider" style="width: 60px;" title="Borne minimale (rouge)" />
+            <span id="ndvi-stretch-min-val" class="val-badge">-0.05</span>
 
-            <div class="ndvi-sliders-inline" style="display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: #334155;">
-              <span>Min :</span>
-              <input type="range" id="ndvi-stretch-min" min="-20" max="70" step="5" value="-5" class="slider" style="width: 60px;" title="Borne minimale (rouge)" />
-              <span id="ndvi-stretch-min-val" class="val-badge">-0.05</span>
-
-              <span>Max :</span>
-              <input type="range" id="ndvi-stretch-max" min="20" max="100" step="5" value="85" class="slider" style="width: 60px;" title="Borne maximale (vert)" />
-              <span id="ndvi-stretch-max-val" class="val-badge">0.85</span>
-
-              <button id="btn-ndvi-auto-stretch" class="profile-dock-btn" type="button" title="Ajuster automatiquement les bornes pour révéler les variations intra-parcelle" style="padding: 2px 8px; color: #166534; font-weight: 700; background: #dcfce7; border-color: #86efac; cursor: pointer;">Auto</button>
-            </div>
-          </div>
-
-          <!-- Opacity & Legend -->
-          <div style="display: flex; align-items: center; gap: 12px; margin-left: auto;">
-            <div class="ndvi-opacity-wrap">
-              <span>Opacité :</span>
-              <input type="range" id="ndvi-tile-opacity" min="0" max="100" value="85" class="slider" style="width: 70px;" />
-              <span id="ndvi-opacity-val" class="val-badge">85%</span>
-            </div>
-            <div class="ndvi-legend-mini">
-              <span class="ndvi-grad-sample"></span>
-              <span id="ndvi-legend-stretch-label" style="font-weight: 600;">-0.05 &rarr; 0.85</span>
-            </div>
+            <span style="margin-left: 6px;">Max :</span>
+            <input type="range" id="ndvi-stretch-max" min="20" max="100" step="5" value="85" class="slider" style="width: 60px;" title="Borne maximale (vert)" />
+            <span id="ndvi-stretch-max-val" class="val-badge">0.85</span>
           </div>
         </div>
       </div>
@@ -2656,6 +3034,42 @@
       <div id="ndvi-chart-container" class="profile-chart-container" style="min-height: 195px; height: 195px;"></div>
     </div>
   </div>
+
+  <!-- Slide-Over Drawer for Agri-Réseau RAG -->
+  <aside id="rag-dock" class="rag-dock" aria-label="Base documentaire Agri-Réseau">
+    <div class="rag-dock-header">
+      <div class="rag-dock-title-wrap">
+        <div class="rag-dock-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            <path d="M9 9h6"></path>
+            <path d="M9 13h4"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="rag-dock-title">Revue Agri-Réseau</div>
+          <div class="rag-dock-subtitle">Base documentaire &amp; synthèse agronomique</div>
+        </div>
+      </div>
+      <div class="rag-dock-actions">
+        <a href="https://agrireseau-rag.vercel.app" target="_blank" rel="noopener noreferrer" class="rag-icon-btn" title="Ouvrir dans un nouvel onglet plein écran">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        </a>
+        <button id="btn-expand-rag" class="rag-icon-btn" type="button" title="Élargir / Réduire le panneau">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+        </button>
+        <button id="btn-close-rag" class="rag-icon-btn" type="button" aria-label="Fermer le panneau">&times;</button>
+      </div>
+    </div>
+    <div class="rag-dock-body">
+      <iframe id="rag-iframe" src="" title="Revue documentaire Agri-Réseau" class="rag-iframe"></iframe>
+      <div id="rag-loading" class="rag-loading">
+        <div class="rag-spinner"></div>
+        <span>Connexion à la base documentaire Agri-Réseau...</span>
+      </div>
+    </div>
+  </aside>
 
   <!-- Floating Conversational Soil Identification Dock -->
   <div id="soil-ai-dock" class="soil-ai-dock">
@@ -2665,7 +3079,7 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
         </div>
         <div>
-          <div class="soil-ai-title">Diagnostic pédologique</div>
+          <div class="soil-ai-title">Diagnostic des sols</div>
           <div class="soil-ai-subtitle">Clé d'identification de terrain</div>
         </div>
       </div>
@@ -2736,6 +3150,29 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>
       <span id="ndvi-btn-text">NDVI Sentinel-2</span>
     </button>
+    <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
+    <button id="btn-quick-rag" class="floating-profile-btn btn-rag-mode" type="button" title="Consulter la base documentaire Agri-Réseau (RAG agronomique)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><path d="M9 9h6"></path><path d="M9 13h4"></path></svg>
+      <span id="rag-btn-text">Agri-Réseau</span>
+    </button>
+    <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
+    <button id="btn-toggle-search" class="floating-profile-btn" type="button" title="Rechercher un lieu, une adresse ou une ville">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <span>Rechercher</span>
+    </button>
+  </div>
+
+  <!-- Floating Search Panel on Map -->
+  <div id="map-search-panel" class="map-search-panel" style="display: none;">
+    <div class="search-input-wrapper">
+      <svg class="search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="address-input" class="search-input" placeholder="Rechercher une adresse, ville..." autocomplete="off" />
+      <button id="clear-search" class="clear-btn" style="display:none;" title="Effacer">&times;</button>
+    </div>
+    <div id="search-suggestions" class="search-suggestions" style="display:none;"></div>
   </div>
 
   <!-- Mobile Profile Floating Action Pill -->
@@ -2770,6 +3207,13 @@
       </svg>
       <span>NDVI</span>
     </button>
+    <button id="mobile-btn-rag" class="mobile-nav-item" type="button">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      <span>Agri-Réseau</span>
+    </button>
     <button id="mobile-btn-profile" class="mobile-nav-item" type="button">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 20h9"></path>
@@ -2777,13 +3221,12 @@
       </svg>
       <span id="mobile-profile-label">Coupe MNT</span>
     </button>
-    <button id="mobile-btn-basemap" class="mobile-nav-item" type="button">
+    <button id="mobile-btn-search" class="mobile-nav-item" type="button">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="2" y1="12" x2="22" y2="12"></line>
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
       </svg>
-      <span id="mobile-basemap-label">Satellite</span>
+      <span>Recherche</span>
     </button>
     <button id="mobile-btn-locate" class="mobile-nav-item" type="button">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2982,6 +3425,225 @@
       return null;
     }
 
+    // Shared HRDEM COG header cache across managers
+    const HRDEM_COG_CACHE = new Map();
+    function getHrdemCog(url) {
+      if (!HRDEM_COG_CACHE.has(url)) {
+        HRDEM_COG_CACHE.set(url, fromUrl(url, {}, AbortSignal.timeout(30000)));
+      }
+      return HRDEM_COG_CACHE.get(url);
+    }
+
+    // Identify all HRDEM 500x500 km tiles intersecting a WGS84 bounding box
+    function findTilesForBbox(minLng, minLat, maxLng, maxLat) {
+      try {
+        const pts = [
+          proj4('EPSG:4326', EPSG_3979_DEF, [minLng, maxLat]),
+          proj4('EPSG:4326', EPSG_3979_DEF, [maxLng, maxLat]),
+          proj4('EPSG:4326', EPSG_3979_DEF, [maxLng, minLat]),
+          proj4('EPSG:4326', EPSG_3979_DEF, [minLng, minLat]),
+          proj4('EPSG:4326', EPSG_3979_DEF, [(minLng + maxLng) / 2, maxLat]),
+          proj4('EPSG:4326', EPSG_3979_DEF, [(minLng + maxLng) / 2, minLat]),
+          proj4('EPSG:4326', EPSG_3979_DEF, [minLng, (minLat + maxLat) / 2]),
+          proj4('EPSG:4326', EPSG_3979_DEF, [maxLng, (minLat + maxLat) / 2])
+        ];
+        const minX = Math.min(...pts.map(p => p[0]));
+        const maxX = Math.max(...pts.map(p => p[0]));
+        const minY = Math.min(...pts.map(p => p[1]));
+        const maxY = Math.max(...pts.map(p => p[1]));
+        const minCol = Math.floor(minX / 500000) + 6;
+        const maxCol = Math.floor(maxX / 500000) + 6;
+        const minRow = Math.floor(minY / 500000) + 3;
+        const maxRow = Math.floor(maxY / 500000) + 3;
+        const tiles = [];
+        for (let c = minCol; c <= maxCol; c++) {
+          for (let r = minRow; r <= maxRow; r++) {
+            const key = `${c}_${r}`;
+            if (VALID_HRDEM_TILES.has(key)) {
+              tiles.push({
+                key,
+                col: c,
+                row: r,
+                url: `https://canelevation-dem.s3.ca-central-1.amazonaws.com/hrdem-mosaic-1m/${key}-mosaic-1m-dtm.tif`,
+                tileX0: (c - 6) * 500000,
+                tileX1: (c - 5) * 500000,
+                tileY0: (r - 3) * 500000,
+                tileY1: (r - 2) * 500000
+              });
+            }
+          }
+        }
+        return tiles;
+      } catch (e) {
+        console.warn('findTilesForBbox error:', e);
+        return [];
+      }
+    }
+
+    // Unified Multi-Tile HRDEM Region Reader: merges adjacent tiles seamlessly into a continuous elevation grid
+    async function readMultiHrdemRegion(bboxWgs84, targetSize = 256, signal = null, resampling = 'bilinear') {
+      const [w, s, e, n] = bboxWgs84;
+      const pts = [
+        proj4('EPSG:4326', EPSG_3979_DEF, [w, n]),
+        proj4('EPSG:4326', EPSG_3979_DEF, [e, n]),
+        proj4('EPSG:4326', EPSG_3979_DEF, [e, s]),
+        proj4('EPSG:4326', EPSG_3979_DEF, [w, s]),
+        proj4('EPSG:4326', EPSG_3979_DEF, [(w + e) / 2, n]),
+        proj4('EPSG:4326', EPSG_3979_DEF, [(w + e) / 2, s]),
+        proj4('EPSG:4326', EPSG_3979_DEF, [w, (s + n) / 2]),
+        proj4('EPSG:4326', EPSG_3979_DEF, [e, (s + n) / 2])
+      ];
+      const minX = Math.min(...pts.map(p => p[0]));
+      const maxX = Math.max(...pts.map(p => p[0]));
+      const minY = Math.min(...pts.map(p => p[1]));
+      const maxY = Math.max(...pts.map(p => p[1]));
+
+      if (minX >= maxX || minY >= maxY) return null;
+
+      const minCol = Math.floor(minX / 500000) + 6;
+      const maxCol = Math.floor(maxX / 500000) + 6;
+      const minRow = Math.floor(minY / 500000) + 3;
+      const maxRow = Math.floor(maxY / 500000) + 3;
+
+      const intersecting = [];
+      for (let c = minCol; c <= maxCol; c++) {
+        for (let r = minRow; r <= maxRow; r++) {
+          const key = `${c}_${r}`;
+          if (VALID_HRDEM_TILES.has(key)) {
+            const tileX0 = (c - 6) * 500000;
+            const tileX1 = (c - 5) * 500000;
+            const tileY0 = (r - 3) * 500000;
+            const tileY1 = (r - 2) * 500000;
+            const ovX0 = Math.max(minX, tileX0);
+            const ovX1 = Math.min(maxX, tileX1);
+            const ovY0 = Math.max(minY, tileY0);
+            const ovY1 = Math.min(maxY, tileY1);
+            if (ovX0 < ovX1 && ovY0 < ovY1) {
+              intersecting.push({
+                key, col: c, row: r,
+                url: `https://canelevation-dem.s3.ca-central-1.amazonaws.com/hrdem-mosaic-1m/${key}-mosaic-1m-dtm.tif`,
+                tileX0, tileX1, tileY0, tileY1,
+                ovX0, ovX1, ovY0, ovY1
+              });
+            }
+          }
+        }
+      }
+
+      if (intersecting.length === 0) return null;
+
+      const gridW = targetSize;
+      const gridH = targetSize;
+      const unifiedData = new Float32Array(gridW * gridH).fill(NaN);
+
+      await Promise.all(intersecting.map(async (tile) => {
+        try {
+          const cog = await getHrdemCog(tile.url);
+          if (signal && signal.aborted) return;
+
+          const col0 = Math.max(0, Math.min(gridW, Math.round(((tile.ovX0 - minX) / (maxX - minX)) * gridW)));
+          const col1 = Math.max(0, Math.min(gridW, Math.round(((tile.ovX1 - minX) / (maxX - minX)) * gridW)));
+          const row0 = Math.max(0, Math.min(gridH, Math.round(((maxY - tile.ovY1) / (maxY - minY)) * gridH)));
+          const row1 = Math.max(0, Math.min(gridH, Math.round(((maxY - tile.ovY0) / (maxY - minY)) * gridH)));
+
+          const subW = col1 - col0;
+          const subH = row1 - row0;
+          if (subW < 1 || subH < 1) return;
+
+          const gX0 = minX + (col0 / gridW) * (maxX - minX);
+          const gX1 = minX + (col1 / gridW) * (maxX - minX);
+          const gY_top = maxY - (row0 / gridH) * (maxY - minY);
+          const gY_bottom = maxY - (row1 / gridH) * (maxY - minY);
+
+          const xFraction1 = Math.max(0, Math.min(1, (gX0 - tile.tileX0) / 500000));
+          const xFraction2 = Math.max(0, Math.min(1, (gX1 - tile.tileX0) / 500000));
+          const yFraction1 = Math.max(0, Math.min(1, (tile.tileY1 - gY_top) / 500000));
+          const yFraction2 = Math.max(0, Math.min(1, (tile.tileY1 - gY_bottom) / 500000));
+
+          if (xFraction2 <= xFraction1 || yFraction2 <= yFraction1) return;
+
+          const baseImage = await cog.getImage(0);
+          const imageCount = await cog.getImageCount();
+          let image = baseImage;
+          for (let idx = 1; idx < imageCount; idx++) {
+            const candidate = await cog.getImage(idx);
+            const candW = (xFraction2 - xFraction1) * candidate.getWidth();
+            const candH = (yFraction2 - yFraction1) * candidate.getHeight();
+            if (candW < subW || candH < subH) break;
+            image = candidate;
+          }
+
+          const imgW = image.getWidth();
+          const imgH = image.getHeight();
+          const px1 = Math.max(0, Math.floor(xFraction1 * imgW));
+          const py1 = Math.max(0, Math.floor(yFraction1 * imgH));
+          const px2 = Math.min(imgW, Math.ceil(xFraction2 * imgW));
+          const py2 = Math.min(imgH, Math.ceil(yFraction2 * imgH));
+
+          if (px2 - px1 < 1 || py2 - py1 < 1) return;
+
+          const rasters = await image.readRasters({
+            samples: [0],
+            window: [px1, py1, px2, py2],
+            width: subW,
+            height: subH,
+            signal,
+            resampleMethod: resampling
+          });
+
+          const raw = rasters[0];
+          for (let r = 0; r < subH; r++) {
+            const targetRowOffset = (row0 + r) * gridW + col0;
+            const srcRowOffset = r * subW;
+            for (let c = 0; c < subW; c++) {
+              const v = Number(raw[srcRowOffset + c]);
+              if (Number.isFinite(v) && v > -1000 && v < 9000 && v !== -32767 && v !== -9999) {
+                unifiedData[targetRowOffset + c] = v;
+              }
+            }
+          }
+        } catch (e) {
+          if (signal && signal.aborted) return;
+          console.warn('Error reading slice for HRDEM tile', tile.key, e);
+        }
+      }));
+
+      let hasValid = false;
+      for (let i = 0; i < unifiedData.length; i++) {
+        if (!isNaN(unifiedData[i])) {
+          hasValid = true;
+          break;
+        }
+      }
+      if (!hasValid) return null;
+
+      const toWgs = (x, y) => proj4(EPSG_3979_DEF, 'EPSG:4326', [x, y]);
+      const cornersWgs84 = [
+        toWgs(minX, maxY), // NW
+        toWgs(maxX, maxY), // NE
+        toWgs(maxX, minY), // SE
+        toWgs(minX, minY)  // SW
+      ];
+      const actualBboxWgs84 = [
+        Math.min(cornersWgs84[0][0], cornersWgs84[3][0]),
+        Math.min(cornersWgs84[2][1], cornersWgs84[3][1]),
+        Math.max(cornersWgs84[1][0], cornersWgs84[2][0]),
+        Math.max(cornersWgs84[0][1], cornersWgs84[1][1])
+      ];
+
+      return {
+        data: unifiedData,
+        width: gridW,
+        height: gridH,
+        sourceBBox: [minX, minY, maxX, maxY],
+        bboxWgs84: actualBboxWgs84,
+        cornersWgs84,
+        projection: EPSG_3979_DEF,
+        tilesCount: intersecting.length,
+        tiles: intersecting.map(t => t.key)
+      };
+    }
+
     function isPointInRing(pt, ring) {
       let inside = false;
       for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -3147,9 +3809,15 @@
           return;
         }
 
-        const center = this.map.getCenter();
-        const tileUrl = findTileForCoords(center.lng, center.lat);
-        if (!tileUrl) {
+        const bounds = this.map.getBounds();
+        const w = bounds.getWest();
+        const s = bounds.getSouth();
+        const e = bounds.getEast();
+        const n = bounds.getNorth();
+        const bbox = [w, s, e, n];
+
+        const intersecting = findTilesForBbox(w, s, e, n);
+        if (intersecting.length === 0) {
           const badge = document.getElementById('topo-alt-badge');
           if (badge) badge.textContent = 'Hors de la zone MNE HRDEM';
           return;
@@ -3158,28 +3826,12 @@
         if (this.abortController) this.abortController.abort();
         this.abortController = new AbortController();
 
-        const bounds = this.map.getBounds();
-        const w = bounds.getWest();
-        const s = bounds.getSouth();
-        const e = bounds.getEast();
-        const n = bounds.getNorth();
-        const bbox = [w, s, e, n];
-
         const badge = document.getElementById('topo-alt-badge');
         if (badge) badge.textContent = 'Calcul du relief...';
 
         try {
-          const cog = await this.getCog(tileUrl);
           const targetSize = 256;
-          const region = await readCogRegion(
-            cog,
-            bbox,
-            targetSize,
-            -32767,
-            false,
-            this.abortController.signal,
-            'bilinear'
-          );
+          const region = await readMultiHrdemRegion(bbox, targetSize, this.abortController.signal, 'bilinear');
 
           if (!region || !region.data || region.data.length === 0) {
             if (badge) badge.textContent = 'Aucune donnée MNE dans la vue';
@@ -3201,7 +3853,8 @@
 
           if (badge) {
             const prefix = this.stretchMethod === 'manual' ? 'Alt fixé : ' : 'Alt : ';
-            badge.textContent = `${prefix}${minAlt.toFixed(2)} m (mauve) → ${maxAlt.toFixed(2)} m (rouge)`;
+            const tileSuffix = region.tiles && region.tiles.length > 1 ? ` (${region.tiles.length} tuiles fusionnées)` : '';
+            badge.textContent = `${prefix}${minAlt.toFixed(2)} m (mauve) → ${maxAlt.toFixed(2)} m (rouge)${tileSuffix}`;
           }
 
           const span = Math.max(1, maxAlt - minAlt);
@@ -3425,29 +4078,18 @@
         const padLat = Math.max(0.003, (maxLat - minLat) * 0.15);
         const bbox = [minLng - padLng, minLat - padLat, maxLng + padLng, maxLat + padLat];
 
-        const midLng = (minLng + maxLng) / 2;
-        const midLat = (minLat + maxLat) / 2;
-        const tileUrl = findTileForCoords(midLng, midLat);
-        if (!tileUrl) {
-          throw new Error("Aucune tuile MNE HRDEM disponible pour ce secteur.");
-        }
-
         if (this.abortController) this.abortController.abort();
         this.abortController = new AbortController();
 
-        const cog = await fromUrl(tileUrl);
-        const region = await readCogRegion(
-          cog,
+        const region = await readMultiHrdemRegion(
           bbox,
           512,
-          -32767,
-          false,
           this.abortController.signal,
           'bilinear'
         );
 
         if (!region || !region.data || !region.sourceBBox) {
-          throw new Error("Impossible de lire les données altimétriques de la tuile MNE.");
+          throw new Error("Impossible de lire les données altimétriques MNE pour ce tracé.");
         }
 
         const distances = [0];
@@ -3753,6 +4395,7 @@
         const valMin = document.getElementById("ndvi-stretch-min-val");
         const valMax = document.getElementById("ndvi-stretch-max-val");
         const legendLabel = document.getElementById("ndvi-legend-stretch-label");
+        const customBox = document.getElementById("ndvi-custom-sliders-box");
 
         if (presetSelect) presetSelect.value = this.stretchPreset;
         if (sliderMin) sliderMin.value = Math.round(this.stretchMin * 100);
@@ -3761,6 +4404,9 @@
         if (valMax) valMax.textContent = this.stretchMax.toFixed(2);
         if (legendLabel) {
           legendLabel.textContent = `${this.stretchMin.toFixed(2)} → ${this.stretchMax.toFixed(2)}`;
+        }
+        if (customBox) {
+          customBox.style.display = (this.stretchPreset === "custom") ? "flex" : "none";
         }
       }
 
@@ -4026,12 +4672,16 @@
           const peakIdx = ndviVals.indexOf(maxNdvi);
 
           if (statsBar) {
+            const peakDate = this.series[peakIdx].dateKey.split("-");
+            const mNames = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+            const mIdx = parseInt(peakDate[1], 10) - 1;
+            const peakStr = (mIdx >= 0 && mIdx < 12) ? `${parseInt(peakDate[2], 10)} ${mNames[mIdx]}` : this.series[peakIdx].dateKey;
             statsBar.innerHTML = `
-              <span class="stat-chip">Saison <strong>${yr}</strong> (mars &rarr; déc.)</span>
-              <span class="stat-chip" style="background:#dcfce7; border-color:#86efac; color:#14532d;">Pic estival : <strong>${maxNdvi.toFixed(2)}</strong> (${this.series[peakIdx].dateKey})</span>
-              <span class="stat-chip">Dernier NDVI : <strong>${latest.ndvi.toFixed(2)}</strong> (${latest.dateKey})</span>
+              <span class="stat-chip">Saison <strong>${yr}</strong></span>
+              <span class="stat-chip" style="background:#dcfce7; border-color:#86efac; color:#14532d;">Pic estival : <strong>${maxNdvi.toFixed(2)}</strong> (${peakStr})</span>
+              <span class="stat-chip">Dernier NDVI : <strong>${latest.ndvi.toFixed(2)}</strong></span>
               <span class="stat-chip">Observations claires : <strong>${this.series.length} dates</strong></span>
-              ${cloudFilteredCount > 0 ? `<span class="stat-chip" style="color:#475569;" title="Passages éliminés car le pixel était sous un nuage, une ombre de nuage ou de la neige (SCL)">Masque SCL : ${cloudFilteredCount} passages nuageux éliminés</span>` : ''}
+              ${cloudFilteredCount > 0 ? `<span class="stat-chip" style="color:#64748b;" title="Passages éliminés car sous un nuage, une ombre ou de la neige">${cloudFilteredCount} nuageux filtrés</span>` : ''}
             `;
           }
 
@@ -4058,7 +4708,11 @@
 
         if (controlsRow) controlsRow.style.display = "flex";
         if (badge) {
-          badge.innerHTML = `<strong>${scene.dateKey}</strong> &bull; NDVI : <strong>${scene.ndvi.toFixed(3)}</strong> &bull; SCL : <span style="background:#dcfce7;color:#14532d;padding:1px 6px;border-radius:4px;font-weight:600;">${this.getSclLabel(scene.scl)}</span> &bull; Nuages scène : ${scene.cloud.toFixed(1)}% &bull; (${scene.platform})`;
+          const parts = scene.dateKey.split("-");
+          const mNames = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+          const mIdx = parseInt(parts[1], 10) - 1;
+          const niceDate = (mIdx >= 0 && mIdx < 12) ? `${parseInt(parts[2], 10)} ${mNames[mIdx]} ${parts[0]}` : scene.dateKey;
+          badge.innerHTML = `<strong>${niceDate}</strong> &bull; NDVI : <strong style="color:#15803d;">${scene.ndvi.toFixed(2)}</strong> <span class="stat-chip" style="margin-left:4px;font-size:10px;padding:1px 5px;background:#dcfce7;color:#14532d;border-color:#86efac;">${this.getSclLabel(scene.scl)}</span> <span style="color:#64748b;font-size:10.5px;margin-left:3px;" title="Couverture nuageuse de la scène : ${scene.cloud.toFixed(1)}% (${scene.platform})">(${scene.cloud.toFixed(0)}% nuages)</span>`;
         }
         if (btnPrev) btnPrev.disabled = (index <= 0);
         if (btnNext) btnNext.disabled = (index >= this.series.length - 1);
@@ -4472,7 +5126,7 @@
       }
     }
 
-    // Gestionnaire de l'hydrologie (écoulement à la volée & raster des dépressions par remplissage D8/Priority-Flood)
+    // Gestionnaire de l'hydrologie (écoulement à la volée & raster des zones plates par pente < 0.1%)
     class ParcelHydrologyManager {
       constructor(mapInstance) {
         this.map = mapInstance;
@@ -4521,7 +5175,7 @@
       }
 
       setupLayers() {
-        // 1. Source & Couche Raster pour les dépressions (MNE Fill - MNE Original)
+        // 1. Source & Couche Raster pour les zones plates (pente < 0.1%)
         if (!this.map.getSource("hydro-cuvettes-source")) {
           const dummyCanvas = document.createElement("canvas");
           dummyCanvas.width = 1; dummyCanvas.height = 1;
@@ -4596,11 +5250,11 @@
               "icon-image": "hydro-flow-arrow",
               "icon-size": [
                 "interpolate", ["linear"], ["get", "slopePct"],
-                0.8, 0.45,
-                2.5, 0.60,
-                5.0, 0.78,
-                10.0, 0.98,
-                18.0, 1.20
+                0.8, 0.72,
+                2.5, 0.88,
+                5.0, 1.02,
+                10.0, 1.20,
+                18.0, 1.40
               ],
               "icon-rotate": ["get", "angle"],
               "icon-rotation-alignment": "map",
@@ -4610,14 +5264,14 @@
             paint: {
               "icon-color": [
                 "interpolate", ["linear"], ["get", "slopePct"],
-                0.8, "#38bdf8",
-                2.5, "#0284c7",
+                0.8, "#0284c7",
+                2.5, "#0369a1",
                 5.0, "#1d4ed8",
                 10.0, "#4338ca",
                 18.0, "#6d28d9"
               ],
               "icon-halo-color": "#ffffff",
-              "icon-halo-width": 1.4,
+              "icon-halo-width": 1.8,
               "icon-opacity": 0.95
             }
           }, beforeLayer);
@@ -4691,190 +5345,129 @@
         return p;
       }
 
-      // Algorithme de remplissage de dépressions (Priority-Flood / Barnes 2014)
-      computeDepressionFill(elev, W, H) {
+      // Filtre gaussien séparable (lissage du MNE pour réduire le bruit)
+      gaussianBlur(elev, W, H, sigma) {
         const size = W * H;
-        const filled = new Float32Array(elev);
-        const visited = new Uint8Array(size);
+        const radius = Math.max(1, Math.ceil(sigma * 3));
+        const kernel = new Float32Array(2 * radius + 1);
+        let ksum = 0;
+        for (let i = -radius; i <= radius; i++) {
+          const v = Math.exp(-(i * i) / (2 * sigma * sigma));
+          kernel[i + radius] = v;
+          ksum += v;
+        }
+        for (let i = 0; i < kernel.length; i++) kernel[i] /= ksum;
 
-        class MinHeap {
-          constructor(cap) {
-            this.heap = new Int32Array(cap);
-            this.size = 0;
-          }
-          push(idx) {
-            let i = this.size++;
-            this.heap[i] = idx;
-            while (i > 0) {
-              const p = (i - 1) >> 1;
-              if (filled[this.heap[p]] <= filled[this.heap[i]]) break;
-              const tmp = this.heap[p];
-              this.heap[p] = this.heap[i];
-              this.heap[i] = tmp;
-              i = p;
+        const temp = new Float32Array(size);
+        const result = new Float32Array(size);
+
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            let acc = 0, wsum = 0;
+            for (let k = -radius; k <= radius; k++) {
+              const nx = x + k;
+              if (nx < 0 || nx >= W) continue;
+              const z = elev[y * W + nx];
+              if (!Number.isFinite(z) || z <= -1000 || z >= 9000) continue;
+              acc += z * kernel[k + radius];
+              wsum += kernel[k + radius];
             }
+            temp[y * W + x] = wsum > 0 ? acc / wsum : NaN;
           }
-          pop() {
-            if (this.size === 0) return -1;
-            const top = this.heap[0];
-            const last = this.heap[--this.size];
-            if (this.size > 0) {
-              this.heap[0] = last;
-              let i = 0;
-              while (true) {
-                let left = (i << 1) + 1;
-                let right = left + 1;
-                let smallest = i;
-                if (left < this.size && filled[this.heap[left]] < filled[this.heap[smallest]]) smallest = left;
-                if (right < this.size && filled[this.heap[right]] < filled[this.heap[smallest]]) smallest = right;
-                if (smallest === i) break;
-                const tmp = this.heap[i];
-                this.heap[i] = this.heap[smallest];
-                this.heap[smallest] = tmp;
-                i = smallest;
-              }
+        }
+
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            let acc = 0, wsum = 0;
+            for (let k = -radius; k <= radius; k++) {
+              const ny = y + k;
+              if (ny < 0 || ny >= H) continue;
+              const z = temp[ny * W + x];
+              if (!Number.isFinite(z) || z <= -1000 || z >= 9000) continue;
+              acc += z * kernel[k + radius];
+              wsum += kernel[k + radius];
             }
-            return top;
+            result[y * W + x] = wsum > 0 ? acc / wsum : NaN;
           }
         }
 
-        const heap = new MinHeap(size);
+        return result;
+      }
 
-        for (let x = 0; x < W; x++) {
-          visited[x] = 1;
-          heap.push(x);
-          const bIdx = (H - 1) * W + x;
-          visited[bIdx] = 1;
-          heap.push(bIdx);
-        }
-        for (let y = 1; y < H - 1; y++) {
-          const lIdx = y * W;
-          visited[lIdx] = 1;
-          heap.push(lIdx);
-          const rIdx = y * W + (W - 1);
-          visited[rIdx] = 1;
-          heap.push(rIdx);
-        }
-
-        for (let i = 0; i < size; i++) {
-          const z = elev[i];
-          if (!Number.isFinite(z) || z <= -1000 || z >= 9000) {
-            visited[i] = 1;
-            filled[i] = -9999;
-            heap.push(i);
-          }
-        }
-
-        const dx = [1, -1, 0, 0, 1, -1, 1, -1];
-        const dy = [0, 0, 1, -1, 1, 1, -1, -1];
-
-        while (heap.size > 0) {
-          const cIdx = heap.pop();
-          const cZ = filled[cIdx];
-          const cx = cIdx % W;
-          const cy = Math.floor(cIdx / W);
-
-          for (let d = 0; d < 8; d++) {
-            const nx = cx + dx[d];
-            const ny = cy + dy[d];
-            if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
-            const nIdx = ny * W + nx;
-            if (visited[nIdx]) continue;
-            visited[nIdx] = 1;
-
-            const nZ = elev[nIdx];
-            if (Number.isFinite(nZ) && nZ > -1000 && nZ < 9000) {
-              if (nZ < cZ) {
-                filled[nIdx] = cZ;
-              } else {
-                filled[nIdx] = nZ;
-              }
-              heap.push(nIdx);
-            }
-          }
-        }
-
+// Détection des dépressions par pente (zones plates : pente < 0.1%)
+      computeSlopeDepressions(elev, W, H, dxMetric, dyMetric) {
+        const size = W * H;
         const diff = new Float32Array(size);
         let maxDepth = 0;
         let countDepressions = 0;
         let sumDepth = 0;
 
-        for (let i = 0; i < size; i++) {
-          const z = elev[i];
-          if (Number.isFinite(z) && z > -1000 && z < 9000) {
-            const d = filled[i] - z;
-            if (d >= 0.08) { // Seuil minimal de 8 cm pour éliminer les micro-ornières et le bruit Lidar
-              diff[i] = d;
-              if (d > maxDepth) maxDepth = d;
-              countDepressions++;
-              sumDepth += d;
-            } else {
-              diff[i] = 0;
-            }
-          } else {
-            diff[i] = 0;
-          }
-        }
+        const SLOPE_THRESHOLD = 0.001; // 0.1% = 0.001 m/m
+        const sigma = 3; // lissage fixe en pixels (s'adapte naturellement au zoom)
 
-        // Filtre de bruit : éliminer les cellules isolées (1 seul pixel isolé sans voisin)
-        for (let y = 0; y < H; y++) {
-          for (let x = 0; x < W; x++) {
+        const smoothed = this.gaussianBlur(elev, W, H, sigma);
+
+        // Référence régionale (lissage large) pour distinguer un trou (minimum local) d'un sommet (maximum local)
+        const coarseSigma = 9;
+        const coarse = this.gaussianBlur(elev, W, H, coarseSigma);
+
+        for (let y = 1; y < H - 1; y++) {
+          for (let x = 1; x < W - 1; x++) {
             const idx = y * W + x;
-            if (diff[idx] <= 0 || diff[idx] >= 0.15) continue;
-            let neighbors = 0;
-            for (let d = 0; d < 8; d++) {
-              const nx = x + dx[d], ny = y + dy[d];
-              if (nx >= 0 && nx < W && ny >= 0 && ny < H) {
-                if (diff[ny * W + nx] > 0) neighbors++;
-              }
-            }
-            if (neighbors === 0) {
-              diff[idx] = 0;
-              countDepressions--;
+            const z = smoothed[idx];
+            if (!Number.isFinite(z) || z <= -1000 || z >= 9000) continue;
+
+            const zNW = smoothed[(y - 1) * W + (x - 1)];
+            const zN  = smoothed[(y - 1) * W + x];
+            const zNE = smoothed[(y - 1) * W + (x + 1)];
+            const zW  = smoothed[y * W + (x - 1)];
+            const zE  = smoothed[y * W + (x + 1)];
+            const zSW = smoothed[(y + 1) * W + (x - 1)];
+            const zS  = smoothed[(y + 1) * W + x];
+            const zSE = smoothed[(y + 1) * W + (x + 1)];
+
+            const nbrs = [zNW, zN, zNE, zW, zE, zSW, zS, zSE];
+            if (nbrs.some(n => !Number.isFinite(n) || n <= -1000 || n >= 9000)) continue;
+
+            const dzdx = ((zNW + 2 * zW + zSW) - (zNE + 2 * zE + zSE)) / (8 * dxMetric);
+            const dzdy = ((zNE + 2 * zN + zNW) - (zSE + 2 * zS + zSW)) / (8 * dyMetric);
+            const slope = Math.sqrt(dzdx * dzdx + dzdy * dzdy);
+
+            if (slope < SLOPE_THRESHOLD && z <= coarse[idx]) {
+              diff[idx] = slope;
+              if (slope > maxDepth) maxDepth = slope;
+              countDepressions++;
+              sumDepth += slope;
             }
           }
         }
 
-        return { diff, maxDepth, countDepressions, sumDepth, filled };
+        return { diff, maxDepth, countDepressions, sumDepth };
       }
 
-      // Génération du raster des dépressions avec palette progressive selon la profondeur
+      // Génération du raster des dépressions (zones plates : pente < 0.1%)
       renderCuvettesCanvas(diff, W, H) {
         this.canvasCuvettes.width = W;
         this.canvasCuvettes.height = H;
         const imgData = this.ctxCuvettes.createImageData(W, H);
         const px = imgData.data;
 
+        const SLOPE_THRESHOLD = 0.001; // 0.1%
+
         for (let i = 0; i < W * H; i++) {
           const pIdx = i * 4;
-          const depth = diff[i];
-          if (depth < 0.08) {
+          const slope = diff[i];
+          if (slope <= 0) {
             px[pIdx + 3] = 0;
             continue;
           }
 
-          if (depth < 0.18) {
-            // Faible stagnation (8 cm à 18 cm) : Cyan turquoise clair
-            const t = (depth - 0.08) / 0.10;
-            px[pIdx] = Math.round(103 + t * (2 - 103));
-            px[pIdx + 1] = Math.round(232 + t * (132 - 232));
-            px[pIdx + 2] = Math.round(249 + t * (199 - 249));
-            px[pIdx + 3] = Math.round(140 + t * 45); // ~55-72% opacité
-          } else if (depth < 0.35) {
-            // Dépression moyenne (18 cm à 35 cm) : Bleu océan vif
-            const t = (depth - 0.18) / 0.17;
-            px[pIdx] = Math.round(2 + t * (29 - 2));
-            px[pIdx + 1] = Math.round(132 + t * (78 - 132));
-            px[pIdx + 2] = Math.round(199 + t * (216 - 199));
-            px[pIdx + 3] = Math.round(185 + t * 35); // ~72-86% opacité
-          } else {
-            // Dépression profonde (> 35 cm) : Bleu roi profond à bleu nuit
-            const t = Math.min(1, (depth - 0.35) / 0.45);
-            px[pIdx] = Math.round(29 + t * (15 - 29));
-            px[pIdx + 1] = Math.round(78 + t * (23 - 78));
-            px[pIdx + 2] = Math.round(216 + t * (66 - 216));
-            px[pIdx + 3] = Math.round(220 + t * 30); // ~86-98% opacité
-          }
+          // Dégradé : plus la pente est faible, plus le bleu est intense
+          const t = Math.min(1, slope / SLOPE_THRESHOLD); // 0 = plat, 1 = seuil
+          px[pIdx] = Math.round(29 + t * (103 - 29));
+          px[pIdx + 1] = Math.round(78 + t * (232 - 78));
+          px[pIdx + 2] = Math.round(216 + t * (249 - 216));
+          px[pIdx + 3] = Math.round(220 - t * 80);
         }
 
         this.ctxCuvettes.putImageData(imgData, 0, 0);
@@ -4909,9 +5502,8 @@
         const n = bounds.getNorth();
         const bboxWgs84 = [w, s, e, n];
 
-        const center = this.map.getCenter();
-        const tileUrl = findTileForCoords(center.lng, center.lat) || findBestTileForArea(w, s, e, n, center.lng, center.lat);
-        if (!tileUrl) {
+        const intersecting = findTilesForBbox(w, s, e, n);
+        if (intersecting.length === 0) {
           if (this.statusBadgeEl) {
             this.statusBadgeEl.textContent = "Hors couverture MNE 1m";
             this.statusBadgeEl.className = "contour-status-badge";
@@ -4934,16 +5526,10 @@
         const signal = this.abortController.signal;
 
         try {
-          const cog = await this.getCog(tileUrl);
-          if (currentId !== this.updateId) return;
-
           const targetSize = 128;
-          const region = await readCogRegion(
-            cog,
+          const region = await readMultiHrdemRegion(
             bboxWgs84,
             targetSize,
-            -32767,
-            false,
             signal,
             "bilinear"
           );
@@ -5013,8 +5599,8 @@
             }
           }
 
-          // 1. Remplissage des dépressions & Raster des cuvettes (Priority-Flood)
-          const { diff, maxDepth, countDepressions, sumDepth } = this.computeDepressionFill(elev, W, H);
+          // 1. Détection des dépressions par pente & Raster des zones plates
+          const { diff, maxDepth, countDepressions, sumDepth } = this.computeSlopeDepressions(elev, W, H, dxMetric, dyMetric);
           const cuvettesDataUrl = this.renderCuvettesCanvas(diff, W, H);
 
           const cuvettesSrc = this.map.getSource("hydro-cuvettes-source");
@@ -5025,7 +5611,7 @@
             });
           }
 
-          // 2. Direction D8 et gradients
+          // 2. Direction D8 et gradients (sur MNE lissé pour un écoulement cohérent)
           const d8dx = [1, 1, 0, -1, -1, -1, 0, 1];
           const d8dy = [0, 1, 1, 1, 0, -1, -1, -1];
           const d8dist = [
@@ -5040,6 +5626,9 @@
           ];
           const d8Angle = [90, 135, 180, 225, 270, 315, 0, 45];
 
+          const flowSigma = 3;
+          const elevSmooth = this.gaussianBlur(elev, W, H, flowSigma);
+
           const flowTarget = new Int32Array(W * H).fill(-1);
           const flowAngle = new Float32Array(W * H).fill(0);
           const flowSlope = new Float32Array(W * H).fill(0);
@@ -5047,7 +5636,7 @@
           for (let y = 1; y < H - 1; y++) {
             for (let x = 1; x < W - 1; x++) {
               const idx = y * W + x;
-              const z = elev[idx];
+              const z = elevSmooth[idx];
               if (!Number.isFinite(z) || z <= -1000 || z >= 9000) continue;
 
               let maxDropSlope = 0;
@@ -5058,7 +5647,7 @@
                 const nx = x + d8dx[d];
                 const ny = y + d8dy[d];
                 const nidx = ny * W + nx;
-                const nz = elev[nidx];
+                const nz = elevSmooth[nidx];
                 if (!Number.isFinite(nz) || nz <= -1000 || nz >= 9000) continue;
 
                 const drop = (z - nz) / d8dist[d];
@@ -5069,7 +5658,7 @@
                 }
               }
 
-              if (bestTarget !== -1 && maxDropSlope >= 0.008) {
+              if (bestTarget !== -1 && maxDropSlope >= 0.001) {
                 flowTarget[idx] = bestTarget;
                 flowAngle[idx] = bestAngle;
                 flowSlope[idx] = maxDropSlope;
@@ -5080,11 +5669,11 @@
           // Flow accumulation (D8) pour identifier les thalwegs
           const cells = [];
           for (let i = 0; i < W * H; i++) {
-            if (Number.isFinite(elev[i]) && elev[i] > -1000 && elev[i] < 9000) {
+            if (Number.isFinite(elevSmooth[i]) && elevSmooth[i] > -1000 && elevSmooth[i] < 9000) {
               cells.push(i);
             }
           }
-          cells.sort((a, b) => elev[b] - elev[a]);
+          cells.sort((a, b) => elevSmooth[b] - elevSmooth[a]);
 
           const accumulation = new Int32Array(W * H).fill(1);
           for (const c of cells) {
@@ -5094,14 +5683,14 @@
             }
           }
 
-          // 3. Flèches de direction d'écoulement (espacées pour une lecture épurée : step = 8)
+          // 3. Flèches de direction d'écoulement (espacées pour une lecture épurée : step = 5)
           const arrowFeatures = [];
-          const step = 8;
+          const step = 5;
 
           for (let y = 2; y < H - 2; y += step) {
             for (let x = 2; x < W - 2; x += step) {
               const idx = y * W + x;
-              if (flowTarget[idx] === -1 || flowSlope[idx] < 0.008) continue;
+              if (flowTarget[idx] === -1 || flowSlope[idx] < 0.001) continue;
 
               const slopePct = Math.round(flowSlope[idx] * 1000) / 10;
 
@@ -5163,7 +5752,7 @@
           const cuvetteAreaM2 = Math.round(countDepressions * cellAreaMetric);
 
           if (this.statusBadgeEl) {
-            const cuvText = cuvetteAreaM2 > 0 ? `${cuvetteAreaM2.toLocaleString('fr-CA')} m² cuvettes` : `aucune stagnation`;
+            const cuvText = cuvetteAreaM2 > 0 ? `${cuvetteAreaM2.toLocaleString('fr-CA')} m² zones plates` : `aucune zone plate`;
             this.statusBadgeEl.textContent = `${arrowFeatures.length} flèches • ${cuvText}`;
             this.statusBadgeEl.className = "contour-status-badge active";
           }
@@ -5291,8 +5880,7 @@
           }
 
           const bbox = [minLng, minLat, maxLng, maxLat];
-          const cog = await fromUrl(tileUrl);
-          const region = await readCogRegion(cog, bbox, 64, -32767, false, AbortSignal.timeout(6000), 'bilinear');
+          const region = await readMultiHrdemRegion(bbox, 64, AbortSignal.timeout(6000), 'bilinear');
           if (!region || !region.data || !region.sourceBBox) return null;
 
           const [clickX, clickY] = proj4('EPSG:4326', EPSG_3979_DEF, [lngLat.lng, lngLat.lat]);
@@ -6687,6 +7275,42 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
 
         this.setupFilterEvents();
         this.updateCategoryBadges();
+        if (this.map) {
+          this.updateZoomState(this.map.getZoom());
+        }
+      }
+
+      updateZoomState(currentZoom) {
+        this.registry.forEach(cfg => {
+          const itemEl = document.getElementById(`wms-item-${cfg.id}`);
+          if (!itemEl) return;
+          const minZ = cfg.minZoom !== undefined ? cfg.minZoom : 0;
+          const maxZ = cfg.maxZoom !== undefined ? cfg.maxZoom : Infinity;
+          const inRange = currentZoom >= minZ && currentZoom <= maxZ;
+
+          let badge = itemEl.querySelector(".layer-zoom-badge");
+          if (!badge && (minZ > 0 || maxZ < Infinity)) {
+            badge = document.createElement("span");
+            badge.className = "layer-zoom-badge";
+            const titleEl = itemEl.querySelector(".wms-item-title");
+            if (titleEl) titleEl.appendChild(badge);
+          }
+
+          if (!inRange) {
+            itemEl.classList.add("layer-out-of-zoom");
+            itemEl.setAttribute("title", `Couche masquée à ce niveau de zoom (requiert zoom ${minZ >= 13 ? '14+' : Math.ceil(minZ) + '+'})`);
+            if (badge) {
+              badge.textContent = `z ≥ ${minZ >= 13 ? 14 : Math.ceil(minZ)}`;
+              badge.classList.remove("visible-now");
+            }
+          } else {
+            itemEl.classList.remove("layer-out-of-zoom");
+            itemEl.removeAttribute("title");
+            if (badge) {
+              badge.classList.add("visible-now");
+            }
+          }
+        });
       }
 
       setupFilterEvents() {
@@ -7086,6 +7710,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       const defaultTile = findTileForCoords(initialCenter[0], initialCenter[1]);
       contourManager.updateConfig({
         cogUrl: defaultTile,
+        regionProvider: (bbox, gridSize, signal) => readMultiHrdemRegion(bbox, gridSize, signal, 'bilinear'),
         interval: 1,
         majorEvery: 5,
         gridSize: 128,
@@ -7215,17 +7840,112 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         }
       });
 
+      // Synchronisation visuelle de l'état des couches selon le niveau de zoom
+      function updateLayersZoomState() {
+        if (!map) return;
+        const zoom = map.getZoom();
+
+        const toolRules = [
+          {
+            id: "card-topo",
+            checkboxId: "toggle-topo",
+            minZoom: 7,
+            maxZoom: Infinity,
+            badgeText: "z ≥ 7",
+            title: "Relief MNE non affiché à ce niveau de zoom (visible dès le zoom 7)"
+          },
+          {
+            id: "card-contours",
+            checkboxId: "toggle-contours",
+            minZoom: 11,
+            maxZoom: Infinity,
+            badgeText: "z ≥ 11",
+            title: "Courbes de niveau non affichées à ce niveau de zoom (visibles dès le zoom 11)"
+          },
+          {
+            id: "card-hydro-parcelle",
+            checkboxId: "toggle-hydro-parcelle",
+            minZoom: 12.8,
+            maxZoom: Infinity,
+            badgeText: "z ≥ 13",
+            title: "Écoulement & dépressions non affichés à ce niveau de zoom (visibles dès le zoom 13)"
+          },
+          {
+            id: "card-pedo",
+            checkboxId: "toggle-pedo",
+            minZoom: 3,
+            maxZoom: Infinity,
+            badgeText: "z ≥ 3",
+            title: "Sols non affichés à ce niveau de zoom (visibles dès le zoom 3)"
+          },
+          {
+            id: "card-parcelles",
+            checkboxId: "toggle-parcelles",
+            minZoom: 3,
+            maxZoom: Infinity,
+            badgeText: "z ≥ 3",
+            title: "Parcelles non affichées à ce niveau de zoom (visibles dès le zoom 3)"
+          }
+        ];
+
+        toolRules.forEach(rule => {
+          const card = document.getElementById(rule.id) || (rule.checkboxId && document.getElementById(rule.checkboxId)?.closest(".tool-card"));
+          if (!card) return;
+          const isVisibleAtZoom = zoom >= rule.minZoom && zoom <= rule.maxZoom;
+
+          let badge = card.querySelector(".layer-zoom-badge");
+          if (!badge && (rule.minZoom > 3 || rule.maxZoom < Infinity)) {
+            badge = document.createElement("span");
+            badge.className = "layer-zoom-badge";
+            const titleEl = card.querySelector(".tool-card-title");
+            if (titleEl) titleEl.appendChild(badge);
+          }
+
+          if (!isVisibleAtZoom) {
+            card.classList.add("layer-out-of-zoom");
+            card.setAttribute("title", rule.title);
+            if (badge) {
+              badge.textContent = rule.badgeText;
+              badge.classList.remove("visible-now");
+            }
+          } else {
+            card.classList.remove("layer-out-of-zoom");
+            card.removeAttribute("title");
+            if (badge) {
+              badge.classList.add("visible-now");
+            }
+          }
+        });
+
+        if (wmsManager && typeof wmsManager.updateZoomState === "function") {
+          wmsManager.updateZoomState(zoom);
+        }
+
+        const btnQuickProfile = document.getElementById("btn-quick-profile");
+        if (btnQuickProfile) {
+          if (zoom < 7) {
+            btnQuickProfile.classList.add("btn-out-of-zoom");
+            btnQuickProfile.title = "Zoomer (z7+) pour tracer une coupe MNT";
+          } else {
+            btnQuickProfile.classList.remove("btn-out-of-zoom");
+            btnQuickProfile.title = "Tracer une coupe topographique (cliquez sur la carte, double-clic ou clic droit pour calculer)";
+          }
+        }
+      }
+      window.updateLayersZoomState = updateLayersZoomState;
+
+      // Camera zoom & move listeners
+      map.on('zoom', updateLayersZoomState);
+      map.on('zoomend', updateLayersZoomState);
+      updateLayersZoomState();
+
       // Camera move listeners
       map.on('moveend', () => {
         if (topoManager && topoManager.enabled) topoManager.scheduleUpdate();
         
         const toggleContoursEl = document.getElementById("toggle-contours");
         if (contourManager && toggleContoursEl && toggleContoursEl.checked) {
-          const center = map.getCenter();
-          const currentTile = findTileForCoords(center.lng, center.lat);
-          if (contourManager.config.cogUrl !== currentTile) {
-            contourManager.updateConfig({ cogUrl: currentTile });
-          }
+          contourManager.generateForView();
         }
 
         if (parcelHydrologyManager && parcelHydrologyManager.enabled) {
@@ -7538,6 +8258,10 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
               <span>Identifier la série de sol (Diagnostic terrain)</span>
             </button>
+            <button type="button" class="btn-popup-rag" data-query="${appellation ? `Gestion agronomique des sols : ${appellation}` : 'Gestion des sols agricoles au Québec'}" title="Consulter la base documentaire Agri-Réseau">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              <span>Consulter Agri-Réseau pour ce sol</span>
+            </button>
           `;
         } else {
           solsTabHtml = `
@@ -7566,6 +8290,10 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
               </div>
               ${crop ? `<div style="color: #334155; margin-top: 4px;">Culture 2026 : <strong>${crop}</strong>${group ? ` <span style="color:#64748b;">(${group})</span>` : ''}</div>` : ''}
               ${cadastreProps && cadastreProps.NO_LOT ? `<div style="color: #475569; margin-top: 3px; font-size: 11px;">Lot cadastre rénové : <strong>nº ${cadastreProps.NO_LOT}</strong></div>` : ''}
+              <button type="button" class="btn-popup-rag" data-query="${crop ? `Pratiques agronomiques pour la culture : ${crop}` : 'Rotation et santé des sols agricoles'}" title="Consulter la base documentaire Agri-Réseau pour cette culture" style="margin-top: 6px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                <span>Consulter Agri-Réseau pour cette culture</span>
+              </button>
             </div>
 
             <div class="popup-crop-history" style="margin-top: 8px;">
@@ -7783,6 +8511,17 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
               }
             });
           }
+
+          // Agri-Réseau RAG popup trigger
+          const ragPopupBtns = popupDom.querySelectorAll(".btn-popup-rag");
+          ragPopupBtns.forEach(btn => {
+            btn.addEventListener("click", () => {
+              const query = btn.dataset.query || "";
+              if (window.ragManager) {
+                window.ragManager.open(query);
+              }
+            });
+          });
 
 
 
@@ -8327,6 +9066,118 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       });
     }
 
+    const btnNdviToggleCustom = document.getElementById("btn-ndvi-toggle-custom");
+    if (btnNdviToggleCustom) {
+      btnNdviToggleCustom.addEventListener("click", () => {
+        const customBox = document.getElementById("ndvi-custom-sliders-box");
+        if (customBox) {
+          const isShown = (customBox.style.display === "flex");
+          customBox.style.display = isShown ? "none" : "flex";
+        }
+      });
+    }
+
+    // Agri-Réseau RAG Manager
+    class RagManager {
+      constructor() {
+        this.dock = document.getElementById("rag-dock");
+        this.iframe = document.getElementById("rag-iframe");
+        this.loadingEl = document.getElementById("rag-loading");
+        this.btnQuick = document.getElementById("btn-quick-rag");
+        this.btnMobile = document.getElementById("mobile-btn-rag");
+        this.baseUrl = "https://agrireseau-rag.vercel.app";
+        this.isLoaded = false;
+        this.isOpen = false;
+        this.isExpanded = false;
+
+        this.init();
+      }
+
+      init() {
+        if (this.btnQuick) {
+          this.btnQuick.addEventListener("click", () => this.toggle());
+        }
+        if (this.btnMobile) {
+          this.btnMobile.addEventListener("click", () => this.toggle());
+        }
+        const btnClose = document.getElementById("btn-close-rag");
+        if (btnClose) {
+          btnClose.addEventListener("click", () => this.close());
+        }
+        const btnExpand = document.getElementById("btn-expand-rag");
+        if (btnExpand) {
+          btnExpand.addEventListener("click", () => this.toggleExpand());
+        }
+        const btnPanelOpen = document.getElementById("btn-panel-open-rag");
+        if (btnPanelOpen) {
+          btnPanelOpen.addEventListener("click", () => this.open());
+        }
+
+        if (this.iframe) {
+          this.iframe.addEventListener("load", () => {
+            if (this.loadingEl) this.loadingEl.classList.add("hidden");
+          });
+        }
+
+        // Close on Escape key
+        window.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && this.isOpen) {
+            this.close();
+          }
+        });
+      }
+
+      open(query = "") {
+        if (!this.dock) return;
+        this.isOpen = true;
+        this.dock.style.display = "flex";
+        this.dock.offsetHeight; // force reflow
+        this.dock.classList.add("open");
+
+        if (this.btnQuick) this.btnQuick.classList.add("active");
+        if (this.btnMobile) this.btnMobile.classList.add("active");
+
+        let targetUrl = this.baseUrl;
+        if (query && query.trim()) {
+          targetUrl += `?q=${encodeURIComponent(query.trim())}`;
+        }
+
+        if (!this.isLoaded || (query && this.iframe && this.iframe.src !== targetUrl)) {
+          if (this.loadingEl) this.loadingEl.classList.remove("hidden");
+          if (this.iframe) this.iframe.src = targetUrl;
+          this.isLoaded = true;
+        }
+      }
+
+      close() {
+        if (!this.dock) return;
+        this.isOpen = false;
+        this.dock.classList.remove("open");
+        if (this.btnQuick) this.btnQuick.classList.remove("active");
+        if (this.btnMobile) this.btnMobile.classList.remove("active");
+        setTimeout(() => {
+          if (!this.isOpen) this.dock.style.display = "none";
+        }, 280);
+      }
+
+      toggle(query = "") {
+        if (this.isOpen) {
+          this.close();
+        } else {
+          this.open(query);
+        }
+      }
+
+      toggleExpand() {
+        if (!this.dock) return;
+        this.isExpanded = !this.isExpanded;
+        this.dock.classList.toggle("expanded", this.isExpanded);
+      }
+    }
+
+    const ragManager = new RagManager();
+    window.ragManager = ragManager;
+
     window.addEventListener("resize", () => {
       if (profileManager && profileManager.profile.length >= 2) {
         const dock = document.getElementById("elevation-profile-dock");
@@ -8347,7 +9198,39 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
     const addressInput = document.getElementById("address-input");
     const clearBtn = document.getElementById("clear-search");
     const suggestionsBox = document.getElementById("search-suggestions");
+    const mapSearchPanel = document.getElementById("map-search-panel");
+    const btnToggleSearch = document.getElementById("btn-toggle-search");
     let searchDebounce = null;
+
+    function openSearchPanel() {
+      if (mapSearchPanel) {
+        mapSearchPanel.style.display = "block";
+        if (btnToggleSearch) btnToggleSearch.classList.add("active");
+        setTimeout(() => { if (addressInput) addressInput.focus(); }, 50);
+      }
+    }
+
+    function closeSearchPanel() {
+      if (mapSearchPanel) {
+        mapSearchPanel.style.display = "none";
+        if (btnToggleSearch) btnToggleSearch.classList.remove("active");
+      }
+    }
+
+    function toggleSearchPanel() {
+      if (mapSearchPanel && mapSearchPanel.style.display === "block") {
+        closeSearchPanel();
+      } else {
+        openSearchPanel();
+      }
+    }
+
+    if (btnToggleSearch) {
+      btnToggleSearch.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleSearchPanel();
+      });
+    }
 
     addressInput.addEventListener("input", (e) => {
       const q = e.target.value.trim();
@@ -8363,7 +9246,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       searchDebounce = setTimeout(async () => {
         try {
           const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=ca&limit=5&addressdetails=1`;
-          const res = await fetch(url, { headers: { "User-Agent": "PedologieQuebecApp/1.0" } });
+          const res = await fetch(url, { headers: { "User-Agent": "PlanDeFermeApp/1.0" } });
           const results = await res.json();
 
           if (!results || results.length === 0) {
@@ -8412,8 +9295,9 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
     });
 
     document.addEventListener("click", (e) => {
-      if (!e.target.closest(".search-box")) {
+      if (!e.target.closest(".map-search-panel") && !e.target.closest("#btn-toggle-search") && !e.target.closest("#mobile-btn-search")) {
         suggestionsBox.style.display = "none";
+        closeSearchPanel();
       }
     });
   
@@ -8424,6 +9308,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
     const toolsBackdrop = document.getElementById("tools-backdrop");
 
     function openMobileTools() {
+      if (typeof updateLayersZoomState === "function") updateLayersZoomState();
       if (panelTools) panelTools.classList.add("open");
       if (toolsBackdrop) toolsBackdrop.classList.add("active");
       if (btnToggleTools) btnToggleTools.classList.add("active");
@@ -8471,8 +9356,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
     const mobileBtnLayers = document.getElementById("mobile-btn-layers");
     const mobileBtnNdvi = document.getElementById("mobile-btn-ndvi");
     const mobileBtnProfile = document.getElementById("mobile-btn-profile");
-    const mobileBtnBasemap = document.getElementById("mobile-btn-basemap");
-    const mobileBasemapLabel = document.getElementById("mobile-basemap-label");
+    const mobileBtnSearch = document.getElementById("mobile-btn-search");
     const mobileBtnLocate = document.getElementById("mobile-btn-locate");
 
     const mobileActCancel = document.getElementById("mobile-act-cancel");
@@ -8499,30 +9383,9 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       mobileBtnProfile.addEventListener("click", toggleDrawing);
     }
 
-    if (mobileBtnBasemap) {
-      mobileBtnBasemap.addEventListener("click", () => {
-        const isSatActive = btnSat && btnSat.classList.contains("active");
-        if (isSatActive) {
-          if (btnPlan) btnPlan.click();
-          if (mobileBasemapLabel) mobileBasemapLabel.textContent = "Satellite";
-          mobileBtnBasemap.classList.remove("active");
-        } else {
-          if (btnSat) btnSat.click();
-          if (mobileBasemapLabel) mobileBasemapLabel.textContent = "Plan";
-          mobileBtnBasemap.classList.add("active");
-        }
-      });
-    }
-
-    // Keep mobile basemap button in sync when toggled elsewhere
-    if (btnPlan && btnSat) {
-      btnPlan.addEventListener("click", () => {
-        if (mobileBasemapLabel) mobileBasemapLabel.textContent = "Satellite";
-        if (mobileBtnBasemap) mobileBtnBasemap.classList.remove("active");
-      });
-      btnSat.addEventListener("click", () => {
-        if (mobileBasemapLabel) mobileBasemapLabel.textContent = "Plan";
-        if (mobileBtnBasemap) mobileBtnBasemap.classList.add("active");
+    if (mobileBtnSearch) {
+      mobileBtnSearch.addEventListener("click", () => {
+        toggleSearchPanel();
       });
     }
 
@@ -8777,7 +9640,6 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
     }
     if (btnPlan) btnPlan.addEventListener("click", () => updateUrl());
     if (btnSat) btnSat.addEventListener("click", () => updateUrl());
-    if (mobileBtnBasemap) mobileBtnBasemap.addEventListener("click", () => updateUrl());
 
     // Share View Helpers & Event Handlers
     function showShareToast() {
@@ -8818,14 +9680,72 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       document.body.removeChild(input);
     }
 
-    const btnShareView = document.getElementById("btn-share-view");
     const btnPanelShare = document.getElementById("btn-panel-share");
 
-    if (btnShareView) {
-      btnShareView.addEventListener("click", shareCurrentView);
-    }
     if (btnPanelShare) {
       btnPanelShare.addEventListener("click", shareCurrentView);
+    }
+
+    // Register Service Worker (PWA)
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch((err) => {
+          console.warn("Service Worker registration failed:", err);
+        });
+      });
+    }
+
+    // PWA Install Prompt
+    let deferredInstallPrompt = null;
+    const pwaBar = document.getElementById("pwa-install-bar");
+    const pwaText = document.getElementById("pwa-install-text");
+    const pwaBtn = document.getElementById("pwa-install-btn");
+    const pwaDismiss = document.getElementById("pwa-install-dismiss");
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+
+    function showPwaBar(text, btnLabel) {
+      if (!pwaBar) return;
+      if (pwaText) pwaText.textContent = text;
+      if (pwaBtn && btnLabel) pwaBtn.textContent = btnLabel;
+      pwaBar.classList.add("visible");
+    }
+    function hidePwaBar() {
+      if (pwaBar) pwaBar.classList.remove("visible");
+    }
+
+    if (!isStandalone) {
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        showPwaBar("Installer Plan de Ferme sur votre appareil", "Installer");
+      });
+
+      window.addEventListener("appinstalled", () => {
+        deferredInstallPrompt = null;
+        hidePwaBar();
+      });
+
+      if (pwaBtn) {
+        pwaBtn.addEventListener("click", async () => {
+          hidePwaBar();
+          if (deferredInstallPrompt) {
+            deferredInstallPrompt.prompt();
+            try { await deferredInstallPrompt.userChoice; } catch (e) {}
+            deferredInstallPrompt = null;
+          }
+        });
+      }
+
+      if (pwaDismiss) {
+        pwaDismiss.addEventListener("click", hidePwaBar);
+      }
+
+      if (isIOS) {
+        setTimeout(() => {
+          showPwaBar("Ajoutez Plan de Ferme à l'écran d'accueil : bouton Partager puis « Sur l'écran d'accueil ».", "OK");
+        }, 3000);
+      }
     }
   </script>
 
@@ -8834,5 +9754,19 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
     <span>Lien de la vue copié dans le presse-papier !</span>
   </div>
+
+  <!-- PWA Install Prompt -->
+  <div id="pwa-install-bar" class="pwa-install-bar" role="dialog" aria-label="Installer l'application">
+    <div id="pwa-install-text" class="pwa-install-text">Installer Plan de Ferme sur votre appareil</div>
+    <button id="pwa-install-btn" class="pwa-install-btn" type="button">Installer</button>
+    <button id="pwa-install-dismiss" class="pwa-install-dismiss" type="button" aria-label="Fermer">&times;</button>
+  </div>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <span>Plan de Ferme</span>
+    <span aria-hidden="true">·</span>
+    <a href="mailto:info@cedricbouffard.com">info@cedricbouffard.com</a>
+  </footer>
 </body>
 </html>
