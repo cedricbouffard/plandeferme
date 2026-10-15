@@ -2839,7 +2839,7 @@
 
         <div class="topo-master-body" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
           <div class="tool-sublabel" style="margin-bottom: 2px;">
-            Relief, ombrage 3D, courbes, pentes &amp; écoulement
+            Relief, ombrage 3D, courbes, pentes, canopée &amp; écoulement
           </div>
 
           <div class="topo-accordion-group">
@@ -3036,6 +3036,66 @@
 
                 <div id="hydro-parcelle-status" class="contour-status-badge" style="margin: 0; font-size: 10px;">
                   Désactivé
+                </div>
+              </div>
+            </details>
+
+            <!-- 5. Hauteur de canopée (m) -->
+            <details class="topo-sub-accordion" id="card-canopee">
+              <summary class="topo-sub-header">
+                <div class="topo-sub-title">
+                  <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L7 9h3l-4 7h6l-3 5h8l-3-5h6l-4-7h3L12 2z"/></svg>
+                  <span>Hauteur de canopée (m)</span>
+                </div>
+                <label class="switch-label" onclick="event.stopPropagation()" title="Afficher/Masquer la hauteur de canopée calculée à la volée (LiDAR 1m Canada)">
+                  <input type="checkbox" id="toggle-canopee" />
+                  <span class="switch-slider"></span>
+                </label>
+              </summary>
+              <div class="topo-sub-content">
+                <div id="canopee-status-badge" class="topo-alt-badge">
+                  Désactivé
+                </div>
+
+                <div class="tool-label-row">
+                  <span class="tool-sublabel">Opacité de la canopée</span>
+                  <span id="canopee-opacity-val" class="val-badge">75%</span>
+                </div>
+                <input type="range" id="canopee-opacity" min="0" max="100" value="75" class="slider" />
+
+                <!-- Légende des 6 classes de hauteur -->
+                <div style="margin-top: 4px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                  <div style="font-size: 10px; font-weight: 700; color: #475569; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;">Hauteur de végétation (m)</div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 10.5px; font-weight: 600; color: #334155;">
+                    <div style="display: flex; align-items: center; gap: 5px;" title="0.5 à 2 m : Haies basses, arbustes, régénération">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #bef264; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>0,5 – 2 m</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;" title="2 à 5 m : Jeunes arbres, vergers, brise-vent bas">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #4ade80; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>2 – 5 m</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;" title="5 à 12 m : Arbres moyens, lisières">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #16a34a; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>5 – 12 m</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;" title="12 à 20 m : Forêt mature, brise-vent arboré">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #15803d; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>12 – 20 m</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;" title="20 à 30 m : Grands conifères, feuillus matures">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #166534; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>20 – 30 m</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;" title="> 30 m : Canopée très haute, arbres dominants">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #064e3b; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>&gt; 30 m</span>
+                    </div>
+                  </div>
+                  <div style="font-size: 9.5px; color: #64748b; margin-top: 5px; line-height: 1.3;">
+                    Différence MNS – MNE issue du LiDAR 1 m (AWS Canada). Les zones de sol nu (&lt; 0,5 m) sont transparentes.
+                  </div>
                 </div>
               </div>
             </details>
@@ -3509,6 +3569,9 @@
       if (searchParams.get("pentes") === "1" || searchParams.get("pentes") === "true") {
         if (!layers.includes("pentes")) layers.push("pentes");
       }
+      if (searchParams.get("canopee") === "1" || searchParams.get("canopee") === "true") {
+        if (!layers.includes("canopee")) layers.push("canopee");
+      }
       if (searchParams.get("contours") === "1" || searchParams.get("contours") === "true") {
         if (!layers.includes("contours")) layers.push("contours");
       }
@@ -3541,6 +3604,7 @@
       const topoHs = searchParams.get("topo_hs");
       const topoHsOp = searchParams.get("topo_hs_op");
       const pentesOp = searchParams.get("pentes_op");
+      const canopeeOp = searchParams.get("canopee_op");
       const interval = searchParams.get("interval");
 
       const hasLocation = (lat !== null && !isNaN(lat) && lng !== null && !isNaN(lng) && zoom !== null && !isNaN(zoom));
@@ -3559,6 +3623,7 @@
         topoHs: topoHs !== null ? (topoHs === "1" || topoHs === "true") : null,
         topoHsOp: topoHsOp ? parseInt(topoHsOp, 10) : null,
         pentesOp: pentesOp ? parseInt(pentesOp, 10) : null,
+        canopeeOp: canopeeOp ? parseInt(canopeeOp, 10) : null,
         interval: interval ? parseFloat(interval) : null
       };
     }
@@ -3646,7 +3711,7 @@
     }
 
     // Identify all HRDEM 500x500 km tiles intersecting a WGS84 bounding box
-    function findTilesForBbox(minLng, minLat, maxLng, maxLat) {
+    function findTilesForBbox(minLng, minLat, maxLng, maxLat, product = 'dtm') {
       try {
         const pts = [
           proj4('EPSG:4326', EPSG_3979_DEF, [minLng, maxLat]),
@@ -3675,7 +3740,7 @@
                 key,
                 col: c,
                 row: r,
-                url: `https://canelevation-dem.s3.ca-central-1.amazonaws.com/hrdem-mosaic-1m/${key}-mosaic-1m-dtm.tif`,
+                url: `https://canelevation-dem.s3.ca-central-1.amazonaws.com/hrdem-mosaic-1m/${key}-mosaic-1m-${product}.tif`,
                 tileX0: (c - 6) * 500000,
                 tileX1: (c - 5) * 500000,
                 tileY0: (r - 3) * 500000,
@@ -3692,7 +3757,7 @@
     }
 
     // Unified Multi-Tile HRDEM Region Reader: merges adjacent tiles seamlessly into a continuous elevation grid
-    async function readMultiHrdemRegion(bboxWgs84, targetSize = 256, signal = null, resampling = 'bilinear') {
+    async function readMultiHrdemRegion(bboxWgs84, targetSize = 256, signal = null, resampling = 'bilinear', product = 'dtm') {
       const [w, s, e, n] = bboxWgs84;
       const pts = [
         proj4('EPSG:4326', EPSG_3979_DEF, [w, n]),
@@ -3732,7 +3797,7 @@
             if (ovX0 < ovX1 && ovY0 < ovY1) {
               intersecting.push({
                 key, col: c, row: r,
-                url: `https://canelevation-dem.s3.ca-central-1.amazonaws.com/hrdem-mosaic-1m/${key}-mosaic-1m-dtm.tif`,
+                url: `https://canelevation-dem.s3.ca-central-1.amazonaws.com/hrdem-mosaic-1m/${key}-mosaic-1m-${product}.tif`,
                 tileX0, tileX1, tileY0, tileY1,
                 ovX0, ovX1, ovY0, ovY1
               });
@@ -4004,6 +4069,9 @@
         this.hillshadeEnabled = on;
         if (this.map.getLayer('hrdem-hillshade-layer')) {
           this.map.setLayoutProperty('hrdem-hillshade-layer', 'visibility', (this.enabled && on) ? 'visible' : 'none');
+          if (this.enabled && on && this.map.getLayer('hrdem-topo-layer')) {
+            this.map.moveLayer('hrdem-topo-layer', 'hrdem-hillshade-layer');
+          }
         }
         if (this.enabled && on && !this.hillshadeSourceAdded) {
           this.scheduleUpdate();
@@ -4017,6 +4085,9 @@
         }
         if (this.map.getLayer('hrdem-hillshade-layer')) {
           this.map.setLayoutProperty('hrdem-hillshade-layer', 'visibility', (on && this.hillshadeEnabled) ? 'visible' : 'none');
+        }
+        if (on && this.map.getLayer('hrdem-topo-layer') && this.map.getLayer('hrdem-hillshade-layer')) {
+          this.map.moveLayer('hrdem-topo-layer', 'hrdem-hillshade-layer');
         }
         if (on) this.scheduleUpdate();
       }
@@ -4547,6 +4618,215 @@
         } catch (err) {
           if (err.name === 'AbortError') return;
           console.warn('Slope calculation failed:', err);
+        }
+      }
+    }
+
+    // Canopy Height Model (Hauteur de canopée) Manager calculated on the fly: DSM - DTM from Canada AWS HRDEM 1m
+    class CanopeeManager {
+      constructor(mapInstance) {
+        this.map = mapInstance;
+        this.enabled = false;
+        this.opacity = 0.75;
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.debounceTimer = null;
+        this.abortController = null;
+        this.sourceAdded = false;
+      }
+
+      setOpacity(val) {
+        this.opacity = val;
+        if (this.map.getLayer('hrdem-canopee-layer')) {
+          this.map.setPaintProperty('hrdem-canopee-layer', 'raster-opacity', this.opacity);
+        }
+      }
+
+      setEnabled(on) {
+        this.enabled = on;
+        if (this.map.getLayer('hrdem-canopee-layer')) {
+          this.map.setLayoutProperty('hrdem-canopee-layer', 'visibility', on ? 'visible' : 'none');
+        }
+        const badge = document.getElementById('canopee-status-badge');
+        if (badge && !on) {
+          badge.textContent = 'Désactivé';
+        }
+        if (on) this.scheduleUpdate();
+      }
+
+      scheduleUpdate() {
+        if (!this.enabled) return;
+        if (this.debounceTimer) clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => {
+          this.updateViewport();
+        }, 150);
+      }
+
+      async updateViewport() {
+        if (!this.enabled || !this.map) return;
+        const zoom = this.map.getZoom();
+        const badge = document.getElementById('canopee-status-badge');
+        if (zoom < 7) {
+          if (badge) badge.textContent = 'Zoomer pour la canopée (zoom 7+)';
+          return;
+        }
+
+        const bounds = this.map.getBounds();
+        const w = bounds.getWest();
+        const s = bounds.getSouth();
+        const e = bounds.getEast();
+        const n = bounds.getNorth();
+        const bbox = [w, s, e, n];
+
+        const intersecting = findTilesForBbox(w, s, e, n, 'dtm');
+        if (intersecting.length === 0) {
+          if (badge) badge.textContent = 'Hors de la zone MNE HRDEM';
+          return;
+        }
+
+        if (this.abortController) this.abortController.abort();
+        this.abortController = new AbortController();
+
+        if (badge) badge.textContent = 'Calcul de la canopée (DSM - DTM)...';
+
+        try {
+          const targetSize = 256;
+          // Concurrent fetch of bare-earth DTM and surface DSM from AWS Canada
+          const [dtmRegion, dsmRegion] = await Promise.all([
+            readMultiHrdemRegion(bbox, targetSize, this.abortController.signal, 'bilinear', 'dtm'),
+            readMultiHrdemRegion(bbox, targetSize, this.abortController.signal, 'bilinear', 'dsm')
+          ]);
+
+          if (!dtmRegion || !dsmRegion || !dtmRegion.data || !dsmRegion.data) {
+            if (badge) badge.textContent = 'Données MNE/MNS indisponibles';
+            return;
+          }
+
+          const width = dtmRegion.width;
+          const height = dtmRegion.height;
+          const dtmData = dtmRegion.data;
+          const dsmData = dsmRegion.data;
+
+          this.canvas.width = width;
+          this.canvas.height = height;
+          const imgData = this.ctx.createImageData(width, height);
+          const pixels = imgData.data;
+
+          let maxCanopy = 0;
+          let sumCanopy = 0;
+          let canopyCount = 0;
+
+          const totalPixels = width * height;
+          for (let i = 0; i < totalPixels; i++) {
+            const pIdx = i * 4;
+            const zDtm = dtmData[i];
+            const zDsm = dsmData[i];
+
+            if (isNaN(zDtm) || isNaN(zDsm) || zDtm <= -1000 || zDsm <= -1000 || zDtm >= 9000 || zDsm >= 9000) {
+              pixels[pIdx + 3] = 0;
+              continue;
+            }
+
+            // Hauteur au sol = MNS - MNE
+            const h = zDsm - zDtm;
+
+            // Seuil minimum de 0.5 m pour éliminer les cultures basses, résidus, gazon et micro-bruit
+            if (h < 0.5) {
+              pixels[pIdx + 3] = 0;
+              continue;
+            }
+
+            if (h > maxCanopy) maxCanopy = h;
+            sumCanopy += h;
+            canopyCount++;
+
+            pixels[pIdx + 3] = 255;
+            if (h < 2.0) {
+              // 0.5 - 2 m : Haies basses, buissons, régénération (#bef264 - lime)
+              pixels[pIdx] = 190;
+              pixels[pIdx + 1] = 242;
+              pixels[pIdx + 2] = 100;
+            } else if (h < 5.0) {
+              // 2 - 5 m : Jeunes arbres, vergers, brise-vent bas (#4ade80 - vert clair)
+              pixels[pIdx] = 74;
+              pixels[pIdx + 1] = 222;
+              pixels[pIdx + 2] = 128;
+            } else if (h < 12.0) {
+              // 5 - 12 m : Arbres moyens, lisières (#16a34a - vert vif)
+              pixels[pIdx] = 22;
+              pixels[pIdx + 1] = 163;
+              pixels[pIdx + 2] = 74;
+            } else if (h < 20.0) {
+              // 12 - 20 m : Forêt mature, brise-vent arboré (#15803d - vert forêt)
+              pixels[pIdx] = 21;
+              pixels[pIdx + 1] = 128;
+              pixels[pIdx + 2] = 61;
+            } else if (h < 30.0) {
+              // 20 - 30 m : Grands conifères / feuillus matures (#166534 - vert sombre)
+              pixels[pIdx] = 22;
+              pixels[pIdx + 1] = 101;
+              pixels[pIdx + 2] = 52;
+            } else {
+              // > 30 m : Canopée très haute / émergents (#064e3b - vert bleuté très sombre)
+              pixels[pIdx] = 6;
+              pixels[pIdx + 1] = 78;
+              pixels[pIdx + 2] = 59;
+            }
+          }
+
+          this.ctx.putImageData(imgData, 0, 0);
+          const dataUrl = this.canvas.toDataURL();
+
+          if (badge) {
+            if (canopyCount > 0) {
+              const avgH = (sumCanopy / canopyCount).toFixed(1);
+              badge.textContent = `Canopée max : ${maxCanopy.toFixed(1)} m | Moy. : ${avgH} m`;
+            } else {
+              badge.textContent = 'Aucun couvert arboré (> 0,5 m)';
+            }
+          }
+
+          const actualBbox = dtmRegion.bboxWgs84 || bbox;
+          const coords = dtmRegion.cornersWgs84 || [
+            [actualBbox[0], actualBbox[3]], // Top-Left (NW)
+            [actualBbox[2], actualBbox[3]], // Top-Right (NE)
+            [actualBbox[2], actualBbox[1]], // Bottom-Right (SE)
+            [actualBbox[0], actualBbox[1]]  // Bottom-Left (SW)
+          ];
+
+          const source = this.map.getSource('hrdem-canopee-source');
+          if (source) {
+            source.updateImage({
+              url: dataUrl,
+              coordinates: coords
+            });
+          } else {
+            this.map.addSource('hrdem-canopee-source', {
+              type: 'image',
+              url: dataUrl,
+              coordinates: coords
+            });
+            const beforeLayer = this.map.getLayer('pedologie-fill') ? 'pedologie-fill' : undefined;
+            this.map.addLayer({
+              id: 'hrdem-canopee-layer',
+              type: 'raster',
+              source: 'hrdem-canopee-source',
+              layout: { visibility: this.enabled ? 'visible' : 'none' },
+              paint: {
+                'raster-opacity': this.opacity,
+                'raster-resampling': 'linear',
+                'raster-fade-duration': 180
+              }
+            }, beforeLayer);
+            this.sourceAdded = true;
+          }
+
+          if (typeof bringTopLayersToFront === 'function') {
+            bringTopLayersToFront();
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.warn('Canopy calculation failed:', err);
         }
       }
     }
@@ -7368,6 +7648,22 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
             icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 0 0-7.54 16.56C5.54 17.65 7.18 17 9 17c1.47 0 2.82.43 3.96 1.16A7.95 7.95 0 0 1 17 17c1.82 0 3.46.65 4.54 1.56A10 10 0 0 0 12 2z"/><path d="M7 10v4"/><path d="M12 7v7"/><path d="M17 9v5"/><path d="M3 20c1.2-1 2.8-1.5 4.5-1.5s3.3.5 4.5 1.5c1.2-1 2.8-1.5 4.5-1.5s3.3.5 4.5 1.5"/></svg>`
           },
           {
+            id: "eau_twi_mffp",
+            category: "eau",
+            name: "Indice d'humidité du sol (TWI)",
+            subtitle: "MFFP — Écologie forestière (LiDAR 1m)",
+            url: "https://geoegl.msp.gouv.qc.ca/ws/mffpecofor.fcgi",
+            layers: "lidar_twi",
+            format: "image/png",
+            transparent: true,
+            version: "1.3.0",
+            defaultOpacity: 0.75,
+            insertPosition: "below_pedologie",
+            attribution: "© Gouvernement du Québec (MFFP - Écologie forestière)",
+            description: "Indice d'humidité topographique (Topographic Wetness Index - TWI) dérivé du LiDAR 1 m par le MFFP. Permet de localiser les zones de saturation hydrique, d'accumulation des eaux et les bas-fonds propices au drainage ou aux cultures exigeantes.",
+            icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/><path d="M7 16a5 5 0 0 0 10 0"/></svg>`
+          },
+          {
             id: "plans_drainage",
             category: "foncier",
             name: "Plans de drainage agricole (Info-Sols)",
@@ -7378,6 +7674,22 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
             attribution: "© Info-Sols / MAPAQ / Producteurs de grains du Québec",
             description: "Périmètres des travaux de drainage agricole souterrain et accès direct aux plans d'ingénierie numérisés haute résolution (JPG).",
             icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>`
+          },
+          {
+            id: "foret_canopee_mffp",
+            category: "foret",
+            name: "Hauteur de canopée (MFFP LiDAR)",
+            subtitle: "Écologie forestière (LiDAR 1m)",
+            url: "https://geoegl.msp.gouv.qc.ca/ws/mffpecofor.fcgi",
+            layers: "lidar_mhc",
+            format: "image/png",
+            transparent: true,
+            version: "1.3.0",
+            defaultOpacity: 0.75,
+            insertPosition: "below_pedologie",
+            attribution: "© Gouvernement du Québec (MFFP - Écologie forestière)",
+            description: "Modèle de hauteur de canopée (MHC) issu du LiDAR 1 m du MFFP. Représente la hauteur relative de la végétation arborée et des peuplements forestiers.",
+            icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L7 9h3l-4 7h6l-3 5h8l-3-5h6l-4-7h3L12 2z"/></svg>`
           },
           {
             id: "deboisement_gfw",
@@ -8141,6 +8453,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
 
     let topoManager = null;
     let pentesManager = null;
+    let canopeeManager = null;
     let contourManager = null;
     let profileManager = null;
     let ndviManager = null;
@@ -8324,6 +8637,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       // Instantiate Topography Manager (starts disabled by default)
       topoManager = new TopoManager(map);
       pentesManager = new PentesManager(map);
+      canopeeManager = new CanopeeManager(map);
 
       // Instantiate ContourManager from geolibre-plugin
       const mockApp = {
@@ -8364,6 +8678,11 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
 
       // Function to ensure parcels, cadastre, contours and hydrography stay properly layered
       function bringTopLayersToFront() {
+        // -1. Ombrage 3D (Hillshade) AU-DESSUS du relief altimétrique (Topo)
+        if (map.getLayer("hrdem-topo-layer") && map.getLayer("hrdem-hillshade-layer")) {
+          map.moveLayer("hrdem-topo-layer", "hrdem-hillshade-layer");
+        }
+
         // 0. Courbes de niveau placées SOUS les couches d'écoulement et de dépressions
         const hydroFirstId = map.getLayer("hydro-cuvettes-layer")
           ? "hydro-cuvettes-layer"
@@ -8489,6 +8808,14 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
             title: "Pentes non affichées à ce niveau de zoom (visibles dès le zoom 7)"
           },
           {
+            id: "card-canopee",
+            checkboxId: "toggle-canopee",
+            minZoom: 7,
+            maxZoom: Infinity,
+            badgeText: "z ≥ 7",
+            title: "Canopée non affichée à ce niveau de zoom (visible dès le zoom 7)"
+          },
+          {
             id: "card-contours",
             checkboxId: "toggle-contours",
             minZoom: 11,
@@ -8577,6 +8904,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       map.on('moveend', () => {
         if (topoManager && topoManager.enabled) topoManager.scheduleUpdate();
         if (pentesManager && pentesManager.enabled) pentesManager.scheduleUpdate();
+        if (canopeeManager && canopeeManager.enabled) canopeeManager.scheduleUpdate();
         
         const toggleContoursEl = document.getElementById("toggle-contours");
         if (contourManager && toggleContoursEl && toggleContoursEl.checked) {
@@ -9449,6 +9777,25 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       });
     }
 
+    // Hauteur de Canopée Controls
+    const toggleCanopee = document.getElementById("toggle-canopee");
+    const canopeeOpacitySlider = document.getElementById("canopee-opacity");
+    const canopeeOpacityVal = document.getElementById("canopee-opacity-val");
+
+    if (toggleCanopee) {
+      toggleCanopee.addEventListener("change", (e) => {
+        if (canopeeManager) canopeeManager.setEnabled(e.target.checked);
+      });
+    }
+
+    if (canopeeOpacitySlider) {
+      canopeeOpacitySlider.addEventListener("input", (e) => {
+        const pct = parseInt(e.target.value, 10);
+        if (canopeeOpacityVal) canopeeOpacityVal.textContent = pct + "%";
+        if (canopeeManager) canopeeManager.setOpacity(pct / 100);
+      });
+    }
+
     // Dynamic Contours Controls
     const toggleContours = document.getElementById("toggle-contours");
     const pillButtons = document.querySelectorAll(".pill-btn");
@@ -10145,6 +10492,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         if (toggleParcelles && toggleParcelles.checked) activeLayers.push("parcelles");
         if (toggleTopo && toggleTopo.checked) activeLayers.push("topo");
         if (togglePentes && togglePentes.checked) activeLayers.push("pentes");
+        if (toggleCanopee && toggleCanopee.checked) activeLayers.push("canopee");
         if (toggleContours && toggleContours.checked) activeLayers.push("contours");
         if (toggleHydroParcelle && toggleHydroParcelle.checked) activeLayers.push("hydro");
         if (ndviManager && ndviManager.isActiveMode) activeLayers.push("ndvi");
@@ -10171,6 +10519,9 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         }
         if (togglePentes && togglePentes.checked && pentesOpacitySlider && parseInt(pentesOpacitySlider.value, 10) !== 75) {
           params.set("pentes_op", pentesOpacitySlider.value);
+        }
+        if (toggleCanopee && toggleCanopee.checked && canopeeOpacitySlider && parseInt(canopeeOpacitySlider.value, 10) !== 75) {
+          params.set("canopee_op", canopeeOpacitySlider.value);
         }
 
         // Active WMS layers
@@ -10268,6 +10619,19 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         }
       }
 
+      // 4c. Hauteur de canopée (AWS Canada)
+      if (state.layers.includes("canopee")) {
+        if (state.canopeeOp !== null && canopeeOpacitySlider) {
+          canopeeOpacitySlider.value = state.canopeeOp;
+          if (canopeeOpacityVal) canopeeOpacityVal.textContent = state.canopeeOp + "%";
+          if (canopeeManager) canopeeManager.setOpacity(state.canopeeOp / 100);
+        }
+        if (toggleCanopee) {
+          toggleCanopee.checked = true;
+          if (canopeeManager) canopeeManager.setEnabled(true);
+        }
+      }
+
       // 5. Contours
       if (state.layers.includes("contours")) {
         if (state.interval && contourManager) {
@@ -10301,7 +10665,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       }
 
       // Auto-déplier l'accordéon topo principal et le sous-accordéon si une couche topo est active dans l'URL
-      if (state.layers.some(l => ["topo", "pentes", "contours", "hydro"].includes(l))) {
+      if (state.layers.some(l => ["topo", "pentes", "contours", "hydro", "canopee"].includes(l))) {
         const topoMaster = document.getElementById("card-topo-master");
         if (topoMaster) topoMaster.open = true;
         if (state.layers.includes("topo")) {
@@ -10310,6 +10674,10 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         }
         if (state.layers.includes("pentes")) {
           const el = document.getElementById("card-pentes");
+          if (el) el.open = true;
+        }
+        if (state.layers.includes("canopee")) {
+          const el = document.getElementById("card-canopee");
           if (el) el.open = true;
         }
         if (state.layers.includes("contours")) {
