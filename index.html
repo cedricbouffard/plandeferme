@@ -191,6 +191,14 @@
       left: 0;
     }
 
+    /* Contrôles MapLibre au bas de l'écran (attribution et échelle) - au-dessus du footer */
+    .maplibregl-ctrl-bottom-right,
+    .maplibregl-ctrl-bottom-left {
+      bottom: 34px !important;
+      z-index: 850;
+      transition: bottom 0.2s ease;
+    }
+
     /* Floating control panel (desktop) */
     .map-controls-panel {
       position: absolute;
@@ -2596,7 +2604,8 @@
         z-index: 1400 !important;
       }
 
-      .maplibregl-ctrl-bottom-right {
+      .maplibregl-ctrl-bottom-right,
+      .maplibregl-ctrl-bottom-left {
         bottom: 62px !important;
       }
       .maplibregl-ctrl-top-right {
