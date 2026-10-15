@@ -976,6 +976,98 @@
       background: #ffffff;
       border-top: 1px solid #f1f5f9;
     }
+
+    /* Accordéon Topographie & Relief */
+    .topo-master-card summary {
+      list-style: none;
+    }
+    .topo-master-card summary::-webkit-details-marker {
+      display: none;
+    }
+    .topo-master-chevron {
+      width: 12px;
+      height: 12px;
+      color: #64748b;
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+    }
+    .topo-master-card[open] > summary .topo-master-chevron {
+      transform: rotate(180deg);
+    }
+    .topo-accordion-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .topo-sub-accordion {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #ffffff;
+      overflow: hidden;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .topo-sub-accordion[open] {
+      border-color: #cbd5e1;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    .topo-sub-header {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 9px;
+      cursor: pointer;
+      user-select: none;
+      background: #f8fafc;
+      font-size: 11px;
+      font-weight: 700;
+      color: #334155;
+      transition: background 0.15s ease;
+    }
+    .topo-sub-header::-webkit-details-marker {
+      display: none;
+    }
+    .topo-sub-header:hover {
+      background: #f1f5f9;
+    }
+    .topo-sub-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      flex: 1;
+    }
+    .topo-sub-title svg {
+      color: #475569;
+      flex-shrink: 0;
+    }
+    .topo-sub-chevron {
+      width: 12px;
+      height: 12px;
+      color: #64748b;
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+    }
+    .topo-sub-accordion[open] > .topo-sub-header .topo-sub-chevron {
+      transform: rotate(180deg);
+    }
+    .topo-sub-content {
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: #ffffff;
+      border-top: 1px solid #f1f5f9;
+    }
+    .topo-sub-accordion.layer-out-of-zoom {
+      opacity: 0.50;
+      filter: grayscale(0.85);
+      background: #f1f5f9 !important;
+    }
+    .topo-sub-accordion.layer-out-of-zoom .topo-sub-header {
+      color: #94a3b8 !important;
+    }
     .wms-layers-list {
       display: flex;
       flex-direction: column;
@@ -2721,139 +2813,222 @@
         <input type="range" id="parcelles-opacity" min="0" max="100" value="95" class="slider" />
       </div>
 
-      <!-- 2c. Écoulement & Dépressions (au-dessus des courbes de niveau) -->
-      <div class="tool-card" id="card-hydro-parcelle">
-        <div class="tool-card-header">
+      <!-- 3. Topographie, Relief & Hydrologie (HRDEM 1m) - Accordéon groupé -->
+      <details class="tool-card topo-master-card" id="card-topo-master">
+        <summary class="tool-card-header" style="cursor: pointer; margin-bottom: 0;">
           <div class="tool-card-title">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
-            <span>Écoulement &amp; dépressions</span>
+            <svg class="topo-master-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 2 22 22 22 12 2"></polygon></svg>
+            <span>Topographie &amp; Relief</span>
           </div>
-          <label class="switch-label" title="Afficher/Masquer les flèches d'écoulement et le raster des dépressions (zoom &gt;= 13)">
-            <input type="checkbox" id="toggle-hydro-parcelle" />
-            <span class="switch-slider"></span>
-          </label>
-        </div>
+          <span class="val-badge" style="background:#e0f2fe; color:#0369a1; border-color:#bae6fd; font-size: 9.5px;">HRDEM 1m</span>
+        </summary>
 
-        <div style="font-size: 10.5px; color: #64748b; line-height: 1.35; margin-bottom: 7px;">
-          Flèches selon la pente et raster des zones plates (pente &lt; 0.1%) calculés à la volée.
-        </div>
+        <div class="topo-master-body" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+          <div class="tool-sublabel" style="margin-bottom: 2px;">
+            Relief, ombrage 3D, courbes, pentes &amp; écoulement
+          </div>
 
-        <!-- Légende des flèches par pente -->
-        <div style="margin-bottom: 6px;">
-          <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 3px;">Pente du ruissellement :</div>
-          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: #64748b; background: #f8fafc; padding: 4px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#38bdf8;"></span> &lt; 2.5%</span>
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#0284c7;"></span> 2.5–5%</span>
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#1d4ed8;"></span> 5–10%</span>
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#6d28d9;"></span> &gt; 10%</span>
+          <div class="topo-accordion-group">
+            <!-- 1. Relief & Ombrage 3D -->
+            <details class="topo-sub-accordion" id="card-topo">
+              <summary class="topo-sub-header">
+                <div class="topo-sub-title">
+                  <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                  <span>Relief &amp; Ombrage 3D</span>
+                </div>
+                <label class="switch-label" onclick="event.stopPropagation()" title="Afficher/Masquer le relief">
+                  <input type="checkbox" id="toggle-topo" />
+                  <span class="switch-slider"></span>
+                </label>
+              </summary>
+              <div class="topo-sub-content">
+                <div class="topo-gradient-bar" title="Dégradé d'altitude dynamique : mauve au plus bas, rouge au plus haut"></div>
+                <div class="topo-gradient-labels">
+                  <span>Bas (mauve)</span>
+                  <span>Haut (rouge)</span>
+                </div>
+
+                <div id="topo-alt-badge" class="topo-alt-badge">
+                  Désactivé
+                </div>
+
+                <div class="tool-label-row">
+                  <span class="tool-sublabel">Opacité du relief</span>
+                  <span id="topo-opacity-val" class="val-badge">70%</span>
+                </div>
+                <input type="range" id="topo-opacity" min="0" max="100" value="70" class="slider" />
+
+                <div class="tool-label-row">
+                  <span class="tool-sublabel">Étirement</span>
+                  <div class="segmented-control" style="width: 180px;">
+                    <button id="btn-stretch-pct" class="seg-btn active" type="button" title="Percentile 5-95%">5-95%</button>
+                    <button id="btn-stretch-minmax" class="seg-btn" type="button" title="Min-Max automatique">Auto</button>
+                    <button id="btn-stretch-manual" class="seg-btn" type="button" title="Plage altimétrique manuelle">Manuel</button>
+                  </div>
+                </div>
+
+                <div id="topo-manual-box" style="display: none; margin-top: 4px; padding: 7px 9px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                  <div style="font-size: 10.5px; font-weight: 600; color: #475569; margin-bottom: 5px;">Plage altimétrique personnalisée (m)</div>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <div style="flex: 1;">
+                      <span style="font-size: 9.5px; color: #64748b; font-weight: 600;">Min (m)</span>
+                      <input type="number" id="topo-manual-min" step="0.5" class="soil-ai-text-input" style="font-size: 11px; padding: 4px 6px; width: 100%; font-family: var(--font-mono, monospace);" placeholder="Min" />
+                    </div>
+                    <div style="flex: 1;">
+                      <span style="font-size: 9.5px; color: #64748b; font-weight: 600;">Max (m)</span>
+                      <input type="number" id="topo-manual-max" step="0.5" class="soil-ai-text-input" style="font-size: 11px; padding: 4px 6px; width: 100%; font-family: var(--font-mono, monospace);" placeholder="Max" />
+                    </div>
+                    <button id="btn-apply-topo-manual" type="button" class="profile-dock-btn" style="margin-top: 14px; padding: 4px 9px; font-size: 11px; font-weight: 600; background: #0f172a; color: #fff; border-color: #0f172a;" title="Appliquer la plage altimétrique">Appliquer</button>
+                  </div>
+                  <div id="topo-manual-error" style="font-size: 10px; color: #b91c1c; margin-top: 3px; display: none;"></div>
+                </div>
+
+                <!-- Ombrage du relief (Hillshade 3D) calculé à la volée -->
+                <div class="tool-label-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #e2e8f0;">
+                  <label class="check-label" style="font-size: 11px; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;" title="Activer / désactiver l'ombrage du relief calculé à la volée">
+                    <input type="checkbox" id="toggle-topo-hillshade" checked />
+                    <span>Ombrage 3D (Hillshade)</span>
+                  </label>
+                  <span id="topo-hillshade-val" class="val-badge">60%</span>
+                </div>
+                <input type="range" id="topo-hillshade-opacity" min="0" max="100" value="60" class="slider" title="Opacité de l'ombrage du relief" />
+              </div>
+            </details>
+
+            <!-- 2. Courbes de niveau -->
+            <details class="topo-sub-accordion" id="card-contours">
+              <summary class="topo-sub-header">
+                <div class="topo-sub-title">
+                  <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12c3-4 6-4 9 0s6 4 9 0"></path><path d="M3 6c3-4 6-4 9 0s6 4 9 0"></path><path d="M3 18c3-4 6-4 9 0s6 4 9 0"></path></svg>
+                  <span>Courbes de niveau</span>
+                </div>
+                <label class="switch-label" onclick="event.stopPropagation()" title="Afficher/Masquer les courbes de niveau (dès zoom 11)">
+                  <input type="checkbox" id="toggle-contours" />
+                  <span class="switch-slider"></span>
+                </label>
+              </summary>
+              <div class="topo-sub-content">
+                <div class="tool-label-row">
+                  <span class="tool-sublabel">Intervalle</span>
+                </div>
+                <div class="pills-group">
+                  <button class="pill-btn" data-interval="0.1">10 cm</button>
+                  <button class="pill-btn" data-interval="0.25">25 cm</button>
+                  <button class="pill-btn" data-interval="0.5">50 cm</button>
+                  <button class="pill-btn active" data-interval="1">1 m</button>
+                </div>
+
+                <div id="contour-status" class="contour-status-badge">
+                  Désactivé
+                </div>
+              </div>
+            </details>
+
+            <!-- 3. Carte des Pentes (%) -->
+            <details class="topo-sub-accordion" id="card-pentes">
+              <summary class="topo-sub-header">
+                <div class="topo-sub-title">
+                  <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 20h18L3 4v16z"/></svg>
+                  <span>Carte des pentes (%)</span>
+                </div>
+                <label class="switch-label" onclick="event.stopPropagation()" title="Afficher/Masquer la carte des pentes">
+                  <input type="checkbox" id="toggle-pentes" />
+                  <span class="switch-slider"></span>
+                </label>
+              </summary>
+              <div class="topo-sub-content">
+                <div id="pentes-status-badge" class="topo-alt-badge">
+                  Désactivé
+                </div>
+
+                <div class="tool-label-row">
+                  <span class="tool-sublabel">Opacité des pentes</span>
+                  <span id="pentes-opacity-val" class="val-badge">75%</span>
+                </div>
+                <input type="range" id="pentes-opacity" min="0" max="100" value="75" class="slider" />
+
+                <!-- Légende des 6 catégories de pente -->
+                <div style="margin-top: 4px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                  <div style="font-size: 10px; font-weight: 700; color: #475569; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;">Classes de pente</div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 10.5px; font-weight: 600; color: #334155;">
+                    <div style="display: flex; align-items: center; gap: 5px;" title="Pente quasi-nulle : zones de stagnation hydrique et de drainage critique">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #0284c7; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>0 – 0,3 %</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;" title="Pente très faible : écoulement lent">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #22c55e; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>0,3 – 1 %</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;" title="Pente faible : bon égouttement superficiel">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #84cc16; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>1 – 3 %</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;" title="Pente modérée : érosion hydrique modérée">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #eab308; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>3 – 10 %</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;" title="Pente forte : risque d'érosion élevé, travail prudent">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #ea580c; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>10 – 30 %</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;" title="Pente très forte : escarpements, talus, non cultivable">
+                      <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #b91c1c; border: 1px solid rgba(0,0,0,0.1);"></span>
+                      <span>&gt; 30 %</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <!-- 4. Écoulement & Dépressions -->
+            <details class="topo-sub-accordion" id="card-hydro-parcelle">
+              <summary class="topo-sub-header">
+                <div class="topo-sub-title">
+                  <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                  <span>Écoulement &amp; dépressions</span>
+                </div>
+                <label class="switch-label" onclick="event.stopPropagation()" title="Afficher/Masquer les flèches d'écoulement et le raster des dépressions (zoom >= 13)">
+                  <input type="checkbox" id="toggle-hydro-parcelle" />
+                  <span class="switch-slider"></span>
+                </label>
+              </summary>
+              <div class="topo-sub-content">
+                <div style="font-size: 10.5px; color: #64748b; line-height: 1.35; margin-bottom: 4px;">
+                  Flèches selon la pente et raster des zones plates (pente &lt; 0.1%) calculés à la volée.
+                </div>
+
+                <!-- Légende des flèches par pente -->
+                <div style="margin-bottom: 4px;">
+                  <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 3px;">Pente du ruissellement :</div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: #64748b; background: #f8fafc; padding: 4px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
+                    <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#38bdf8;"></span> &lt; 2.5%</span>
+                    <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#0284c7;"></span> 2.5–5%</span>
+                    <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#1d4ed8;"></span> 5–10%</span>
+                    <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#6d28d9;"></span> &gt; 10%</span>
+                  </div>
+                </div>
+
+                <!-- Légende des dépressions par pente -->
+                <div style="margin-bottom: 4px;">
+                  <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 3px;">Dépressions / zones plates :</div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: #64748b; background: #f8fafc; padding: 4px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
+                    <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(2,132,199,0.85);"></span> Pente &lt; 0.1%</span>
+                  </div>
+                </div>
+
+                <div id="hydro-parcelle-status" class="contour-status-badge" style="margin: 0; font-size: 10px;">
+                  Désactivé
+                </div>
+              </div>
+            </details>
           </div>
         </div>
-
-        <!-- Légende des dépressions par pente -->
-        <div style="margin-bottom: 7px;">
-          <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 3px;">Dépressions / zones plates :</div>
-          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: #64748b; background: #f8fafc; padding: 4px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
-            <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(2,132,199,0.85);"></span> Pente &lt; 0.1%</span>
-          </div>
-        </div>
-
-        <div id="hydro-parcelle-status" class="contour-status-badge" style="margin: 0; font-size: 10px;">
-          Désactivé
-        </div>
-      </div>
-
-      <!-- 3. Courbes de niveau dynamiques (au-dessus de la topographie) -->
-      <div class="tool-card" id="card-contours">
-        <div class="tool-card-header">
-          <div class="tool-card-title">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12c3-4 6-4 9 0s6 4 9 0"></path><path d="M3 6c3-4 6-4 9 0s6 4 9 0"></path><path d="M3 18c3-4 6-4 9 0s6 4 9 0"></path></svg>
-            <span>Courbes de niveau</span>
-          </div>
-          <label class="switch-label" title="Afficher/Masquer les courbes de niveau (dès zoom 11)">
-            <input type="checkbox" id="toggle-contours" />
-            <span class="switch-slider"></span>
-          </label>
-        </div>
-
-        <div class="tool-label-row">
-          <span class="tool-sublabel">Intervalle</span>
-        </div>
-        <div class="pills-group">
-          <button class="pill-btn" data-interval="0.1">10 cm</button>
-          <button class="pill-btn" data-interval="0.25">25 cm</button>
-          <button class="pill-btn" data-interval="0.5">50 cm</button>
-          <button class="pill-btn active" data-interval="1">1 m</button>
-        </div>
-
-        <div id="contour-status" class="contour-status-badge">
-          Désactivé
-        </div>
-      </div>
-
-      <!-- 4. Topographie MNE (HRDEM 1m) -->
-      <div class="tool-card" id="card-topo">
-        <div class="tool-card-header">
-          <div class="tool-card-title">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-            <span>Topographie (MNE HRDEM)</span>
-          </div>
-          <label class="switch-label" title="Afficher/Masquer le relief">
-            <input type="checkbox" id="toggle-topo" />
-            <span class="switch-slider"></span>
-          </label>
-        </div>
-
-        <div class="topo-gradient-bar" title="Dégradé d'altitude dynamique : mauve au plus bas, rouge au plus haut"></div>
-        <div class="topo-gradient-labels">
-          <span>Bas (mauve)</span>
-          <span>Haut (rouge)</span>
-        </div>
-
-        <div id="topo-alt-badge" class="topo-alt-badge">
-          Désactivé
-        </div>
-
-        <div class="tool-label-row">
-          <span class="tool-sublabel">Opacité du relief</span>
-          <span id="topo-opacity-val" class="val-badge">70%</span>
-        </div>
-        <input type="range" id="topo-opacity" min="0" max="100" value="70" class="slider" />
-
-        <div class="tool-label-row">
-          <span class="tool-sublabel">Étirement viewport</span>
-          <div class="segmented-control" style="width: 180px;">
-            <button id="btn-stretch-pct" class="seg-btn active" type="button" title="Percentile 5-95%">5-95%</button>
-            <button id="btn-stretch-minmax" class="seg-btn" type="button" title="Min-Max automatique">Auto</button>
-            <button id="btn-stretch-manual" class="seg-btn" type="button" title="Plage altimétrique manuelle">Manuel</button>
-          </div>
-        </div>
-
-        <div id="topo-manual-box" style="display: none; margin-top: 8px; padding: 7px 9px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
-          <div style="font-size: 10.5px; font-weight: 600; color: #475569; margin-bottom: 5px;">Plage altimétrique personnalisée (m)</div>
-          <div style="display: flex; gap: 6px; align-items: center;">
-            <div style="flex: 1;">
-              <span style="font-size: 9.5px; color: #64748b; font-weight: 600;">Min (m)</span>
-              <input type="number" id="topo-manual-min" step="0.5" class="soil-ai-text-input" style="font-size: 11px; padding: 4px 6px; width: 100%; font-family: var(--font-mono, monospace);" placeholder="Min" />
-            </div>
-            <div style="flex: 1;">
-              <span style="font-size: 9.5px; color: #64748b; font-weight: 600;">Max (m)</span>
-              <input type="number" id="topo-manual-max" step="0.5" class="soil-ai-text-input" style="font-size: 11px; padding: 4px 6px; width: 100%; font-family: var(--font-mono, monospace);" placeholder="Max" />
-            </div>
-            <button id="btn-apply-topo-manual" type="button" class="profile-dock-btn" style="margin-top: 14px; padding: 4px 9px; font-size: 11px; font-weight: 600; background: #0f172a; color: #fff; border-color: #0f172a;" title="Appliquer la plage altimétrique">Appliquer</button>
-          </div>
-          <div id="topo-manual-error" style="font-size: 10px; color: #b91c1c; margin-top: 3px; display: none;"></div>
-        </div>
-
-        <!-- Ombrage du relief (Hillshade 3D) calculé à la volée -->
-        <div class="tool-label-row" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0;">
-          <label class="check-label" style="font-size: 11px; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;" title="Activer / désactiver l'ombrage du relief calculé à la volée">
-            <input type="checkbox" id="toggle-topo-hillshade" checked />
-            <span>Ombrage du relief (Hillshade 3D)</span>
-          </label>
-          <span id="topo-hillshade-val" class="val-badge">60%</span>
-        </div>
-        <input type="range" id="topo-hillshade-opacity" min="0" max="100" value="60" class="slider" title="Opacité de l'ombrage du relief" />
-      </div>
+      </details>
 
       <!-- 5. Couches géomatiques et WMS (Québec) -->
       <div class="tool-card" id="card-wms">
@@ -3314,6 +3489,9 @@
       if (searchParams.get("topo") === "1" || searchParams.get("topo") === "true") {
         if (!layers.includes("topo")) layers.push("topo");
       }
+      if (searchParams.get("pentes") === "1" || searchParams.get("pentes") === "true") {
+        if (!layers.includes("pentes")) layers.push("pentes");
+      }
       if (searchParams.get("contours") === "1" || searchParams.get("contours") === "true") {
         if (!layers.includes("contours")) layers.push("contours");
       }
@@ -3345,6 +3523,7 @@
       const topoOp = searchParams.get("topo_op");
       const topoHs = searchParams.get("topo_hs");
       const topoHsOp = searchParams.get("topo_hs_op");
+      const pentesOp = searchParams.get("pentes_op");
       const interval = searchParams.get("interval");
 
       const hasLocation = (lat !== null && !isNaN(lat) && lng !== null && !isNaN(lng) && zoom !== null && !isNaN(zoom));
@@ -3362,6 +3541,7 @@
         topoOp: topoOp ? parseInt(topoOp, 10) : null,
         topoHs: topoHs !== null ? (topoHs === "1" || topoHs === "true") : null,
         topoHsOp: topoHsOp ? parseInt(topoHsOp, 10) : null,
+        pentesOp: pentesOp ? parseInt(pentesOp, 10) : null,
         interval: interval ? parseFloat(interval) : null
       };
     }
@@ -4075,6 +4255,281 @@
         } catch (err) {
           if (err.name === 'AbortError') return;
           console.warn('Topo viewport stretch update failed:', err);
+        }
+      }
+    }
+
+    // Slope (Pentes en %) Manager with Gaussian Smoothing calculated on the fly
+    class PentesManager {
+      constructor(mapInstance) {
+        this.map = mapInstance;
+        this.enabled = false;
+        this.opacity = 0.75;
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.debounceTimer = null;
+        this.abortController = null;
+        this.sourceAdded = false;
+      }
+
+      setOpacity(val) {
+        this.opacity = val;
+        if (this.map.getLayer('hrdem-pentes-layer')) {
+          this.map.setPaintProperty('hrdem-pentes-layer', 'raster-opacity', this.opacity);
+        }
+      }
+
+      setEnabled(on) {
+        this.enabled = on;
+        if (this.map.getLayer('hrdem-pentes-layer')) {
+          this.map.setLayoutProperty('hrdem-pentes-layer', 'visibility', on ? 'visible' : 'none');
+        }
+        const badge = document.getElementById('pentes-status-badge');
+        if (badge && !on) {
+          badge.textContent = 'Désactivé';
+        }
+        if (on) this.scheduleUpdate();
+      }
+
+      scheduleUpdate() {
+        if (!this.enabled) return;
+        if (this.debounceTimer) clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => {
+          this.updateViewport();
+        }, 150);
+      }
+
+      async updateViewport() {
+        if (!this.enabled || !this.map) return;
+        const zoom = this.map.getZoom();
+        const badge = document.getElementById('pentes-status-badge');
+        if (zoom < 7) {
+          if (badge) badge.textContent = 'Zoomer pour les pentes (zoom 7+)';
+          return;
+        }
+
+        const bounds = this.map.getBounds();
+        const w = bounds.getWest();
+        const s = bounds.getSouth();
+        const e = bounds.getEast();
+        const n = bounds.getNorth();
+        const bbox = [w, s, e, n];
+
+        const intersecting = findTilesForBbox(w, s, e, n);
+        if (intersecting.length === 0) {
+          if (badge) badge.textContent = 'Hors de la zone MNE HRDEM';
+          return;
+        }
+
+        if (this.abortController) this.abortController.abort();
+        this.abortController = new AbortController();
+
+        if (badge) badge.textContent = 'Calcul des pentes...';
+
+        try {
+          const targetSize = 256;
+          const region = await readMultiHrdemRegion(bbox, targetSize, this.abortController.signal, 'bilinear');
+
+          if (!region || !region.data || region.data.length === 0) {
+            if (badge) badge.textContent = 'Aucune donnée MNE dans la vue';
+            return;
+          }
+
+          const width = region.width;
+          const height = region.height;
+          const rawData = region.data;
+
+          // 1. Lissage Gaussien 3x3 séparable pour éliminer le micro-bruit LiDAR 1m
+          const temp = new Float32Array(width * height);
+          for (let r = 0; r < height; r++) {
+            const rowOff = r * width;
+            for (let c = 0; c < width; c++) {
+              const center = rawData[rowOff + c];
+              if (isNaN(center) || center <= -1000 || center >= 9000) {
+                temp[rowOff + c] = NaN;
+                continue;
+              }
+              const cPrev = c > 0 ? c - 1 : 0;
+              const cNext = c < width - 1 ? c + 1 : width - 1;
+              const v0 = rawData[rowOff + cPrev];
+              const v1 = center;
+              const v2 = rawData[rowOff + cNext];
+              const valid0 = !isNaN(v0) && v0 > -1000 && v0 < 9000;
+              const valid2 = !isNaN(v2) && v2 > -1000 && v2 < 9000;
+              const w0 = valid0 ? 1 : 0;
+              const w1 = 2;
+              const w2 = valid2 ? 1 : 0;
+              const sumW = w0 + w1 + w2;
+              temp[rowOff + c] = ((valid0 ? v0 : 0) * w0 + v1 * w1 + (valid2 ? v2 : 0) * w2) / sumW;
+            }
+          }
+
+          const smoothed = new Float32Array(width * height);
+          for (let c = 0; c < width; c++) {
+            for (let r = 0; r < height; r++) {
+              const center = temp[r * width + c];
+              if (isNaN(center)) {
+                smoothed[r * width + c] = NaN;
+                continue;
+              }
+              const rPrev = (r > 0 ? r - 1 : 0) * width;
+              const rCurr = r * width;
+              const rNext = (r < height - 1 ? r + 1 : height - 1) * width;
+              const v0 = temp[rPrev + c];
+              const v1 = center;
+              const v2 = temp[rNext + c];
+              const valid0 = !isNaN(v0);
+              const valid2 = !isNaN(v2);
+              const w0 = valid0 ? 1 : 0;
+              const w1 = 2;
+              const w2 = valid2 ? 1 : 0;
+              const sumW = w0 + w1 + w2;
+              smoothed[rCurr + c] = ((valid0 ? v0 : 0) * w0 + v1 * w1 + (valid2 ? v2 : 0) * w2) / sumW;
+            }
+          }
+
+          // 2. Calcul des pentes en % avec filtre de Horn
+          const dx = Math.max(0.5, (region.sourceBBox[2] - region.sourceBBox[0]) / width);
+          const dy = Math.max(0.5, (region.sourceBBox[3] - region.sourceBBox[1]) / height);
+          const inv8dx = 1 / (8 * dx);
+          const inv8dy = 1 / (8 * dy);
+
+          this.canvas.width = width;
+          this.canvas.height = height;
+          const imgData = this.ctx.createImageData(width, height);
+          const pixels = imgData.data;
+
+          let sumSlope = 0, countSlope = 0;
+
+          for (let r = 0; r < height; r++) {
+            const rPrev = (r > 0 ? r - 1 : 0) * width;
+            const rCurr = r * width;
+            const rNext = (r < height - 1 ? r + 1 : height - 1) * width;
+
+            for (let c = 0; c < width; c++) {
+              const pIdx = (rCurr + c) * 4;
+              const z_c = smoothed[rCurr + c];
+
+              if (isNaN(z_c) || z_c <= -1000 || z_c >= 9000) {
+                pixels[pIdx + 3] = 0;
+                continue;
+              }
+
+              const cPrev = c > 0 ? c - 1 : 0;
+              const cNext = c < width - 1 ? c + 1 : width - 1;
+
+              const getVal = (idx) => {
+                const v = smoothed[idx];
+                return (isNaN(v) || v <= -1000 || v >= 9000) ? z_c : v;
+              };
+
+              const z_nw = getVal(rPrev + cPrev);
+              const z_n  = getVal(rPrev + c);
+              const z_ne = getVal(rPrev + cNext);
+              const z_w  = getVal(rCurr + cPrev);
+              const z_e  = getVal(rCurr + cNext);
+              const z_sw = getVal(rNext + cPrev);
+              const z_s  = getVal(rNext + c);
+              const z_se = getVal(rNext + cNext);
+
+              const dzdx = ((z_ne + 2 * z_e + z_se) - (z_nw + 2 * z_w + z_sw)) * inv8dx;
+              const dzdy = ((z_nw + 2 * z_n + z_ne) - (z_sw + 2 * z_s + z_se)) * inv8dy;
+
+              // Pente en % = dénivelé / distance horizontale * 100
+              const slopePct = Math.sqrt(dzdx * dzdx + dzdy * dzdy) * 100;
+              if (isNaN(slopePct)) {
+                pixels[pIdx + 3] = 0;
+                continue;
+              }
+              sumSlope += slopePct;
+              countSlope++;
+
+              // 6 catégories exactes :
+              // 0-0.3%, 0.3-1%, 1-3%, 3-10%, 10-30%, >30%
+              pixels[pIdx + 3] = 255;
+              if (slopePct < 0.3) {
+                // 0 - 0.3% : Bleu cyan (zones plates / risque de stagnation)
+                pixels[pIdx] = 2;
+                pixels[pIdx + 1] = 132;
+                pixels[pIdx + 2] = 199;
+              } else if (slopePct < 1.0) {
+                // 0.3 - 1% : Vert vif (très faible pente)
+                pixels[pIdx] = 34;
+                pixels[pIdx + 1] = 197;
+                pixels[pIdx + 2] = 94;
+              } else if (slopePct < 3.0) {
+                // 1 - 3% : Jaune-vert / lime (pente faible)
+                pixels[pIdx] = 132;
+                pixels[pIdx + 1] = 204;
+                pixels[pIdx + 2] = 22;
+              } else if (slopePct < 10.0) {
+                // 3 - 10% : Jaune doré (pente modérée)
+                pixels[pIdx] = 234;
+                pixels[pIdx + 1] = 179;
+                pixels[pIdx + 2] = 8;
+              } else if (slopePct < 30.0) {
+                // 10 - 30% : Orange (pente forte)
+                pixels[pIdx] = 234;
+                pixels[pIdx + 1] = 88;
+                pixels[pIdx + 2] = 12;
+              } else {
+                // > 30% : Rouge vif / carmin (pente très forte / escarpement)
+                pixels[pIdx] = 185;
+                pixels[pIdx + 1] = 28;
+                pixels[pIdx + 2] = 28;
+              }
+            }
+          }
+
+          this.ctx.putImageData(imgData, 0, 0);
+          const dataUrl = this.canvas.toDataURL();
+
+          if (badge && countSlope > 0) {
+            const avgSlope = (sumSlope / countSlope).toFixed(1);
+            badge.textContent = `Pente moyenne : ${avgSlope} %`;
+          }
+
+          const actualBbox = region.bboxWgs84 || bbox;
+          const coords = region.cornersWgs84 || [
+            [actualBbox[0], actualBbox[3]], // Top-Left (NW)
+            [actualBbox[2], actualBbox[3]], // Top-Right (NE)
+            [actualBbox[2], actualBbox[1]], // Bottom-Right (SE)
+            [actualBbox[0], actualBbox[1]]  // Bottom-Left (SW)
+          ];
+
+          const source = this.map.getSource('hrdem-pentes-source');
+          if (source) {
+            source.updateImage({
+              url: dataUrl,
+              coordinates: coords
+            });
+          } else {
+            this.map.addSource('hrdem-pentes-source', {
+              type: 'image',
+              url: dataUrl,
+              coordinates: coords
+            });
+            const beforeLayer = this.map.getLayer('pedologie-fill') ? 'pedologie-fill' : undefined;
+            this.map.addLayer({
+              id: 'hrdem-pentes-layer',
+              type: 'raster',
+              source: 'hrdem-pentes-source',
+              layout: { visibility: this.enabled ? 'visible' : 'none' },
+              paint: {
+                'raster-opacity': this.opacity,
+                'raster-resampling': 'linear',
+                'raster-fade-duration': 180
+              }
+            }, beforeLayer);
+            this.sourceAdded = true;
+          }
+
+          if (typeof bringTopLayersToFront === 'function') {
+            bringTopLayersToFront();
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.warn('Slope calculation failed:', err);
         }
       }
     }
@@ -7668,6 +8123,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
     }
 
     let topoManager = null;
+    let pentesManager = null;
     let contourManager = null;
     let profileManager = null;
     let ndviManager = null;
@@ -7850,6 +8306,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
 
       // Instantiate Topography Manager (starts disabled by default)
       topoManager = new TopoManager(map);
+      pentesManager = new PentesManager(map);
 
       // Instantiate ContourManager from geolibre-plugin
       const mockApp = {
@@ -8007,6 +8464,14 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
             title: "Relief MNE non affiché à ce niveau de zoom (visible dès le zoom 7)"
           },
           {
+            id: "card-pentes",
+            checkboxId: "toggle-pentes",
+            minZoom: 7,
+            maxZoom: Infinity,
+            badgeText: "z ≥ 7",
+            title: "Pentes non affichées à ce niveau de zoom (visibles dès le zoom 7)"
+          },
+          {
             id: "card-contours",
             checkboxId: "toggle-contours",
             minZoom: 11,
@@ -8041,7 +8506,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         ];
 
         toolRules.forEach(rule => {
-          const card = document.getElementById(rule.id) || (rule.checkboxId && document.getElementById(rule.checkboxId)?.closest(".tool-card"));
+          const card = document.getElementById(rule.id) || (rule.checkboxId && document.getElementById(rule.checkboxId)?.closest(".tool-card, .topo-sub-accordion"));
           if (!card) return;
           const isVisibleAtZoom = zoom >= rule.minZoom && zoom <= rule.maxZoom;
 
@@ -8049,7 +8514,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
           if (!badge && (rule.minZoom > 3 || rule.maxZoom < Infinity)) {
             badge = document.createElement("span");
             badge.className = "layer-zoom-badge";
-            const titleEl = card.querySelector(".tool-card-title");
+            const titleEl = card.querySelector(".tool-card-title") || card.querySelector(".topo-sub-title");
             if (titleEl) titleEl.appendChild(badge);
           }
 
@@ -8094,6 +8559,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       // Camera move listeners
       map.on('moveend', () => {
         if (topoManager && topoManager.enabled) topoManager.scheduleUpdate();
+        if (pentesManager && pentesManager.enabled) pentesManager.scheduleUpdate();
         
         const toggleContoursEl = document.getElementById("toggle-contours");
         if (contourManager && toggleContoursEl && toggleContoursEl.checked) {
@@ -8947,6 +9413,25 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       });
     }
 
+    // Carte des Pentes (%) Controls
+    const togglePentes = document.getElementById("toggle-pentes");
+    const pentesOpacitySlider = document.getElementById("pentes-opacity");
+    const pentesOpacityVal = document.getElementById("pentes-opacity-val");
+
+    if (togglePentes) {
+      togglePentes.addEventListener("change", (e) => {
+        if (pentesManager) pentesManager.setEnabled(e.target.checked);
+      });
+    }
+
+    if (pentesOpacitySlider) {
+      pentesOpacitySlider.addEventListener("input", (e) => {
+        const pct = parseInt(e.target.value, 10);
+        if (pentesOpacityVal) pentesOpacityVal.textContent = pct + "%";
+        if (pentesManager) pentesManager.setOpacity(pct / 100);
+      });
+    }
+
     // Dynamic Contours Controls
     const toggleContours = document.getElementById("toggle-contours");
     const pillButtons = document.querySelectorAll(".pill-btn");
@@ -9642,6 +10127,7 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         if (togglePedo && togglePedo.checked) activeLayers.push("pedo");
         if (toggleParcelles && toggleParcelles.checked) activeLayers.push("parcelles");
         if (toggleTopo && toggleTopo.checked) activeLayers.push("topo");
+        if (togglePentes && togglePentes.checked) activeLayers.push("pentes");
         if (toggleContours && toggleContours.checked) activeLayers.push("contours");
         if (toggleHydroParcelle && toggleHydroParcelle.checked) activeLayers.push("hydro");
         if (ndviManager && ndviManager.isActiveMode) activeLayers.push("ndvi");
@@ -9665,6 +10151,9 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         }
         if (toggleTopo && toggleTopo.checked && topoHillshadeOpacitySlider && parseInt(topoHillshadeOpacitySlider.value, 10) !== 60) {
           params.set("topo_hs_op", topoHillshadeOpacitySlider.value);
+        }
+        if (togglePentes && togglePentes.checked && pentesOpacitySlider && parseInt(pentesOpacitySlider.value, 10) !== 75) {
+          params.set("pentes_op", pentesOpacitySlider.value);
         }
 
         // Active WMS layers
@@ -9749,6 +10238,19 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         }
       }
 
+      // 4b. Carte des Pentes (%)
+      if (state.layers.includes("pentes")) {
+        if (state.pentesOp !== null && pentesOpacitySlider) {
+          pentesOpacitySlider.value = state.pentesOp;
+          if (pentesOpacityVal) pentesOpacityVal.textContent = state.pentesOp + "%";
+          if (pentesManager) pentesManager.setOpacity(state.pentesOp / 100);
+        }
+        if (togglePentes) {
+          togglePentes.checked = true;
+          if (pentesManager) pentesManager.setEnabled(true);
+        }
+      }
+
       // 5. Contours
       if (state.layers.includes("contours")) {
         if (state.interval && contourManager) {
@@ -9778,6 +10280,28 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         if (toggleHydroParcelle) {
           toggleHydroParcelle.checked = false;
           if (parcelHydrologyManager) parcelHydrologyManager.setEnabled(false);
+        }
+      }
+
+      // Auto-déplier l'accordéon topo principal et le sous-accordéon si une couche topo est active dans l'URL
+      if (state.layers.some(l => ["topo", "pentes", "contours", "hydro"].includes(l))) {
+        const topoMaster = document.getElementById("card-topo-master");
+        if (topoMaster) topoMaster.open = true;
+        if (state.layers.includes("topo")) {
+          const el = document.getElementById("card-topo");
+          if (el) el.open = true;
+        }
+        if (state.layers.includes("pentes")) {
+          const el = document.getElementById("card-pentes");
+          if (el) el.open = true;
+        }
+        if (state.layers.includes("contours")) {
+          const el = document.getElementById("card-contours");
+          if (el) el.open = true;
+        }
+        if (state.layers.includes("hydro")) {
+          const el = document.getElementById("card-hydro-parcelle");
+          if (el) el.open = true;
         }
       }
 
