@@ -20,7 +20,7 @@ Application cartographique interactive pour l'analyse des sols agricoles, du dra
 
 ## Développement
 
-Le fichier principal de l'application est `carte.html` (déployé en tant que `index.html` à la racine).
+Le fichier principal de l'application est `index.html` à la racine.
 
 Pour tester localement :
 

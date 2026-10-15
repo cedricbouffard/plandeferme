@@ -3,7 +3,6 @@ const CACHE_NAME = "plandeferme-v2";
 const ASSETS = [
   "/",
   "/index.html",
-  "/carte.html",
   "/style.css",
   "/geolibre-contour.css",
   "/geolibre-contour.js",
