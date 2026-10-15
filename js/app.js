@@ -1,4 +1,4 @@
-    const { ContourManager, readCogRegion, fromUrl, proj4 } = window.GeoLibreContour;
+    // ContourManager, readCogRegion, fromUrl, proj4 are declared in js/config.js
 
     // Initialize PMTiles protocol
     const protocol = new pmtiles.Protocol();
@@ -159,6 +159,7 @@
     let ndviManager = null;
     let soilAiAssistant = null;
     let wmsManager = null;
+    let parcelHydrologyManager = null;
 
     map.on("load", () => {
       // 1. Google Hybrid Raster Source
@@ -1798,6 +1799,32 @@
     }
 
     // Agri-Réseau RAG Manager
+    const ragManager = new RagManager();
+    window.ragManager = ragManager;
+
+    window.addEventListener("resize", () => {
+      if (profileManager && profileManager.profile.length >= 2) {
+        const dock = document.getElementById("elevation-profile-dock");
+        if (dock && dock.classList.contains("open")) {
+          const prec = profilePrecision ? profilePrecision.value : "decimal2";
+          profileManager.renderChart(prec);
+        }
+      }
+      if (ndviManager && ndviManager.series.length > 0) {
+        const dock = document.getElementById("ndvi-dock");
+        if (dock && dock.classList.contains("open")) {
+          ndviManager.renderChart(ndviManager.selectedIndex);
+        }
+      }
+    });
+
+    // Address Search Logic (Nominatim API)
+    const addressInput = document.getElementById("address-input");
+    const clearBtn = document.getElementById("clear-search");
+    const suggestionsBox = document.getElementById("search-suggestions");
+    const mapSearchPanel = document.getElementById("map-search-panel");
+    const btnToggleSearch = document.getElementById("btn-toggle-search");
+    let searchDebounce = null;
 
     function openSearchPanel() {
       if (mapSearchPanel) {
