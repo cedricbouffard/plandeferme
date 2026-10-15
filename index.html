@@ -2843,6 +2843,16 @@
           </div>
           <div id="topo-manual-error" style="font-size: 10px; color: #b91c1c; margin-top: 3px; display: none;"></div>
         </div>
+
+        <!-- Ombrage du relief (Hillshade 3D) calculé à la volée -->
+        <div class="tool-label-row" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0;">
+          <label class="check-label" style="font-size: 11px; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;" title="Activer / désactiver l'ombrage du relief calculé à la volée">
+            <input type="checkbox" id="toggle-topo-hillshade" checked />
+            <span>Ombrage du relief (Hillshade 3D)</span>
+          </label>
+          <span id="topo-hillshade-val" class="val-badge">60%</span>
+        </div>
+        <input type="range" id="topo-hillshade-opacity" min="0" max="100" value="60" class="slider" title="Opacité de l'ombrage du relief" />
       </div>
 
       <!-- 5. Couches géomatiques et WMS (Québec) -->
@@ -3333,6 +3343,8 @@
       const pedoOp = searchParams.get("pedo_op");
       const parcellesOp = searchParams.get("parcelles_op");
       const topoOp = searchParams.get("topo_op");
+      const topoHs = searchParams.get("topo_hs");
+      const topoHsOp = searchParams.get("topo_hs_op");
       const interval = searchParams.get("interval");
 
       const hasLocation = (lat !== null && !isNaN(lat) && lng !== null && !isNaN(lng) && zoom !== null && !isNaN(zoom));
@@ -3348,6 +3360,8 @@
         pedoOp: pedoOp ? parseInt(pedoOp, 10) : null,
         parcellesOp: parcellesOp ? parseInt(parcellesOp, 10) : null,
         topoOp: topoOp ? parseInt(topoOp, 10) : null,
+        topoHs: topoHs !== null ? (topoHs === "1" || topoHs === "true") : null,
+        topoHsOp: topoHsOp ? parseInt(topoHsOp, 10) : null,
         interval: interval ? parseFloat(interval) : null
       };
     }
@@ -3749,9 +3763,14 @@
         this.cogPromise = null;
         this.canvas = document.createElement('canvas');
         this.ctx = this.canvas.getContext('2d');
+        this.hillshadeEnabled = true;
+        this.hillshadeOpacity = 0.60;
+        this.hillshadeCanvas = document.createElement('canvas');
+        this.hillshadeCtx = this.hillshadeCanvas.getContext('2d');
         this.debounceTimer = null;
         this.abortController = null;
         this.sourceAdded = false;
+        this.hillshadeSourceAdded = false;
       }
 
       setStretchMethod(method) {
@@ -3777,10 +3796,30 @@
         }
       }
 
+      setHillshadeOpacity(val) {
+        this.hillshadeOpacity = val;
+        if (this.map.getLayer('hrdem-hillshade-layer')) {
+          this.map.setPaintProperty('hrdem-hillshade-layer', 'raster-opacity', this.hillshadeOpacity);
+        }
+      }
+
+      setHillshadeEnabled(on) {
+        this.hillshadeEnabled = on;
+        if (this.map.getLayer('hrdem-hillshade-layer')) {
+          this.map.setLayoutProperty('hrdem-hillshade-layer', 'visibility', (this.enabled && on) ? 'visible' : 'none');
+        }
+        if (this.enabled && on && !this.hillshadeSourceAdded) {
+          this.scheduleUpdate();
+        }
+      }
+
       setEnabled(on) {
         this.enabled = on;
         if (this.map.getLayer('hrdem-topo-layer')) {
           this.map.setLayoutProperty('hrdem-topo-layer', 'visibility', on ? 'visible' : 'none');
+        }
+        if (this.map.getLayer('hrdem-hillshade-layer')) {
+          this.map.setLayoutProperty('hrdem-hillshade-layer', 'visibility', (on && this.hillshadeEnabled) ? 'visible' : 'none');
         }
         if (on) this.scheduleUpdate();
       }
@@ -3916,9 +3955,122 @@
               }
             }, 'pedologie-fill');
             this.sourceAdded = true;
-            if (typeof bringTopLayersToFront === 'function') {
-              bringTopLayersToFront();
+          }
+
+          // --- Calcul de l'ombrage du relief (Hillshade 3D) semi-transparent à la volée ---
+          const dx = Math.max(0.5, (region.sourceBBox[2] - region.sourceBBox[0]) / width);
+          const dy = Math.max(0.5, (region.sourceBBox[3] - region.sourceBBox[1]) / height);
+          const inv8dx = 1 / (8 * dx);
+          const inv8dy = 1 / (8 * dy);
+          // Vecteur d'éclairage : Azimut 315° (Nord-Ouest), Altitude solaire 45°
+          const Sx = -0.5, Sy = 0.5, Sz = 0.7071068;
+          const I0 = 0.7071068;
+          const invI0 = 1 / I0;
+          const inv1MinusI0 = 1 / (1 - I0);
+
+          // Exagération verticale adaptative selon le zoom pour révéler le micro-relief
+          let zFactor = 2.4;
+          if (zoom >= 15) zFactor = 1.8;
+          else if (zoom <= 10) zFactor = 3.6;
+
+          this.hillshadeCanvas.width = width;
+          this.hillshadeCanvas.height = height;
+          const hsImgData = this.hillshadeCtx.createImageData(width, height);
+          const hsPixels = hsImgData.data;
+          const rawData = region.data;
+
+          for (let r = 0; r < height; r++) {
+            const rPrev = (r > 0 ? r - 1 : 0) * width;
+            const rCurr = r * width;
+            const rNext = (r < height - 1 ? r + 1 : height - 1) * width;
+
+            for (let c = 0; c < width; c++) {
+              const pIdx = (rCurr + c) * 4;
+              const z_c = rawData[rCurr + c];
+
+              if (isNaN(z_c) || z_c <= -1000 || z_c >= 9000) {
+                hsPixels[pIdx + 3] = 0;
+                continue;
+              }
+
+              const cPrev = c > 0 ? c - 1 : 0;
+              const cNext = c < width - 1 ? c + 1 : width - 1;
+
+              const getVal = (idx) => {
+                const v = rawData[idx];
+                return (isNaN(v) || v <= -1000 || v >= 9000) ? z_c : v;
+              };
+
+              const z_nw = getVal(rPrev + cPrev);
+              const z_n  = getVal(rPrev + c);
+              const z_ne = getVal(rPrev + cNext);
+              const z_w  = getVal(rCurr + cPrev);
+              const z_e  = getVal(rCurr + cNext);
+              const z_sw = getVal(rNext + cPrev);
+              const z_s  = getVal(rNext + c);
+              const z_se = getVal(rNext + cNext);
+
+              // Filtre de Horn 3x3 pour le gradient altimétrique métrique
+              const dzdx = ((z_ne + 2 * z_e + z_se) - (z_nw + 2 * z_w + z_sw)) * inv8dx;
+              const dzdy = ((z_nw + 2 * z_n + z_ne) - (z_sw + 2 * z_s + z_se)) * inv8dy;
+
+              const nx = -dzdx * zFactor;
+              const ny = -dzdy * zFactor;
+              const invLen = 1 / Math.sqrt(nx * nx + ny * ny + 1.0);
+
+              const dot = (nx * Sx + ny * Sy + Sz) * invLen;
+              const I = dot > 1 ? 1 : (dot < 0 ? 0 : dot);
+
+              if (I < I0) {
+                // Versant à l'ombre (obscurcissement progressif semi-transparent)
+                const shade = Math.pow((I0 - I) * invI0, 0.85);
+                hsPixels[pIdx] = 15;
+                hsPixels[pIdx + 1] = 23;
+                hsPixels[pIdx + 2] = 42;
+                hsPixels[pIdx + 3] = Math.min(255, (shade * 255 * 1.35) | 0);
+              } else {
+                // Versant exposé au soleil (lumière diffuse / rehaut blanc semi-transparent)
+                const light = Math.pow((I - I0) * inv1MinusI0, 0.9);
+                hsPixels[pIdx] = 255;
+                hsPixels[pIdx + 1] = 255;
+                hsPixels[pIdx + 2] = 255;
+                hsPixels[pIdx + 3] = Math.min(255, (light * 255 * 1.2) | 0);
+              }
             }
+          }
+
+          this.hillshadeCtx.putImageData(hsImgData, 0, 0);
+          const hsDataUrl = this.hillshadeCanvas.toDataURL();
+
+          const hsSource = this.map.getSource('hrdem-hillshade-source');
+          if (hsSource) {
+            hsSource.updateImage({
+              url: hsDataUrl,
+              coordinates: coords
+            });
+          } else {
+            this.map.addSource('hrdem-hillshade-source', {
+              type: 'image',
+              url: hsDataUrl,
+              coordinates: coords
+            });
+            const beforeLayer = this.map.getLayer('pedologie-fill') ? 'pedologie-fill' : undefined;
+            this.map.addLayer({
+              id: 'hrdem-hillshade-layer',
+              type: 'raster',
+              source: 'hrdem-hillshade-source',
+              layout: { visibility: (this.enabled && this.hillshadeEnabled) ? 'visible' : 'none' },
+              paint: {
+                'raster-opacity': this.hillshadeOpacity,
+                'raster-resampling': 'linear',
+                'raster-fade-duration': 180
+              }
+            }, beforeLayer);
+            this.hillshadeSourceAdded = true;
+          }
+
+          if (typeof bringTopLayersToFront === 'function') {
+            bringTopLayersToFront();
           }
         } catch (err) {
           if (err.name === 'AbortError') return;
@@ -8776,6 +8928,25 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
       topoManualMax.addEventListener("keydown", (e) => { if (e.key === "Enter") applyManualTopoRange(); });
     }
 
+    // Topo Hillshade (Ombrage 3D) Controls
+    const toggleTopoHillshade = document.getElementById("toggle-topo-hillshade");
+    const topoHillshadeOpacitySlider = document.getElementById("topo-hillshade-opacity");
+    const topoHillshadeVal = document.getElementById("topo-hillshade-val");
+
+    if (toggleTopoHillshade) {
+      toggleTopoHillshade.addEventListener("change", (e) => {
+        if (topoManager) topoManager.setHillshadeEnabled(e.target.checked);
+      });
+    }
+
+    if (topoHillshadeOpacitySlider) {
+      topoHillshadeOpacitySlider.addEventListener("input", (e) => {
+        const pct = parseInt(e.target.value, 10);
+        if (topoHillshadeVal) topoHillshadeVal.textContent = pct + "%";
+        if (topoManager) topoManager.setHillshadeOpacity(pct / 100);
+      });
+    }
+
     // Dynamic Contours Controls
     const toggleContours = document.getElementById("toggle-contours");
     const pillButtons = document.querySelectorAll(".pill-btn");
@@ -9486,8 +9657,14 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         if (toggleParcelles && toggleParcelles.checked && parcellesOpacity && parseInt(parcellesOpacity.value, 10) !== 95) {
           params.set("parcelles_op", parcellesOpacity.value);
         }
-        if (toggleTopo && toggleTopo.checked && topoOpacitySlider && parseInt(topoOpacitySlider.value, 10) !== 100) {
+        if (toggleTopo && toggleTopo.checked && topoOpacitySlider && parseInt(topoOpacitySlider.value, 10) !== 70) {
           params.set("topo_op", topoOpacitySlider.value);
+        }
+        if (toggleTopo && toggleTopo.checked && toggleTopoHillshade && !toggleTopoHillshade.checked) {
+          params.set("topo_hs", "0");
+        }
+        if (toggleTopo && toggleTopo.checked && topoHillshadeOpacitySlider && parseInt(topoHillshadeOpacitySlider.value, 10) !== 60) {
+          params.set("topo_hs_op", topoHillshadeOpacitySlider.value);
         }
 
         // Active WMS layers
@@ -9550,12 +9727,21 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         }
       }
 
-      // 4. Topo
+      // 4. Topo & Hillshade
       if (state.layers.includes("topo")) {
         if (state.topoOp !== null && topoOpacitySlider) {
           topoOpacitySlider.value = state.topoOp;
           if (topoOpacityVal) topoOpacityVal.textContent = state.topoOp + "%";
           if (topoManager) topoManager.setOpacity(state.topoOp / 100);
+        }
+        if (state.topoHs !== null && toggleTopoHillshade) {
+          toggleTopoHillshade.checked = state.topoHs;
+          if (topoManager) topoManager.setHillshadeEnabled(state.topoHs);
+        }
+        if (state.topoHsOp !== null && topoHillshadeOpacitySlider) {
+          topoHillshadeOpacitySlider.value = state.topoHsOp;
+          if (topoHillshadeVal) topoHillshadeVal.textContent = state.topoHsOp + "%";
+          if (topoManager) topoManager.setHillshadeOpacity(state.topoHsOp / 100);
         }
         if (toggleTopo) {
           toggleTopo.checked = true;
