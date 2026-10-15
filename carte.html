@@ -9689,7 +9689,17 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
     // Register Service Worker (PWA)
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").catch((err) => {
+        navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((reg) => {
+          // Vérification immédiate des mises à jour du Service Worker à chaque chargement
+          reg.update().catch(() => {});
+
+          // Vérification automatique au retour sur l'onglet
+          document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+              reg.update().catch(() => {});
+            }
+          });
+        }).catch((err) => {
           console.warn("Service Worker registration failed:", err);
         });
       });
