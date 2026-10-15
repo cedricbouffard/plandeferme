@@ -1,4 +1,4 @@
-const CACHE_NAME = "plandeferme-v2";
+const CACHE_NAME = "plandeferme-v3";
 
 const ASSETS = [
   "/",
@@ -12,7 +12,14 @@ const ASSETS = [
   "/favicon/favicon.ico",
   "/favicon/favicon-192.png",
   "/favicon/favicon-512.png",
-  "/logos/logo_plandeferme_v3_joyeux.png"
+  "/logos/logo_plandeferme_v3_joyeux.png",
+  "/js/config.js",
+  "/js/topo.js",
+  "/js/hydro.js",
+  "/js/ndvi.js",
+  "/js/soil-ai.js",
+  "/js/wms.js",
+  "/js/app.js"
 ];
 
 // Installation : pré-caching robuste des actifs essentiels et activation immédiate
