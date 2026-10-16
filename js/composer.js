@@ -208,24 +208,19 @@
                   </select>
                 </div>
                 <div class="composer-template-actions">
-                  <button type="button" id="composer-btn-save-template" class="composer-btn-action" title="Enregistrer le modèle actuel dans votre navigateur">
+                  <button type="button" id="composer-btn-save-template" class="composer-btn-action" title="Enregistrer le modèle actuel dans votre navigateur (localStorage)">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                     <span>Enregistrer</span>
                   </button>
-                  <button type="button" id="composer-btn-export-json" class="composer-btn-action" title="Télécharger le modèle sous forme de fichier JSON">
+                  <button type="button" id="composer-btn-export-qpt" class="composer-btn-action" title="Télécharger le modèle au format gabarit QGIS (.qpt)">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    <span>Export JSON</span>
+                    <span>Exporter .qpt</span>
                   </button>
                 </div>
-                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                  <label class="composer-btn-action" style="flex: 1; min-width: 130px; cursor: pointer; text-align: center;">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                    <span>Charger un fichier .json</span>
-                    <input type="file" id="composer-input-import-json" accept=".json" style="display: none;" />
-                  </label>
-                  <label class="composer-btn-action" style="flex: 1; min-width: 130px; cursor: pointer; text-align: center; border-color: #86efac; background: #f0fdf4; color: #166534;" title="Importer un modèle de mise en page QGIS (.qpt)">
+                <div style="margin-top: 6px;">
+                  <label class="composer-btn-action" style="width: 100%; cursor: pointer; text-align: center; border-color: #86efac; background: #f0fdf4; color: #166534;" title="Importer un modèle de mise en page QGIS (.qpt)">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-                    <span>Importer gabarit QGIS (.qpt)</span>
+                    <span>Importer un gabarit QGIS (.qpt)</span>
                     <input type="file" id="composer-input-import-qpt" accept=".qpt,.xml" style="display: none;" />
                   </label>
                 </div>
@@ -435,8 +430,7 @@
         btnOrientPortrait: document.getElementById("composer-orient-portrait"),
         templateSelect: document.getElementById("composer-template-select"),
         btnSaveTemplate: document.getElementById("composer-btn-save-template"),
-        btnExportJson: document.getElementById("composer-btn-export-json"),
-        inputImportJson: document.getElementById("composer-input-import-json"),
+        btnExportQpt: document.getElementById("composer-btn-export-qpt"),
         inputLogo: document.getElementById("composer-input-logo"),
         btnClearLogo: document.getElementById("composer-btn-clear-logo"),
         logoPreview: document.getElementById("composer-logo-preview"),
@@ -684,51 +678,10 @@
         }
       });
 
-      // Télécharger en JSON
-      this.dom.btnExportJson.addEventListener("click", () => {
-        const exportData = {
-          app: "PlanDeFerme",
-          version: "1.0",
-          exportDate: new Date().toISOString(),
-          template: this.state
-        };
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        const slug = (this.state.title || "modele").toLowerCase().replace(/[^a-z0-9]/g, "-");
-        a.download = `plan-de-ferme-template-${slug}.layout.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-      });
-
-      // Importer depuis un JSON
-      this.dom.inputImportJson.addEventListener("change", (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          try {
-            const data = JSON.parse(evt.target.result);
-            const tmpl = data.template || data;
-            if (!tmpl.title && !tmpl.orientation) {
-              throw new Error("Structure de gabarit non reconnue.");
-            }
-            const id = "imported_" + Date.now();
-            tmpl.id = id;
-            tmpl.name = tmpl.name || file.name.replace(/\.[^/.]+$/, "");
-            this.userTemplates[id] = tmpl;
-            this.saveUserTemplates();
-            this.populateTemplateSelect();
-            this.dom.templateSelect.value = "user_" + id;
-            this.loadState(tmpl);
-            alert(`Modèle "${tmpl.name}" importé avec succès !`);
-          } catch (err) {
-            alert("Erreur lors de l'importation du modèle JSON : " + err.message);
-          }
-        };
-        reader.readAsText(file);
-      });
+      // Exporter au format QGIS Print Layout (.qpt)
+      if (this.dom.btnExportQpt) {
+        this.dom.btnExportQpt.addEventListener("click", () => this.exportQptTemplate());
+      }
 
       // Importer depuis un gabarit QGIS (.qpt)
       if (this.dom.inputImportQpt) {
@@ -1088,6 +1041,137 @@
     }
 
     /**
+     * Échappe les caractères réservés XML
+     */
+    escapeXml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+    }
+
+    /**
+     * Exporte le gabarit actuel au format standard QGIS Print Layout (.qpt / XML)
+     */
+    exportQptTemplate() {
+      const isLandscape = this.state.orientation === "landscape";
+      const pageW = isLandscape ? 279.4 : 215.9;
+      const pageH = isLandscape ? 215.9 : 279.4;
+      const orientation = isLandscape ? "landscape" : "portrait";
+      const templateName = this.state.title || "Plan de ferme";
+      const margin = 10;
+      const headerH = 22;
+      const mapTopY = margin + headerH + 3;
+
+      // Dimensions de la carte selon orientation
+      const mapW = isLandscape ? (pageW - margin * 2 - 64) : (pageW - margin * 2);
+      const mapH = isLandscape ? (pageH - mapTopY - margin - 6) : (this.state.showProfile ? 118 : 158);
+
+      // Sérialisation des paramètres PlanDeFerme dans une propriété personnalisée
+      const serializedState = encodeURIComponent(JSON.stringify(this.state));
+
+      const dateStr = (this.dom.sheetMetaDate && this.dom.sheetMetaDate.textContent) || "";
+      const metaLines = [];
+      if (dateStr) metaLines.push("Date : " + dateStr);
+      if (this.state.location) metaLines.push("Lieu : " + this.state.location);
+      if (this.state.author) metaLines.push("Auteur : " + this.state.author);
+
+      const qptXml = `<!DOCTYPE qgis_layout>
+<Layout name="${this.escapeXml(templateName)}" units="mm" worldFileMap="">
+  <Snapper snapToGuides="1" tolerance="5" snapToItems="1" snapToGrid="0"/>
+  <Grid offsetX="0" resolution="10" resUnits="mm" offsetY="0" offsetUnits="mm"/>
+  <PageCollection>
+    <symbol force_rhr="0" type="fill" alpha="1" clip_to_extent="1" name="">
+      <layer class="SimpleFill" pass="0" locked="0" enabled="1">
+        <prop k="border_width_map_unit_scale" v="3x:0,0,0,0,0,0"/>
+        <prop k="color" v="255,255,255,255"/>
+        <prop k="joinstyle" v="miter"/>
+        <prop k="outline_color" v="15,23,42,255"/>
+        <prop k="outline_style" v="no"/>
+        <prop k="outline_width" v="0.26"/>
+        <prop k="outline_width_unit" v="MM"/>
+        <prop k="style" v="solid"/>
+      </layer>
+    </symbol>
+    <LayoutItem id="" type="65638" position="0,0,mm" positionOnPage="0,0,mm" size="${pageW},${pageH},mm" frame="false" visibility="1" zIndex="0" background="true">
+      <pageProperties pageWidth="${pageW}" pageHeight="${pageH}" orientation="${orientation}" format="Letter"/>
+    </LayoutItem>
+  </PageCollection>
+
+  <!-- Cadre de Carte -->
+  <LayoutItem id="Carte Principale" type="65639" position="${margin},${mapTopY},mm" positionOnPage="${margin},${mapTopY},mm" size="${mapW},${mapH},mm" frame="true" outlineWidthM="0.4,mm" visibility="1" zIndex="1" background="true">
+    <FrameColor alpha="255" red="15" blue="42" green="23"/>
+    <BackgroundColor alpha="255" red="241" blue="249" green="245"/>
+  </LayoutItem>
+
+  <!-- Cartouche En-Tête -->
+  <LayoutItem id="Cartouche Fond" type="65641" position="${margin},${margin},mm" positionOnPage="${margin},${margin},mm" size="${pageW - margin * 2},${headerH},mm" frame="true" outlineWidthM="0.4,mm" visibility="1" zIndex="1" background="true">
+    <FrameColor alpha="255" red="15" blue="42" green="23"/>
+    <BackgroundColor alpha="255" red="255" blue="255" green="255"/>
+  </LayoutItem>
+
+  <!-- Titre -->
+  <LayoutItem id="Titre" type="65641" position="${margin + 4},${margin + 2},mm" positionOnPage="${margin + 4},${margin + 2},mm" size="${pageW - margin * 2 - 80},10,mm" frame="false" visibility="1" zIndex="2" labelText="${this.escapeXml(this.state.title || "Plan de ferme")}">
+    <FontDescription style="Bold" description="Helvetica,14,-1,5,75,0,0,0,0,0"/>
+    <FontColor alpha="255" red="15" blue="42" green="23"/>
+  </LayoutItem>
+
+  <!-- Sous-titre -->
+  <LayoutItem id="SousTitre" type="65641" position="${margin + 4},${margin + 12},mm" positionOnPage="${margin + 4},${margin + 12},mm" size="${pageW - margin * 2 - 80},8,mm" frame="false" visibility="1" zIndex="2" labelText="${this.escapeXml(this.state.subtitle || "")}">
+    <FontDescription style="Bold" description="Helvetica,9,-1,5,75,0,0,0,0,0"/>
+    <FontColor alpha="255" red="22" blue="52" green="101"/>
+  </LayoutItem>
+
+  <!-- Métadonnées (Date, Lieu, Auteur) -->
+  <LayoutItem id="Metadonnees" type="65641" position="${pageW - margin - 75},${margin + 2},mm" positionOnPage="${pageW - margin - 75},${margin + 2},mm" size="70,18,mm" frame="false" halign="2" visibility="1" zIndex="2" labelText="${this.escapeXml(metaLines.join("\n"))}">
+    <FontDescription style="Regular" description="Helvetica,8,-1,5,50,0,0,0,0,0"/>
+    <FontColor alpha="255" red="71" blue="105" green="85"/>
+  </LayoutItem>
+
+  ${this.state.showLegend !== false ? `
+  <!-- Légende -->
+  <LayoutItem id="Legende" type="65642" position="${isLandscape ? (margin + mapW + 4) : (margin + 49)},${isLandscape ? (mapTopY + 49) : (mapTopY + mapH + 3)},mm" size="${isLandscape ? 60 : 72},${isLandscape ? 80 : 55},mm" frame="true" outlineWidthM="0.3,mm" visibility="1" zIndex="2" title="LÉGENDE">
+    <TitleFont style="Bold" description="Helvetica,8,-1,5,75,0,0,0,0,0"/>
+  </LayoutItem>` : ""}
+
+  ${this.state.showScale !== false ? `
+  <!-- Barre d'échelle -->
+  <LayoutItem id="Echelle" type="65646" position="${isLandscape ? (margin + mapW + 4) : margin},${isLandscape ? (mapTopY + 28) : (mapTopY + mapH + 28)},mm" size="${isLandscape ? 60 : 46},14,mm" frame="false" visibility="1" zIndex="2" unitLabel="m" numUnitsPerSegment="100" segmentMillimeters="20" numSegments="2" numSegmentsLeft="0" numMapUnitsPerScaleBarUnit="1">
+  </LayoutItem>` : ""}
+
+  ${this.state.showCompass !== false ? `
+  <!-- Flèche Nord (Rose des vents) -->
+  <LayoutItem id="RoseDesVents" type="65640" position="${isLandscape ? (margin + mapW + 18) : (margin + 11)},${isLandscape ? (mapTopY + 3) : (mapTopY + mapH + 3)},mm" size="24,24,mm" frame="false" visibility="1" zIndex="2" picturePath="arrows/NorthArrow_04.svg">
+  </LayoutItem>` : ""}
+
+  ${(this.state.showNotes !== false && this.state.notes) ? `
+  <!-- Notes de terrain -->
+  <LayoutItem id="Notes" type="65641" position="${isLandscape ? (margin + mapW + 4) : (margin + 124)},${isLandscape ? (pageH - margin - 35) : (mapTopY + mapH + 3)},mm" size="${isLandscape ? 60 : (pageW - margin * 2 - 124)},30,mm" frame="true" outlineWidthM="0.3,mm" visibility="1" zIndex="2" labelText="${this.escapeXml(this.state.notes)}">
+    <FontDescription style="Regular" description="Helvetica,7,-1,5,50,0,0,0,0,0"/>
+    <FontColor alpha="255" red="71" blue="105" green="85"/>
+  </LayoutItem>` : ""}
+
+  <customproperties>
+    <property key="plandeferme_app" value="PlanDeFerme"/>
+    <property key="plandeferme_version" value="1.0"/>
+    <property key="plandeferme_state" value="${serializedState}"/>
+  </customproperties>
+</Layout>`;
+
+      const blob = new Blob([qptXml], { type: "application/x-qgis-project" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const slug = (this.state.title || "plan-de-ferme").toLowerCase().replace(/[^a-z0-9]/g, "-");
+      a.download = `plan-de-ferme-${slug}.qpt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    /**
      * Importe un fichier de composition QGIS Print Layout (.qpt / XML)
      */
     importQptTemplate(xmlContent, fileName) {
@@ -1098,6 +1182,31 @@
         const parseError = xmlDoc.querySelector("parsererror");
         if (parseError) {
           throw new Error("Le fichier XML n'est pas valide ou est corrompu.");
+        }
+
+        // Vérification préalable : si le fichier provient d'un export PlanDeFerme
+        const customProp = xmlDoc.querySelector('customproperties property[key="plandeferme_state"]');
+        if (customProp && customProp.getAttribute("value")) {
+          try {
+            const rawJson = decodeURIComponent(customProp.getAttribute("value"));
+            const importedState = JSON.parse(rawJson);
+            const templateId = "user_qpt_" + Date.now();
+            const baseName = fileName ? fileName.replace(/\.qpt$/i, "").replace(/\.xml$/i, "") : "Modèle QGIS";
+            const newTemplate = {
+              ...importedState,
+              id: templateId,
+              name: importedState.name || `QGIS - ${baseName}`
+            };
+            this.userTemplates[templateId.replace("user_", "")] = newTemplate;
+            this.saveUserTemplates();
+            this.populateTemplateSelect();
+            this.dom.templateSelect.value = templateId;
+            this.applyTemplate(templateId);
+            alert(`Gabarit QGIS "${newTemplate.name}" importé avec succès !`);
+            return;
+          } catch (e) {
+            console.warn("[Composer] Erreur lecture métadonnées PlanDeFerme dans le QPT:", e);
+          }
         }
 
         // 1. Détection de l'orientation et des dimensions de la page
