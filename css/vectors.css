@@ -850,6 +850,18 @@
   border-color: #cbd5e1;
 }
 
+.personal-layer-btn.btn-rename:hover {
+  background: #f8fafc;
+  color: #0284c7;
+  border-color: #cbd5e1;
+}
+
+.personal-layer-btn.btn-export:hover {
+  background: #f0fdf4;
+  color: #16a34a;
+  border-color: #bbf7d0;
+}
+
 .personal-layer-btn.danger:hover {
   background: #fef2f2;
   color: #dc2626;

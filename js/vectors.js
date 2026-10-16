@@ -856,11 +856,16 @@
         }
       };
 
-      if (this.map.isStyleLoaded()) {
+      if (this.map.style) {
         ensureDrawSources();
       } else {
-        this.map.once("styledata", ensureDrawSources);
+        this.map.once("load", ensureDrawSources);
       }
+
+      this.map.on("styledata", () => {
+        ensureDrawSources();
+        this.bringToFront();
+      });
 
       // Écouteur de clic sur la carte
       this.map.on("click", (e) => {
@@ -1097,9 +1102,17 @@
         const nameEl = card.querySelector(".vector-layer-name");
         nameEl.addEventListener("blur", () => {
           const val = nameEl.textContent.trim();
-          if (val) {
+          if (val && val !== layer.name) {
             layer.name = val;
-            this.saveLayers();
+            this.updateLayerOnMap(layer);
+            this.renderInlineLayersList();
+            this.showToast(`Couche renommée en "${layer.name}"`);
+          }
+        });
+        nameEl.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            nameEl.blur();
           }
         });
 
@@ -1198,7 +1211,7 @@
               ${eyeIcon}
             </button>
             <span class="personal-layer-swatch" style="background: ${color};" title="Couleur de la couche"></span>
-            <span class="personal-layer-name" title="${layer.name}">${layer.name}</span>
+            <span class="personal-layer-name" contenteditable="true" spellcheck="false" title="Double-cliquez ou modifiez pour renommer">${layer.name}</span>
             <span style="font-size: 10px; color: #94a3b8; font-weight: 600; flex-shrink: 0;">(${count})</span>
           </div>
           <div class="personal-layer-actions">
@@ -1207,6 +1220,12 @@
             </button>
             <button type="button" class="personal-layer-btn btn-zoom" title="Zoomer sur cette couche">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </button>
+            <button type="button" class="personal-layer-btn btn-rename" title="Renommer la couche">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            </button>
+            <button type="button" class="personal-layer-btn btn-export" title="Exporter la couche (GeoJSON, KML, CSV)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             </button>
             <button type="button" class="personal-layer-btn btn-edit" title="Modifier le style, attributs &amp; QML">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -1222,9 +1241,65 @@
           e.stopPropagation();
           layer.visible = !layer.visible;
           this.setLayerVisibility(layer.id, layer.visible);
+          if (layer.visible) this.bringToFront();
           this.renderInlineLayersList();
           this.renderLayersList();
         });
+
+        // Événement Renommer la couche
+        const nameEl = row.querySelector(".personal-layer-name");
+        const btnRename = row.querySelector(".btn-rename");
+        const doRename = () => {
+          const current = layer.name;
+          const val = prompt("Nouveau nom de la couche :", current);
+          if (val && val.trim() && val.trim() !== current) {
+            layer.name = val.trim();
+            this.updateLayerOnMap(layer);
+            this.renderInlineLayersList();
+            this.renderLayersList();
+            this.showToast(`Couche renommée en "${layer.name}"`);
+          }
+        };
+
+        if (btnRename) {
+          btnRename.addEventListener("click", (e) => {
+            e.stopPropagation();
+            doRename();
+          });
+        }
+
+        if (nameEl) {
+          nameEl.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            doRename();
+          });
+          nameEl.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              nameEl.blur();
+            }
+          });
+          nameEl.addEventListener("blur", () => {
+            const val = nameEl.textContent.trim();
+            if (val && val !== layer.name) {
+              layer.name = val;
+              this.updateLayerOnMap(layer);
+              this.renderLayersList();
+              this.showToast(`Couche renommée en "${layer.name}"`);
+            } else {
+              nameEl.textContent = layer.name;
+            }
+          });
+        }
+
+        // Événement Exporter la couche
+        const btnExport = row.querySelector(".btn-export");
+        if (btnExport) {
+          btnExport.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.showExportMenu(layer, btnExport);
+          });
+        }
 
         // Événement Tracer / Dessiner
         row.querySelector(".btn-draw").addEventListener("click", (e) => {
@@ -1268,7 +1343,7 @@
      * Maintient les couches personnelles toujours par-dessus toutes les autres couches de la carte
      */
     bringToFront() {
-      if (!this.map || !this.map.isStyleLoaded()) return;
+      if (!this.map || !this.map.style) return;
 
       this.layers.forEach(layer => {
         const layerIds = [
@@ -1586,16 +1661,19 @@
         return;
       }
 
-      this.createFeatureFromCoords(this.drawingCoords);
+      const coords = [...this.drawingCoords];
+      const geomType = this.drawingType;
       this.cancelDrawing();
+      this.createFeatureFromCoords(coords, geomType);
     }
 
-    createFeatureFromCoords(coords) {
+    createFeatureFromCoords(coords, forcedGeomType = null) {
       const layer = this.getLayer(this.activeLayerId);
       if (!layer) return;
 
       const featId = "feat_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
       let geom = null;
+      const type = forcedGeomType || this.drawingType || layer.geometryType;
       const props = {
         id: featId,
         __pf_id: featId,
@@ -1603,7 +1681,7 @@
         date: new Date().toLocaleDateString("fr-CA")
       };
 
-      if (this.drawingType === "Polygon") {
+      if (type === "Polygon") {
         const ring = [...coords];
         if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
           ring.push([...ring[0]]);
@@ -1612,7 +1690,7 @@
         const area = computePolygonArea(ring);
         props.superficie_ha = area.ha;
         props.superficie_m2 = area.m2;
-      } else if (this.drawingType === "LineString") {
+      } else if (type === "LineString") {
         geom = { type: "LineString", coordinates: coords };
         const dist = computeLineDistance(coords);
         props.longueur_m = dist.m;
@@ -1628,12 +1706,17 @@
       };
 
       layer.data.features.push(newFeature);
-      this.updateLayerOnMap(layer);
+      this.syncLayerToMap(layer);
+      this.bringToFront();
       this.renderLayersList();
       this.renderInlineLayersList();
 
-      // Ouvrir immédiatement la modale d'édition des attributs de la nouvelle entité
-      this.openFeatureModal(layer.id, featId, newFeature);
+      // Sélectionner l'entité nouvellement créée avec ses sommets et son popup d'options
+      this.selectFeature(layer.id, featId, props);
+
+      const geomLabel = type === "Polygon" ? "Polygone créé" : type === "LineString" ? "Ligne créée" : "Point créé";
+      const measureStr = props.superficie_ha ? ` (${props.superficie_ha} ha)` : props.longueur_m ? ` (${props.longueur_m} m)` : "";
+      this.showToast(`${geomLabel}${measureStr} !`);
     }
 
     /**
@@ -2193,25 +2276,31 @@
     }
 
     syncLayerToMap(layer) {
-      if (!this.map || !this.map.isStyleLoaded()) {
-        if (this.map) this.map.once("styledata", () => this.syncLayerToMap(layer));
+      if (!this.map) return;
+      if (!this.map.style) {
+        this.map.once("load", () => this.syncLayerToMap(layer));
         return;
       }
 
       const sourceId = `vector-source-${layer.id}`;
-      const geomType = layer.geometryType.toLowerCase();
-      const style = layer.style;
+      const geomType = (layer.geometryType || "Polygon").toLowerCase();
+      const style = layer.style || {};
 
       // 1. Source GeoJSON avec promoteId pour identifier fidèlement chaque entité cliquée
+      const featureCollection = {
+        type: "FeatureCollection",
+        features: Array.isArray(layer.data?.features) ? [...layer.data.features] : []
+      };
+
       let src = this.map.getSource(sourceId);
       if (!src) {
         this.map.addSource(sourceId, {
           type: "geojson",
-          data: layer.data || { type: "FeatureCollection", features: [] },
+          data: featureCollection,
           promoteId: "__pf_id"
         });
       } else {
-        src.setData(layer.data || { type: "FeatureCollection", features: [] });
+        src.setData(featureCollection);
       }
 
       // 2. Calques d'affichage
@@ -2229,10 +2318,13 @@
               "fill-opacity": style.fillOpacity ?? 0.45
             }
           });
+        } else {
+          this.map.setPaintProperty(fillId, "fill-color", style.fillColor || "#3b82f6");
+          this.map.setPaintProperty(fillId, "fill-opacity", style.fillOpacity ?? 0.45);
         }
 
+        const dash = style.strokeStyle === "dashed" ? [3, 2] : style.strokeStyle === "dotted" ? [1, 1.5] : undefined;
         if (!this.map.getLayer(strokeId)) {
-          const dash = style.strokeStyle === "dashed" ? [3, 2] : style.strokeStyle === "dotted" ? [1, 1.5] : undefined;
           this.map.addLayer({
             id: strokeId,
             type: "line",
@@ -2243,11 +2335,19 @@
               ...(dash ? { "line-dasharray": dash } : {})
             }
           });
+        } else {
+          this.map.setPaintProperty(strokeId, "line-color", style.strokeColor || "#1d4ed8");
+          this.map.setPaintProperty(strokeId, "line-width", style.strokeWidth || 2);
+          if (dash) {
+            this.map.setPaintProperty(strokeId, "line-dasharray", dash);
+          } else {
+            try { this.map.setPaintProperty(strokeId, "line-dasharray", undefined); } catch (e) {}
+          }
         }
       } else if (geomType.includes("line")) {
         const lineId = `vector-line-${layer.id}`;
+        const dash = style.strokeStyle === "dashed" ? [3, 2] : style.strokeStyle === "dotted" ? [1, 1.5] : undefined;
         if (!this.map.getLayer(lineId)) {
-          const dash = style.strokeStyle === "dashed" ? [3, 2] : style.strokeStyle === "dotted" ? [1, 1.5] : undefined;
           this.map.addLayer({
             id: lineId,
             type: "line",
@@ -2258,6 +2358,14 @@
               ...(dash ? { "line-dasharray": dash } : {})
             }
           });
+        } else {
+          this.map.setPaintProperty(lineId, "line-color", style.strokeColor || "#0284c7");
+          this.map.setPaintProperty(lineId, "line-width", style.strokeWidth || 3);
+          if (dash) {
+            this.map.setPaintProperty(lineId, "line-dasharray", dash);
+          } else {
+            try { this.map.setPaintProperty(lineId, "line-dasharray", undefined); } catch (e) {}
+          }
         }
       } else {
         const pointId = `vector-point-${layer.id}`;
@@ -2274,6 +2382,12 @@
               "circle-stroke-width": style.strokeWidth || 1.5
             }
           });
+        } else {
+          this.map.setPaintProperty(pointId, "circle-radius", style.markerSize || 8);
+          this.map.setPaintProperty(pointId, "circle-color", style.fillColor || "#ef4444");
+          this.map.setPaintProperty(pointId, "circle-opacity", style.fillOpacity ?? 0.9);
+          this.map.setPaintProperty(pointId, "circle-stroke-color", style.strokeColor || "#ffffff");
+          this.map.setPaintProperty(pointId, "circle-stroke-width", style.strokeWidth || 1.5);
         }
       }
 
@@ -2317,89 +2431,12 @@
     }
 
     updateLayerOnMap(layer) {
-      if (!this.map || !this.map.isStyleLoaded()) return;
-      const sourceId = `vector-source-${layer.id}`;
-      const src = this.map.getSource(sourceId);
-      if (src) {
-        src.setData(layer.data || { type: "FeatureCollection", features: [] });
-      }
-
-      const style = layer.style;
-      const geomType = layer.geometryType.toLowerCase();
-
-      if (geomType === "polygon") {
-        const fillId = `vector-fill-${layer.id}`;
-        if (this.map.getLayer(fillId)) {
-          this.map.setPaintProperty(fillId, "fill-color", style.fillColor || "#3b82f6");
-          this.map.setPaintProperty(fillId, "fill-opacity", style.fillOpacity ?? 0.45);
-        }
-        const strokeId = `vector-stroke-${layer.id}`;
-        if (this.map.getLayer(strokeId)) {
-          this.map.setPaintProperty(strokeId, "line-color", style.strokeColor || "#1d4ed8");
-          this.map.setPaintProperty(strokeId, "line-width", style.strokeWidth || 2);
-          const dash = style.strokeStyle === "dashed" ? [3, 2] : style.strokeStyle === "dotted" ? [1, 1.5] : undefined;
-          if (dash) this.map.setPaintProperty(strokeId, "line-dasharray", dash);
-        }
-      } else if (geomType.includes("line")) {
-        const lineId = `vector-line-${layer.id}`;
-        if (this.map.getLayer(lineId)) {
-          this.map.setPaintProperty(lineId, "line-color", style.strokeColor || "#0284c7");
-          this.map.setPaintProperty(lineId, "line-width", style.strokeWidth || 3);
-          const dash = style.strokeStyle === "dashed" ? [3, 2] : style.strokeStyle === "dotted" ? [1, 1.5] : undefined;
-          if (dash) this.map.setPaintProperty(lineId, "line-dasharray", dash);
-        }
-      } else {
-        const pointId = `vector-point-${layer.id}`;
-        if (this.map.getLayer(pointId)) {
-          this.map.setPaintProperty(pointId, "circle-radius", style.markerSize || 8);
-          this.map.setPaintProperty(pointId, "circle-color", style.fillColor || "#ef4444");
-          this.map.setPaintProperty(pointId, "circle-opacity", style.fillOpacity ?? 0.9);
-          this.map.setPaintProperty(pointId, "circle-stroke-color", style.strokeColor || "#ffffff");
-          this.map.setPaintProperty(pointId, "circle-stroke-width", style.strokeWidth || 1.5);
-        }
-      }
-
-      // Mise à jour de l'étiquette textuelle
-      const labelId = `vector-label-${layer.id}`;
-      const textField = ["to-string", ["coalesce", ["get", style.labelProperty || "nom"], ["get", "nom"], ["get", "name"], ""]];
-      if (style.labelProperty) {
-        if (this.map.getLayer(labelId)) {
-          this.map.setLayoutProperty(labelId, "text-field", textField);
-          this.map.setLayoutProperty(labelId, "text-font", ["Noto Sans Bold", "Noto Sans Regular"]);
-          this.map.setLayoutProperty(labelId, "text-allow-overlap", true);
-          this.map.setLayoutProperty(labelId, "text-ignore-placement", true);
-        } else {
-          this.map.addLayer({
-            id: labelId,
-            type: "symbol",
-            source: sourceId,
-            layout: {
-              "text-field": textField,
-              "text-size": 12,
-              "text-font": ["Noto Sans Bold", "Noto Sans Regular"],
-              "text-anchor": "center",
-              "text-offset": [0, 0],
-              "text-allow-overlap": true,
-              "text-ignore-placement": true,
-              ...(geomType.includes("line") ? { "symbol-placement": "line-center" } : {})
-            },
-            paint: {
-              "text-color": "#0f172a",
-              "text-halo-color": "#ffffff",
-              "text-halo-width": 2.5
-            }
-          });
-        }
-      } else if (this.map.getLayer(labelId)) {
-        this.map.removeLayer(labelId);
-      }
-
-      this.setLayerVisibility(layer.id, layer.visible);
-      this.bringToFront();
+      if (!this.map || !this.map.style) return;
+      this.syncLayerToMap(layer);
     }
 
     setLayerVisibility(layerId, isVisible) {
-      if (!this.map || !this.map.isStyleLoaded()) return;
+      if (!this.map || !this.map.style) return;
       const vis = isVisible ? "visible" : "none";
       const layerIds = [
         `vector-fill-${layerId}`,
@@ -2413,10 +2450,13 @@
           this.map.setLayoutProperty(id, "visibility", vis);
         }
       });
+      if (isVisible) {
+        this.bringToFront();
+      }
     }
 
     removeLayerFromMap(layerId) {
-      if (!this.map || !this.map.isStyleLoaded()) return;
+      if (!this.map || !this.map.style) return;
       const layerIds = [
         `vector-fill-${layerId}`,
         `vector-stroke-${layerId}`,
@@ -2518,6 +2558,92 @@
 
       const fileName = `${layer.name.toLowerCase().replace(/[^a-z0-9]/g, "_")}.csv`;
       downloadBlob(csv, fileName, "text/csv;charset=utf-8;");
+    }
+
+    /**
+     * Menu contextuel flottant pour exporter une couche personnelle
+     */
+    showExportMenu(layer, anchorEl) {
+      const existing = document.getElementById("vector-export-popover");
+      if (existing) existing.remove();
+
+      const popover = document.createElement("div");
+      popover.id = "vector-export-popover";
+      popover.className = "personal-add-dropdown";
+      popover.style.cssText = `
+        position: fixed;
+        z-index: 10001;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+        padding: 5px;
+        min-width: 190px;
+        font-family: var(--font-sans, sans-serif);
+      `;
+
+      const rect = anchorEl.getBoundingClientRect();
+      popover.style.top = `${rect.bottom + 4}px`;
+      const right = window.innerWidth - rect.right;
+      popover.style.right = `${Math.max(10, right)}px`;
+
+      popover.innerHTML = `
+        <div style="font-size: 10px; font-weight: 700; color: #64748b; padding: 4px 8px 6px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #f1f5f9; margin-bottom: 4px;">
+          Exporter "${layer.name}"
+        </div>
+        <button type="button" class="personal-dropdown-item btn-exp-geojson">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>GeoJSON (.geojson)</span>
+        </button>
+        <button type="button" class="personal-dropdown-item btn-exp-kml">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg>
+          <span>KML (.kml - Google Earth)</span>
+        </button>
+        <button type="button" class="personal-dropdown-item btn-exp-csv">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span>Tableur CSV (.csv - WKT)</span>
+        </button>
+        <button type="button" class="personal-dropdown-item btn-exp-qml" style="border-top: 1px solid #f1f5f9; margin-top: 3px; padding-top: 6px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span>Style QGIS (.qml)</span>
+        </button>
+      `;
+
+      document.body.appendChild(popover);
+
+      const closePopover = (evt) => {
+        if (!popover.contains(evt.target) && evt.target !== anchorEl) {
+          popover.remove();
+          document.removeEventListener("click", closePopover);
+        }
+      };
+      setTimeout(() => document.addEventListener("click", closePopover), 50);
+
+      popover.querySelector(".btn-exp-geojson").addEventListener("click", () => {
+        popover.remove();
+        this.exportLayerGeoJson(layer);
+        this.showToast(`Couche "${layer.name}" exportée en GeoJSON.`);
+      });
+
+      popover.querySelector(".btn-exp-kml").addEventListener("click", () => {
+        popover.remove();
+        this.exportLayerKml(layer);
+        this.showToast(`Couche "${layer.name}" exportée en KML.`);
+      });
+
+      popover.querySelector(".btn-exp-csv").addEventListener("click", () => {
+        popover.remove();
+        this.exportLayerCsv(layer);
+        this.showToast(`Couche "${layer.name}" exportée en CSV.`);
+      });
+
+      popover.querySelector(".btn-exp-qml").addEventListener("click", () => {
+        popover.remove();
+        const qmlXml = QmlHandler.generate(layer);
+        const fileName = `${layer.name.toLowerCase().replace(/[^a-z0-9]/g, "_")}_style.qml`;
+        downloadBlob(qmlXml, fileName, "text/xml");
+        this.showToast(`Style QGIS (.qml) exporté.`);
+      });
     }
 
     importVectorFile(file) {
