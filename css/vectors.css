@@ -714,3 +714,188 @@
   font-size: 10.5px;
   color: #64748b;
 }
+
+/* ==========================================================================
+   6. Carte compacte « Couche personnelle » dans le panneau latéral
+   ========================================================================== */
+.personal-layers-inline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.personal-layer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.personal-layer-row:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 2px 5px rgba(2, 132, 199, 0.1);
+}
+
+.personal-layer-row.active {
+  border-color: #0284c7;
+  background: #f8fafc;
+}
+
+.personal-layer-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.personal-layer-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
+.personal-layer-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+}
+
+.personal-layer-name[contenteditable="true"]:focus {
+  background: #ffffff;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1.5px #0284c7;
+  padding: 0 3px;
+}
+
+.personal-layer-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 1px 5px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.personal-layer-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.personal-layer-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+
+.personal-layer-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #e2e8f0;
+}
+
+.personal-layer-btn.btn-vis {
+  color: #0284c7;
+}
+
+.personal-layer-btn.btn-vis.muted {
+  color: #94a3b8;
+  opacity: 0.6;
+}
+
+.personal-layer-btn.btn-draw:hover {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.personal-layer-btn.btn-edit:hover {
+  background: #f0f9ff;
+  color: #0284c7;
+  border-color: #bae6fd;
+}
+
+.personal-layer-btn.btn-zoom:hover {
+  background: #f8fafc;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+.personal-layer-btn.danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* Menu popover du bouton + */
+.personal-add-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 100;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  padding: 4px;
+  min-width: 170px;
+  animation: fadeInDown 0.12s ease-out;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.personal-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #1e293b;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+  box-sizing: border-box;
+}
+
+.personal-dropdown-item:hover {
+  background: #f0f9ff;
+  color: #0284c7;
+}

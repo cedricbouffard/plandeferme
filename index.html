@@ -98,19 +98,45 @@
       </div>
 
       <!-- Couche personnelle (Dessin, Import SHP, FGB, GeoJSON, KML, QML) -->
-      <div class="tool-card" id="card-custom-vectors" style="border: 1.5px solid #93c5fd; background: #f0f9ff;">
-        <div class="tool-card-header">
+      <div class="tool-card" id="card-custom-vectors" style="border: 1.5px solid #93c5fd; background: #f0f9ff; padding: 10px;">
+        <div class="tool-card-header" style="margin-bottom: 6px;">
           <div class="tool-card-title">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
             <span style="color: #0369a1; font-weight: 700;">Couche personnelle</span>
           </div>
-          <button id="btn-panel-open-vectors" class="profile-dock-btn" type="button" style="padding: 2px 8px; font-size: 11px; font-weight: 600; color: #0284c7; background: #ffffff; border-color: #7dd3fc;" title="Gérer vos couches personnelles, importer ou dessiner">Gérer</button>
+          <div style="position: relative; display: flex; align-items: center; gap: 4px;">
+            <button id="btn-add-personal-layer" type="button" title="Ajouter une couche (dessin ou import)" style="width: 24px; height: 24px; border-radius: 50%; background: #0284c7; color: #ffffff; border: none; font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(2,132,199,0.3); transition: all 0.15s ease;">+</button>
+            <div id="personal-add-dropdown" class="personal-add-dropdown" style="display: none;">
+              <button type="button" class="personal-dropdown-item" id="btn-quick-new-poly">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon></svg>
+                <span>Nouveau polygone</span>
+              </button>
+              <button type="button" class="personal-dropdown-item" id="btn-quick-new-line">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><path d="M4 20L20 4"></path></svg>
+                <span>Nouvelle ligne</span>
+              </button>
+              <button type="button" class="personal-dropdown-item" id="btn-quick-new-point">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.5"><circle cx="12" cy="12" r="4"></circle></svg>
+                <span>Nouveau point</span>
+              </button>
+              <div style="height: 1px; background: #e2e8f0; margin: 3px 0;"></div>
+              <label class="personal-dropdown-item" style="margin: 0; cursor: pointer;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span>Importer un fichier...</span>
+                <input type="file" id="vector-input-quick-file" accept=".geojson,.json,.kml,.fgb,.zip,.qml" multiple style="display: none;" />
+              </label>
+            </div>
+          </div>
         </div>
-        <div class="tool-sublabel" style="line-height: 1.4; color: #475569;">
-          Dessin d'entités et glisser-déposer de fichiers (Shapefile .zip, FlatGeobuf, GeoJSON, KML, Style QML).
+
+        <!-- Liste dynamique des couches avec boutons [Visibilité/Cacher] [Nom] [Zoom] [Éditer] [Delete] -->
+        <div id="panel-vector-layers-list" class="personal-layers-inline-list">
+          <!-- Rempli dynamiquement -->
         </div>
-        <div id="panel-vector-layers-quick" style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px;">
-          <!-- Liste dynamique des couches personnelles -->
+
+        <div style="font-size: 10px; color: #64748b; margin-top: 6px; line-height: 1.3; font-style: italic; display: flex; align-items: center; gap: 4px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <span>Glissez un fichier (.zip, .fgb, .geojson, .qml) sur l'écran pour l'ajouter directement.</span>
         </div>
       </div>
 

@@ -420,12 +420,17 @@
             map.moveLayer(id);
           }
         });
-        // 2. Cadastre at the ABSOLUTE TOP of everything
+        // 2. Cadastre
         ["cadastre-fill", "cadastre-lines", "cadastre-labels"].forEach(id => {
           if (map.getLayer(id)) {
             map.moveLayer(id);
           }
         });
+
+        // 3. Couches personnelles au SOMMET ABSOLU de toutes les couches
+        if (window.vectorManager && typeof window.vectorManager.bringToFront === "function") {
+          window.vectorManager.bringToFront();
+        }
       }
       window.bringParcellesToFront = bringTopLayersToFront;
       window.bringTopLayersToFront = bringTopLayersToFront;
@@ -1858,19 +1863,28 @@
     }
 
     // Vector Manager triggers
-    const btnQuickVectors = document.getElementById("btn-quick-vectors");
-    if (btnQuickVectors) {
-      btnQuickVectors.addEventListener("click", () => {
-        if (window.vectorManager) window.vectorManager.openManagerModal();
-      });
+    function openPersonalLayersPanel() {
+      const panelTools = document.getElementById("panel-tools");
+      const backdrop = document.getElementById("tools-backdrop");
+      if (panelTools) {
+        panelTools.classList.add("open");
+        panelTools.scrollTop = 0;
+        if (backdrop) backdrop.classList.add("active");
+        const card = document.getElementById("card-custom-vectors");
+        if (card) {
+          card.style.transition = "box-shadow 0.3s ease";
+          card.style.boxShadow = "0 0 0 3px #0284c7";
+          setTimeout(() => { card.style.boxShadow = ""; }, 1200);
+        }
+      }
     }
 
-    const btnPanelOpenVectors = document.getElementById("btn-panel-open-vectors");
-    if (btnPanelOpenVectors) {
-      btnPanelOpenVectors.addEventListener("click", () => {
-        if (window.vectorManager) window.vectorManager.openManagerModal();
-      });
+    const btnQuickVectors = document.getElementById("btn-quick-vectors");
+    if (btnQuickVectors) {
+      btnQuickVectors.addEventListener("click", openPersonalLayersPanel);
     }
+
+    window.openPersonalLayersPanel = openPersonalLayersPanel;
 
     window.addEventListener("resize", () => {
       if (profileManager && profileManager.profile.length >= 2) {
@@ -2150,12 +2164,12 @@
       });
     }
 
-    // 4. Couches vectorielles & Dessin
+    // 4. Couche personnelle
     const mobileToolVectors = document.getElementById("mobile-tool-vectors");
     if (mobileToolVectors) {
       mobileToolVectors.addEventListener("click", () => {
         closeMobileToolsSheet();
-        if (window.vectorManager) window.vectorManager.openManagerModal();
+        openPersonalLayersPanel();
       });
     }
 

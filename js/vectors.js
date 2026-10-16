@@ -79,6 +79,24 @@
   }
 
   /**
+   * Test géométrique précis : vérifie si un point [lng, lat] est dans un polygone
+   */
+  function pointInPolygon(point, vs) {
+    if (!point || !vs) return false;
+    const ring = vs && vs[0] && Array.isArray(vs[0][0]) ? vs[0] : vs;
+    if (!ring || ring.length < 3) return false;
+    const x = point[0], y = point[1];
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  /**
    * Déclenche le téléchargement d'un fichier texte dans le navigateur
    */
   function downloadBlob(content, fileName, mimeType) {
@@ -315,63 +333,27 @@
       this.bindMapEvents();
       this.setupDragAndDrop();
       this.syncAllLayersToMap();
+      this.renderInlineLayersList();
     }
 
     /**
-     * Charge les couches sauvegardées dans le stockage local du navigateur
+     * Initialise les couches en mémoire (sans persistance localStorage selon les exigences utilisateur)
      */
     loadLayers() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY_VECTORS);
-        if (raw) {
-          this.layers = JSON.parse(raw);
-        }
+        localStorage.removeItem(STORAGE_KEY_VECTORS);
       } catch (e) {
-        console.warn("[Vectors] Erreur lecture localStorage:", e);
+        // Ignorer
       }
-
-      // Si aucune couche n'existe, créer une couche exemple pour la ferme
-      if (!this.layers || this.layers.length === 0) {
-        this.layers = [
-          {
-            id: "vec_parcelles_" + Date.now(),
-            name: "Parcelles & Champs",
-            geometryType: "Polygon",
-            visible: true,
-            data: { type: "FeatureCollection", features: [] },
-            style: {
-              fillColor: "#16a34a",
-              fillOpacity: 0.35,
-              strokeColor: "#14532d",
-              strokeWidth: 2,
-              strokeStyle: "solid",
-              labelProperty: "nom"
-            },
-            fields: [
-              { name: "nom", label: "Nom de la parcelle" },
-              { name: "culture", label: "Culture en place" },
-              { name: "superficie_ha", label: "Superficie (ha)" },
-              { name: "notes", label: "Notes agronomiques" }
-            ]
-          }
-        ];
-        this.saveLayers();
-      }
-
-      if (this.layers.length > 0 && !this.activeLayerId) {
-        this.activeLayerId = this.layers[0].id;
-      }
+      this.layers = [];
+      this.activeLayerId = null;
     }
 
     /**
-     * Enregistre les couches dans localStorage
+     * Enregistre les couches (désactivé pour éviter la saturation 5MB et préserver des sessions fraîches)
      */
     saveLayers() {
-      try {
-        localStorage.setItem(STORAGE_KEY_VECTORS, JSON.stringify(this.layers));
-      } catch (e) {
-        console.warn("[Vectors] Erreur sauvegarde localStorage:", e);
-      }
+      // Non-persistant selon la consigne de l'utilisateur
     }
 
     /**
@@ -688,6 +670,58 @@
         });
       }
 
+      // Dropdown menu du bouton "+" dans le panneau des couches perso
+      const btnAddPersonal = document.getElementById("btn-add-personal-layer");
+      const dropdownPersonal = document.getElementById("personal-add-dropdown");
+      if (btnAddPersonal && dropdownPersonal) {
+        btnAddPersonal.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const isShown = dropdownPersonal.style.display === "block";
+          dropdownPersonal.style.display = isShown ? "none" : "block";
+        });
+
+        document.addEventListener("click", (e) => {
+          if (!dropdownPersonal.contains(e.target) && e.target !== btnAddPersonal) {
+            dropdownPersonal.style.display = "none";
+          }
+        });
+
+        const btnQuickPoly = document.getElementById("btn-quick-new-poly");
+        if (btnQuickPoly) {
+          btnQuickPoly.addEventListener("click", () => {
+            dropdownPersonal.style.display = "none";
+            this.createNewLayerQuick("Polygon");
+          });
+        }
+
+        const btnQuickLine = document.getElementById("btn-quick-new-line");
+        if (btnQuickLine) {
+          btnQuickLine.addEventListener("click", () => {
+            dropdownPersonal.style.display = "none";
+            this.createNewLayerQuick("LineString");
+          });
+        }
+
+        const btnQuickPoint = document.getElementById("btn-quick-new-point");
+        if (btnQuickPoint) {
+          btnQuickPoint.addEventListener("click", () => {
+            dropdownPersonal.style.display = "none";
+            this.createNewLayerQuick("Point");
+          });
+        }
+
+        const inputQuickFile = document.getElementById("vector-input-quick-file");
+        if (inputQuickFile) {
+          inputQuickFile.addEventListener("change", async (e) => {
+            dropdownPersonal.style.display = "none";
+            if (e.target.files && e.target.files.length > 0) {
+              await this.handleDroppedFiles(e.target.files);
+              e.target.value = "";
+            }
+          });
+        }
+      }
+
       // Exportation de style QML
       if (this.dom.btnExportQml) {
         this.dom.btnExportQml.addEventListener("click", () => {
@@ -839,7 +873,13 @@
         const vectorLayerIds = [];
         this.layers.forEach(l => {
           if (l.visible) {
-            vectorLayerIds.push(`vector-fill-${l.id}`, `vector-line-${l.id}`, `vector-point-${l.id}`);
+            vectorLayerIds.push(
+              `vector-fill-${l.id}`,
+              `vector-stroke-${l.id}`,
+              `vector-line-${l.id}`,
+              `vector-point-${l.id}`,
+              `vector-label-${l.id}`
+            );
           }
         });
 
@@ -848,8 +888,10 @@
           const features = this.map.queryRenderedFeatures(e.point, { layers: existingLayers });
           if (features && features.length > 0) {
             const feat = features[0];
-            const layerId = feat.layer.id.replace(/^vector-(fill|line|point)-/, "");
-            this.selectFeature(layerId, feat.properties.id || feat.id);
+            const layerId = feat.layer.id.replace(/^vector-(fill|stroke|line|point|label)-/, "");
+            const featId = feat.properties?.__pf_id || feat.id || feat.properties?.id;
+            const clickCoords = [e.lngLat.lng, e.lngLat.lat];
+            this.selectFeature(layerId, featId, feat.properties, clickCoords);
           } else {
             this.clearFeatureSelection();
           }
@@ -863,13 +905,104 @@
         }
       });
 
-      // Double-clic pour terminer le dessin
+      // Double-clic : terminer le dessin OU ouvrir directement les attributs de l'entité cliquée
       this.map.on("dblclick", (e) => {
         if (this.isDrawing) {
           e.preventDefault();
           this.finishDrawing();
+          return;
+        }
+
+        const vectorLayerIds = [];
+        this.layers.forEach(l => {
+          if (l.visible) {
+            vectorLayerIds.push(
+              `vector-fill-${l.id}`,
+              `vector-stroke-${l.id}`,
+              `vector-line-${l.id}`,
+              `vector-point-${l.id}`,
+              `vector-label-${l.id}`
+            );
+          }
+        });
+
+        const existingLayers = vectorLayerIds.filter(id => this.map.getLayer(id));
+        if (existingLayers.length > 0) {
+          const features = this.map.queryRenderedFeatures(e.point, { layers: existingLayers });
+          if (features && features.length > 0) {
+            e.preventDefault();
+            const feat = features[0];
+            const layerId = feat.layer.id.replace(/^vector-(fill|stroke|line|point|label)-/, "");
+            const featId = feat.properties?.__pf_id || feat.id || feat.properties?.id;
+            const clickCoords = [e.lngLat.lng, e.lngLat.lat];
+            const layer = this.getLayer(layerId);
+            const targetFeat = this.findFeature(layer, featId, feat.properties, clickCoords);
+            if (targetFeat) {
+              const actualId = targetFeat.properties?.__pf_id || targetFeat.id || targetFeat.properties?.id;
+              this.openFeatureModal(layerId, actualId, targetFeat);
+            }
+          }
         }
       });
+    }
+
+    /**
+     * Recherche avec précision une entité spécifique dans une couche (évite absolument de renvoyer la 1ère par défaut)
+     */
+    findFeature(layer, featureId, featProps = null, clickCoords = null) {
+      if (!layer || !layer.data || !layer.data.features || !layer.data.features.length) return null;
+      const features = layer.data.features;
+
+      // 1. Chercher par identifiant exact strict (ne jamais matcher avec undefined)
+      if (featureId !== undefined && featureId !== null && featureId !== "") {
+        const byId = features.find(f => 
+          (f.properties && f.properties.__pf_id === featureId) ||
+          f.__pf_id === featureId ||
+          f.id === featureId ||
+          (f.properties && f.properties.id === featureId)
+        );
+        if (byId) return byId;
+      }
+
+      // 2. Chercher via les propriétés retournées par MapLibre
+      if (featProps && typeof featProps === "object") {
+        const propId = featProps.__pf_id || featProps.id;
+        if (propId) {
+          const byPropId = features.find(f => 
+            (f.properties && f.properties.__pf_id === propId) ||
+            f.id === propId ||
+            (f.properties && f.properties.id === propId)
+          );
+          if (byPropId) return byPropId;
+        }
+
+        // Comparaison sur les attributs réels
+        const propKeys = Object.keys(featProps).filter(k => !k.startsWith("__"));
+        if (propKeys.length > 0) {
+          const byProps = features.find(f => {
+            if (!f.properties) return false;
+            return propKeys.every(k => String(f.properties[k]) === String(featProps[k]));
+          });
+          if (byProps) return byProps;
+        }
+      }
+
+      // 3. Fallback géométrique si des coordonnées de clic sont fournies (point dans polygone)
+      if (clickCoords && Array.isArray(clickCoords)) {
+        for (const f of features) {
+          if (f.geometry && f.geometry.type === "Polygon") {
+            if (pointInPolygon(clickCoords, f.geometry.coordinates)) {
+              return f;
+            }
+          } else if (f.geometry && f.geometry.type === "MultiPolygon") {
+            for (const ring of f.geometry.coordinates) {
+              if (pointInPolygon(clickCoords, ring)) return f;
+            }
+          }
+        }
+      }
+
+      return null;
     }
 
     /**
@@ -1025,6 +1158,187 @@
       if (window.composer && window.composer.isOpen && typeof window.composer.updateActiveLegend === "function") {
         window.composer.updateActiveLegend();
       }
+
+      this.renderInlineLayersList();
+    }
+
+    /**
+     * Affiche la liste compacte directe des couches personnelles dans le volet latéral
+     * avec les boutons directs : Cacher/Afficher, Zoom to, Éditer (style/QML/attributs), Tracer, Supprimer
+     */
+    renderInlineLayersList() {
+      const container = document.getElementById("panel-vector-layers-list");
+      if (!container) return;
+      container.innerHTML = "";
+
+      if (this.layers.length === 0) {
+        container.innerHTML = `
+          <div style="padding: 10px 8px; text-align: center; color: #64748b; font-size: 11px; background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 6px;">
+            Aucune couche personnelle.<br/>Cliquez sur <strong style="color: #0284c7;">+</strong> ci-dessus ou glissez un fichier.
+          </div>
+        `;
+        return;
+      }
+
+      this.layers.forEach(layer => {
+        const row = document.createElement("div");
+        row.className = `personal-layer-row ${layer.id === this.activeLayerId ? "active" : ""}`;
+        row.dataset.layerId = layer.id;
+
+        const count = layer.data && layer.data.features ? layer.data.features.length : 0;
+        const color = layer.style.fillColor || layer.style.strokeColor || "#16a34a";
+
+        const eyeIcon = layer.visible
+          ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`
+          : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+
+        row.innerHTML = `
+          <div class="personal-layer-left">
+            <button type="button" class="personal-layer-btn btn-vis ${layer.visible ? "" : "muted"}" title="${layer.visible ? "Masquer la couche" : "Afficher la couche"}">
+              ${eyeIcon}
+            </button>
+            <span class="personal-layer-swatch" style="background: ${color};" title="Couleur de la couche"></span>
+            <span class="personal-layer-name" title="${layer.name}">${layer.name}</span>
+            <span style="font-size: 10px; color: #94a3b8; font-weight: 600; flex-shrink: 0;">(${count})</span>
+          </div>
+          <div class="personal-layer-actions">
+            <button type="button" class="personal-layer-btn btn-draw" title="Tracer une nouvelle entité sur cette couche">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            </button>
+            <button type="button" class="personal-layer-btn btn-zoom" title="Zoomer sur cette couche">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </button>
+            <button type="button" class="personal-layer-btn btn-edit" title="Modifier le style, attributs &amp; QML">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </button>
+            <button type="button" class="personal-layer-btn danger btn-del" title="Supprimer la couche">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        `;
+
+        // Événement Visibilité
+        row.querySelector(".btn-vis").addEventListener("click", (e) => {
+          e.stopPropagation();
+          layer.visible = !layer.visible;
+          this.setLayerVisibility(layer.id, layer.visible);
+          this.renderInlineLayersList();
+          this.renderLayersList();
+        });
+
+        // Événement Tracer / Dessiner
+        row.querySelector(".btn-draw").addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.activeLayerId = layer.id;
+          this.startDrawing(layer.id);
+        });
+
+        // Événement Zoom to
+        row.querySelector(".btn-zoom").addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.zoomToLayer(layer.id);
+        });
+
+        // Événement Éditer style & QML
+        row.querySelector(".btn-edit").addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.openStyleModal(layer.id);
+        });
+
+        // Événement Supprimer
+        row.querySelector(".btn-del").addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (confirm(`Supprimer la couche vectorielle "${layer.name}" ?`)) {
+            this.deleteLayer(layer.id);
+          }
+        });
+
+        // Clic sur la ligne pour activer la couche
+        row.addEventListener("click", () => {
+          this.activeLayerId = layer.id;
+          container.querySelectorAll(".personal-layer-row").forEach(el => el.classList.remove("active"));
+          row.classList.add("active");
+        });
+
+        container.appendChild(row);
+      });
+    }
+
+    /**
+     * Maintient les couches personnelles toujours par-dessus toutes les autres couches de la carte
+     */
+    bringToFront() {
+      if (!this.map || !this.map.isStyleLoaded()) return;
+
+      this.layers.forEach(layer => {
+        const layerIds = [
+          `vector-fill-${layer.id}`,
+          `vector-stroke-${layer.id}`,
+          `vector-line-${layer.id}`,
+          `vector-point-${layer.id}`,
+          `vector-label-${layer.id}`
+        ];
+        layerIds.forEach(id => {
+          if (this.map.getLayer(id)) {
+            try {
+              this.map.moveLayer(id);
+            } catch (e) {}
+          }
+        });
+      });
+
+      const drawLayers = ["vector-draw-fill", "vector-draw-line", "vector-draw-vertices"];
+      drawLayers.forEach(id => {
+        if (this.map.getLayer(id)) {
+          try {
+            this.map.moveLayer(id);
+          } catch (e) {}
+        }
+      });
+    }
+
+    /**
+     * Crée instantanément une nouvelle couche vectorielle et démarre le tracé
+     */
+    createNewLayerQuick(geometryType = "Polygon") {
+      const count = this.layers.filter(l => l.geometryType === geometryType).length + 1;
+      const geomFr = geometryType === "Polygon" ? "Polygone" : geometryType === "LineString" ? "Ligne" : "Point";
+      const name = `${geomFr} ${count}`;
+      const color = DEFAULT_PALETTE[this.layers.length % DEFAULT_PALETTE.length];
+
+      const newLayer = {
+        id: "vec_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+        name,
+        geometryType,
+        visible: true,
+        data: { type: "FeatureCollection", features: [] },
+        style: {
+          fillColor: color,
+          fillOpacity: geometryType === "Polygon" ? 0.45 : 0.9,
+          strokeColor: color,
+          strokeWidth: 2,
+          strokeStyle: "solid",
+          markerShape: "circle",
+          markerSize: 8,
+          labelProperty: "nom"
+        },
+        fields: [
+          { name: "nom", label: "Nom" },
+          { name: "description", label: "Description" },
+          ...(geometryType === "Polygon" ? [{ name: "superficie_ha", label: "Superficie (ha)" }] : []),
+          ...(geometryType === "LineString" ? [{ name: "longueur_m", label: "Longueur (m)" }] : [])
+        ]
+      };
+
+      this.layers.push(newLayer);
+      this.activeLayerId = newLayer.id;
+      this.syncLayerToMap(newLayer);
+      this.bringToFront();
+      this.renderInlineLayersList();
+      this.renderLayersList();
+      this.startDrawing(newLayer.id);
+      this.showToast(`Nouvelle couche "${name}" créée. Cliquez sur la carte pour dessiner.`);
+      return newLayer;
     }
 
     /**
@@ -1066,9 +1380,10 @@
 
       this.layers.push(newLayer);
       this.activeLayerId = newLayer.id;
-      this.saveLayers();
       this.syncLayerToMap(newLayer);
+      this.bringToFront();
       this.renderLayersList();
+      this.renderInlineLayersList();
     }
 
     /**
@@ -1080,8 +1395,8 @@
       if (this.activeLayerId === layerId) {
         this.activeLayerId = this.layers.length > 0 ? this.layers[0].id : null;
       }
-      this.saveLayers();
       this.renderLayersList();
+      this.renderInlineLayersList();
     }
 
     /**
@@ -1279,10 +1594,11 @@
       const layer = this.getLayer(this.activeLayerId);
       if (!layer) return;
 
-      const featId = "feat_" + Date.now();
+      const featId = "feat_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
       let geom = null;
       const props = {
         id: featId,
+        __pf_id: featId,
         nom: `${layer.name} ${layer.data.features.length + 1}`,
         date: new Date().toLocaleDateString("fr-CA")
       };
@@ -1313,10 +1629,11 @@
 
       layer.data.features.push(newFeature);
       this.updateLayerOnMap(layer);
-      this.saveLayers();
+      this.renderLayersList();
+      this.renderInlineLayersList();
 
-      // Ouvrir immédiatement la modale d'édition des attributs
-      this.openFeatureModal(layer.id, featId);
+      // Ouvrir immédiatement la modale d'édition des attributs de la nouvelle entité
+      this.openFeatureModal(layer.id, featId, newFeature);
     }
 
     /**
@@ -1324,14 +1641,16 @@
      * Sélection & Modification des sommets (Vertex Dragging)
      * =========================================================================
      */
-    selectFeature(layerId, featureId) {
+    selectFeature(layerId, featureId, featProps = null, clickCoords = null) {
       this.clearFeatureSelection();
       const layer = this.getLayer(layerId);
       if (!layer) return;
-      const feat = layer.data.features.find(f => (f.properties.id || f.id) === featureId);
+
+      const feat = this.findFeature(layer, featureId, featProps, clickCoords);
       if (!feat) return;
 
-      this.selectedFeature = { layerId, featureId, feature: feat };
+      const actualId = feat.properties?.__pf_id || feat.id || feat.properties?.id;
+      this.selectedFeature = { layerId, featureId: actualId, feature: feat };
 
       // Afficher les poignées de sommets déplaçables
       const geom = feat.geometry;
@@ -1387,11 +1706,12 @@
         this.activeVertexMarkers.push(marker);
       });
 
-      // Afficher un popup informatif
-      const center = this.getFeatureCenter(feat);
+      // Afficher un popup informatif sur l'entité exacte
+      const center = clickCoords || this.getFeatureCenter(feat);
+      const featName = feat.properties.nom || feat.properties.name || "Entité";
       const popupHtml = `
         <div style="font-family: var(--font-sans, sans-serif); font-size: 12px; padding: 4px;">
-          <strong style="color: #0f172a; font-size: 13px;">${feat.properties.nom || "Entité"}</strong>
+          <strong style="color: #0f172a; font-size: 13px;">${featName}</strong>
           <div style="color: #64748b; margin: 3px 0 6px;">
             ${feat.properties.superficie_ha ? `${feat.properties.superficie_ha} ha` : ""}
             ${feat.properties.longueur_m ? `${feat.properties.longueur_m} m` : ""}
@@ -1412,14 +1732,14 @@
         const btnEdit = document.getElementById("btn-popup-edit-attr");
         if (btnEdit) {
           btnEdit.addEventListener("click", () => {
-            this.openFeatureModal(layerId, featureId);
+            this.openFeatureModal(layerId, actualId, feat);
           });
         }
         const btnDel = document.getElementById("btn-popup-del-feat");
         if (btnDel) {
           btnDel.addEventListener("click", () => {
-            if (confirm("Supprimer cette entité ?")) {
-              this.deleteFeature(layerId, featureId);
+            if (confirm(`Supprimer l'entité "${featName}" ?`)) {
+              this.deleteFeature(layerId, actualId, feat);
               this.clearFeatureSelection();
             }
           });
@@ -1455,13 +1775,21 @@
       return [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
     }
 
-    deleteFeature(layerId, featureId) {
+    deleteFeature(layerId, featureId, featureObj = null) {
       const layer = this.getLayer(layerId);
       if (!layer) return;
-      layer.data.features = layer.data.features.filter(f => (f.properties.id || f.id) !== featureId);
+      const target = featureObj || this.findFeature(layer, featureId);
+      if (target) {
+        layer.data.features = layer.data.features.filter(f => f !== target);
+      } else {
+        layer.data.features = layer.data.features.filter(f => {
+          const fid = f.properties?.__pf_id || f.id || f.properties?.id;
+          return fid !== featureId;
+        });
+      }
       this.updateLayerOnMap(layer);
-      this.saveLayers();
       this.renderLayersList();
+      this.renderInlineLayersList();
     }
 
     /**
@@ -1469,20 +1797,23 @@
      * Formulaire & Table d'Attributs (Attribute Management)
      * =========================================================================
      */
-    openFeatureModal(layerId, featureId) {
+    openFeatureModal(layerId, featureId, featureObj = null) {
       const layer = this.getLayer(layerId);
       if (!layer) return;
-      const feat = layer.data.features.find(f => (f.properties.id || f.id) === featureId);
+      const feat = featureObj || this.findFeature(layer, featureId);
       if (!feat) return;
 
-      this.editingFeatureInfo = { layerId, featureId, feature: feat };
+      const actualId = feat.properties?.__pf_id || feat.id || feat.properties?.id;
+      this.editingFeatureInfo = { layerId, featureId: actualId, feature: feat };
       const container = this.dom.featureFieldsContainer;
       container.innerHTML = "";
 
       // Champs existants de la couche ou de l'entité
       const fieldKeys = new Set(["nom", "description"]);
       if (layer.fields) layer.fields.forEach(f => fieldKeys.add(f.name));
-      Object.keys(feat.properties).forEach(k => fieldKeys.add(k));
+      Object.keys(feat.properties).forEach(k => {
+        if (!k.startsWith("__")) fieldKeys.add(k);
+      });
 
       // Ne pas permettre d'éditer manuellement l'identifiant interne
       fieldKeys.delete("id");
@@ -1519,7 +1850,7 @@
         if (!layer.fields.some(f => f.name === clean)) {
           layer.fields.push({ name: clean, label: clean });
         }
-        this.openFeatureModal(layerId, featureId);
+        this.openFeatureModal(layerId, actualId, feat);
       });
 
       this.dom.featureModal.classList.add("active");
@@ -1535,15 +1866,17 @@
       inputs.forEach(input => {
         const k = input.getAttribute("name");
         let v = input.value;
-        if (!isNaN(v) && v.trim() !== "" && !k.includes("nom") && !k.includes("date")) {
+        if (!isNaN(v) && v.trim() !== "" && !k.includes("nom") && !k.includes("date") && !k.includes("culture")) {
           v = parseFloat(v);
         }
         feature.properties[k] = v;
       });
 
       this.updateLayerOnMap(layer);
-      this.saveLayers();
+      this.renderLayersList();
+      this.renderInlineLayersList();
       this.dom.featureModal.classList.remove("active");
+      this.clearFeatureSelection();
     }
 
     openTableModal(layerId) {
@@ -1605,16 +1938,17 @@
           this.dom.tableModal.classList.remove("active");
           const center = this.getFeatureCenter(feat);
           this.map.flyTo({ center, zoom: 16, duration: 800 });
-          setTimeout(() => this.selectFeature(layer.id, feat.properties.id || feat.id), 850);
+          setTimeout(() => this.selectFeature(layer.id, feat.properties?.__pf_id || feat.id || feat.properties?.id, feat.properties), 850);
         });
 
         tdActions.querySelector(".btn-row-edit").addEventListener("click", () => {
-          this.openFeatureModal(layer.id, feat.properties.id || feat.id);
+          this.openFeatureModal(layer.id, feat.properties?.__pf_id || feat.id || feat.properties?.id, feat);
         });
 
         tdActions.querySelector(".btn-row-del").addEventListener("click", () => {
-          if (confirm("Supprimer cette entité ?")) {
-            this.deleteFeature(layer.id, feat.properties.id || feat.id);
+          const featName = feat.properties?.nom || feat.properties?.name || "cette entité";
+          if (confirm(`Supprimer ${featName} ?`)) {
+            this.deleteFeature(layer.id, feat.properties?.__pf_id || feat.id || feat.properties?.id, feat);
             this.renderTableModal(layer);
           }
         });
@@ -1818,7 +2152,8 @@
     applyStyleChange(layer) {
       this.updateStylePreview(layer);
       this.updateLayerOnMap(layer);
-      this.saveLayers();
+      this.renderLayersList();
+      this.renderInlineLayersList();
     }
 
     updateStylePreview(layer) {
@@ -1867,12 +2202,13 @@
       const geomType = layer.geometryType.toLowerCase();
       const style = layer.style;
 
-      // 1. Source GeoJSON
+      // 1. Source GeoJSON avec promoteId pour identifier fidèlement chaque entité cliquée
       let src = this.map.getSource(sourceId);
       if (!src) {
         this.map.addSource(sourceId, {
           type: "geojson",
-          data: layer.data || { type: "FeatureCollection", features: [] }
+          data: layer.data || { type: "FeatureCollection", features: [] },
+          promoteId: "__pf_id"
         });
       } else {
         src.setData(layer.data || { type: "FeatureCollection", features: [] });
@@ -1941,8 +2277,9 @@
         }
       }
 
-      // Calque d'étiquette textuelle
+      // Calque d'étiquette textuelle (utilise les polices Noto Sans supportées et force text-allow-overlap)
       const labelId = `vector-label-${layer.id}`;
+      const textField = ["to-string", ["coalesce", ["get", style.labelProperty || "nom"], ["get", "nom"], ["get", "name"], ""]];
       if (style.labelProperty) {
         if (!this.map.getLayer(labelId)) {
           this.map.addLayer({
@@ -1950,24 +2287,33 @@
             type: "symbol",
             source: sourceId,
             layout: {
-              "text-field": ["get", style.labelProperty],
-              "text-size": 11.5,
-              "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+              "text-field": textField,
+              "text-size": 12,
+              "text-font": ["Noto Sans Bold", "Noto Sans Regular"],
               "text-anchor": "center",
-              "text-offset": [0, 0]
+              "text-offset": [0, 0],
+              "text-allow-overlap": true,
+              "text-ignore-placement": true,
+              ...(geomType.includes("line") ? { "symbol-placement": "line-center" } : {})
             },
             paint: {
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
-              "text-halo-width": 2
+              "text-halo-width": 2.5
             }
           });
+        } else {
+          this.map.setLayoutProperty(labelId, "text-field", textField);
+          this.map.setLayoutProperty(labelId, "text-font", ["Noto Sans Bold", "Noto Sans Regular"]);
+          this.map.setLayoutProperty(labelId, "text-allow-overlap", true);
+          this.map.setLayoutProperty(labelId, "text-ignore-placement", true);
         }
       } else if (this.map.getLayer(labelId)) {
         this.map.removeLayer(labelId);
       }
 
       this.setLayerVisibility(layer.id, layer.visible);
+      this.bringToFront();
     }
 
     updateLayerOnMap(layer) {
@@ -2013,7 +2359,43 @@
         }
       }
 
+      // Mise à jour de l'étiquette textuelle
+      const labelId = `vector-label-${layer.id}`;
+      const textField = ["to-string", ["coalesce", ["get", style.labelProperty || "nom"], ["get", "nom"], ["get", "name"], ""]];
+      if (style.labelProperty) {
+        if (this.map.getLayer(labelId)) {
+          this.map.setLayoutProperty(labelId, "text-field", textField);
+          this.map.setLayoutProperty(labelId, "text-font", ["Noto Sans Bold", "Noto Sans Regular"]);
+          this.map.setLayoutProperty(labelId, "text-allow-overlap", true);
+          this.map.setLayoutProperty(labelId, "text-ignore-placement", true);
+        } else {
+          this.map.addLayer({
+            id: labelId,
+            type: "symbol",
+            source: sourceId,
+            layout: {
+              "text-field": textField,
+              "text-size": 12,
+              "text-font": ["Noto Sans Bold", "Noto Sans Regular"],
+              "text-anchor": "center",
+              "text-offset": [0, 0],
+              "text-allow-overlap": true,
+              "text-ignore-placement": true,
+              ...(geomType.includes("line") ? { "symbol-placement": "line-center" } : {})
+            },
+            paint: {
+              "text-color": "#0f172a",
+              "text-halo-color": "#ffffff",
+              "text-halo-width": 2.5
+            }
+          });
+        }
+      } else if (this.map.getLayer(labelId)) {
+        this.map.removeLayer(labelId);
+      }
+
       this.setLayerVisibility(layer.id, layer.visible);
+      this.bringToFront();
     }
 
     setLayerVisibility(layerId, isVisible) {
@@ -2158,18 +2540,29 @@
             else if (t.includes("Point")) geomType = "Point";
           }
 
+          // Assurer un identifiant unique persistant et les attributs sur chaque entité
+          featureCollection.features.forEach((feat, idx) => {
+            const fid = feat.id || feat.properties?.id || `feat_${Date.now()}_${idx}_${Math.floor(Math.random() * 100000)}`;
+            feat.id = fid;
+            if (!feat.properties) feat.properties = {};
+            feat.properties.__pf_id = fid;
+            if (!feat.properties.id) feat.properties.id = fid;
+          });
+
           // Extraire les champs d'attributs détectés
           const fieldsMap = new Set();
           featureCollection.features.forEach(f => {
             if (f.properties) {
-              Object.keys(f.properties).forEach(k => fieldsMap.add(k));
+              Object.keys(f.properties).forEach(k => {
+                if (!k.startsWith("__")) fieldsMap.add(k);
+              });
             }
           });
           const fields = Array.from(fieldsMap).map(k => ({ name: k, label: k }));
 
           const color = DEFAULT_PALETTE[this.layers.length % DEFAULT_PALETTE.length];
           const newLayer = {
-            id: "vec_" + Date.now(),
+            id: "vec_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
             name: name || "Couche importée",
             geometryType: geomType,
             visible: true,
@@ -2182,16 +2575,17 @@
               strokeStyle: "solid",
               markerShape: "circle",
               markerSize: 8,
-              labelProperty: fieldsMap.has("nom") ? "nom" : (fieldsMap.has("name") ? "name" : "")
+              labelProperty: fieldsMap.has("nom") ? "nom" : (fieldsMap.has("name") ? "name" : (fields.length > 0 ? fields[0].name : "nom"))
             },
             fields
           };
 
           this.layers.push(newLayer);
           this.activeLayerId = newLayer.id;
-          this.saveLayers();
           this.syncLayerToMap(newLayer);
+          this.bringToFront();
           this.renderLayersList();
+          this.renderInlineLayersList();
           this.zoomToLayer(newLayer.id);
           this.showToast(`Couche "${newLayer.name}" importée avec succès (${featureCollection.features.length} entités) !`);
           resolve(newLayer.id);
@@ -2372,6 +2766,7 @@
               this.renderStyleModal(layer);
             }
             this.renderLayersList();
+            this.renderInlineLayersList();
             this.showToast(`Style QGIS "${file.name}" appliqué à "${layer.name}" !`);
             resolve(true);
           } catch (err) {
