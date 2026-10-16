@@ -9,6 +9,15 @@
 
   const STORAGE_KEY_TEMPLATES = "plandeferme_composer_templates_v1";
 
+  // Dimensions standards par défaut (en millimètres, inspiré de QGIS Layout-Composer)
+  const DEFAULT_LAYOUT = {
+    margin: 10,       // Marge extérieure (mm)
+    headerH: 22,      // Hauteur du cartouche d'en-tête (mm)
+    sideW: 60,        // Largeur du panneau latéral en Paysage (mm)
+    compassSize: 24,  // Diamètre / dimension de la rose des vents (mm)
+    profileH: 46      // Hauteur du bloc de coupe topographique MNT (mm)
+  };
+
   // Gabarits intégrés par défaut
   const DEFAULT_TEMPLATES = {
     standard_paysage: {
@@ -27,7 +36,8 @@
       showNotes: true,
       showProfile: false,
       logoUrl: null,
-      excludedLegendIds: []
+      excludedLegendIds: [],
+      layout: { ...DEFAULT_LAYOUT }
     },
     fiche_portrait: {
       id: "fiche_portrait",
@@ -45,7 +55,8 @@
       showNotes: true,
       showProfile: false,
       logoUrl: null,
-      excludedLegendIds: []
+      excludedLegendIds: [],
+      layout: { ...DEFAULT_LAYOUT }
     },
     drainage_paysage: {
       id: "drainage_paysage",
@@ -63,7 +74,8 @@
       showNotes: true,
       showProfile: false,
       logoUrl: null,
-      excludedLegendIds: []
+      excludedLegendIds: [],
+      layout: { ...DEFAULT_LAYOUT }
     },
     coupe_topo: {
       id: "coupe_topo",
@@ -81,7 +93,8 @@
       showNotes: true,
       showProfile: true,
       logoUrl: null,
-      excludedLegendIds: []
+      excludedLegendIds: [],
+      layout: { ...DEFAULT_LAYOUT }
     }
   };
 
@@ -92,6 +105,7 @@
       this.isOpen = false;
       this.state = {
         ...DEFAULT_TEMPLATES.standard_paysage,
+        layout: { ...DEFAULT_LAYOUT },
         showProfile: false,
         excludedLegendIds: []
       };
@@ -311,6 +325,44 @@
                   <input type="checkbox" id="composer-check-profile" />
                 </label>
               </div>
+
+              <!-- Section Dimensions des boîtes (mm) -->
+              <div class="composer-section">
+                <div class="composer-section-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                  Dimensions des boîtes (mm)
+                </div>
+                <div class="composer-size-grid">
+                  <div class="composer-size-field">
+                    <label for="composer-size-header-h">En-tête (H)</label>
+                    <div class="composer-size-input-wrap">
+                      <input type="number" id="composer-size-header-h" class="composer-input-sm" min="12" max="60" step="1" value="22" />
+                      <span class="composer-unit">mm</span>
+                    </div>
+                  </div>
+                  <div class="composer-size-field">
+                    <label for="composer-size-side-w">Panneau (L)</label>
+                    <div class="composer-size-input-wrap">
+                      <input type="number" id="composer-size-side-w" class="composer-input-sm" min="30" max="110" step="1" value="60" />
+                      <span class="composer-unit">mm</span>
+                    </div>
+                  </div>
+                  <div class="composer-size-field">
+                    <label for="composer-size-compass">Boussole</label>
+                    <div class="composer-size-input-wrap">
+                      <input type="number" id="composer-size-compass" class="composer-input-sm" min="14" max="50" step="1" value="24" />
+                      <span class="composer-unit">mm</span>
+                    </div>
+                  </div>
+                  <div class="composer-size-field">
+                    <label for="composer-size-profile-h">Profil (H)</label>
+                    <div class="composer-size-input-wrap">
+                      <input type="number" id="composer-size-profile-h" class="composer-input-sm" min="20" max="90" step="1" value="46" />
+                      <span class="composer-unit">mm</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Viewport de Prévisualisation (Feuille de papier) -->
@@ -492,7 +544,15 @@
         sheetMapColumn: document.getElementById("sheet-map-column"),
         sheetProfileBlock: document.getElementById("sheet-profile-block"),
         sheetProfileChips: document.getElementById("sheet-profile-chips"),
-        sheetProfileChartWrap: document.getElementById("sheet-profile-chart-wrap")
+        sheetProfileChartWrap: document.getElementById("sheet-profile-chart-wrap"),
+
+        // Réglages des dimensions des boîtes
+        inputSizeHeaderH: document.getElementById("composer-size-header-h"),
+        inputSizeSideW: document.getElementById("composer-size-side-w"),
+        inputSizeCompass: document.getElementById("composer-size-compass"),
+        inputSizeProfileH: document.getElementById("composer-size-profile-h"),
+        sheetCartouche: document.querySelector(".sheet-cartouche"),
+        sheetSidePanel: document.querySelector(".sheet-side-panel")
       };
 
       this.populateTemplateSelect();
@@ -800,6 +860,37 @@
         });
       }
 
+      // Réglages dynamiques des dimensions des boîtes (style Layout-Composer)
+      const onSizeChange = () => {
+        if (!this.state.layout) this.state.layout = { ...DEFAULT_LAYOUT };
+        if (this.dom.inputSizeHeaderH) {
+          const val = parseFloat(this.dom.inputSizeHeaderH.value);
+          if (val > 0) this.state.layout.headerH = val;
+        }
+        if (this.dom.inputSizeSideW) {
+          const val = parseFloat(this.dom.inputSizeSideW.value);
+          if (val > 0) this.state.layout.sideW = val;
+        }
+        if (this.dom.inputSizeCompass) {
+          const val = parseFloat(this.dom.inputSizeCompass.value);
+          if (val > 0) this.state.layout.compassSize = val;
+        }
+        if (this.dom.inputSizeProfileH) {
+          const val = parseFloat(this.dom.inputSizeProfileH.value);
+          if (val > 0) this.state.layout.profileH = val;
+        }
+        this.applyLayoutDimensions();
+        this.updateMapSnapshotForOrientation();
+        this.updateScale();
+      };
+
+      [this.dom.inputSizeHeaderH, this.dom.inputSizeSideW, this.dom.inputSizeCompass, this.dom.inputSizeProfileH].forEach(input => {
+        if (input) {
+          input.addEventListener("input", onSizeChange);
+          input.addEventListener("change", onSizeChange);
+        }
+      });
+
       // Contrôles de zoom & ajustement de la prévisualisation
       if (this.dom.zoomFit) {
         this.dom.zoomFit.addEventListener("click", () => {
@@ -900,23 +991,26 @@
 
     updateNavBlockVisibility() {
       const show = this.state.showCompass || this.state.showScale;
-      this.dom.sheetNavBlock.style.display = show ? "flex" : "none";
+      if (this.dom && this.dom.sheetNavBlock) {
+        this.dom.sheetNavBlock.style.display = show ? "flex" : "none";
+      }
     }
 
     /**
      * Mise à jour de l'affichage du logo
      */
     updateLogoDisplay() {
+      if (!this.dom) return;
       if (this.state.logoUrl) {
-        this.dom.logoPreview.innerHTML = `<img src="${this.state.logoUrl}" alt="Logo" />`;
-        this.dom.btnClearLogo.style.display = "block";
-        this.dom.sheetLogoContainer.style.display = "flex";
-        this.dom.sheetLogoImg.src = this.state.logoUrl;
+        if (this.dom.logoPreview) this.dom.logoPreview.innerHTML = `<img src="${this.state.logoUrl}" alt="Logo" />`;
+        if (this.dom.btnClearLogo) this.dom.btnClearLogo.style.display = "block";
+        if (this.dom.sheetLogoContainer) this.dom.sheetLogoContainer.style.display = "flex";
+        if (this.dom.sheetLogoImg) this.dom.sheetLogoImg.src = this.state.logoUrl;
       } else {
-        this.dom.logoPreview.innerHTML = `<span class="composer-logo-preview-empty">Aucun<br/>logo</span>`;
-        this.dom.btnClearLogo.style.display = "none";
-        this.dom.sheetLogoContainer.style.display = "none";
-        this.dom.sheetLogoImg.src = "";
+        if (this.dom.logoPreview) this.dom.logoPreview.innerHTML = `<span class="composer-logo-preview-empty">Aucun<br/>logo</span>`;
+        if (this.dom.btnClearLogo) this.dom.btnClearLogo.style.display = "none";
+        if (this.dom.sheetLogoContainer) this.dom.sheetLogoContainer.style.display = "none";
+        if (this.dom.sheetLogoImg) this.dom.sheetLogoImg.src = "";
       }
     }
 
@@ -1054,7 +1148,80 @@
     }
 
     /**
+     * Décode les entités XML vers du texte brut
+     */
+    unescapeXml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&apos;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&gt;/g, ">")
+        .replace(/&lt;/g, "<")
+        .replace(/&#10;/g, "\n")
+        .replace(/&#13;/g, "")
+        .replace(/&amp;/g, "&");
+    }
+
+    /**
+     * Applique fidèlement les dimensions personnalisées (en millimètres) sur la feuille d'aperçu
+     * (style QGIS Layout-Composer)
+     */
+    applyLayoutDimensions() {
+      if (!this.state.layout) {
+        this.state.layout = { ...DEFAULT_LAYOUT };
+      }
+      const layout = this.state.layout;
+      const isLandscape = this.state.orientation === "landscape";
+      const pxPerMm = isLandscape ? (880 / 279.4) : (650 / 215.9);
+
+      // 1. En-tête / Cartouche
+      if (this.dom.sheetCartouche) {
+        const hPx = Math.round((layout.headerH || 22) * pxPerMm);
+        this.dom.sheetCartouche.style.minHeight = `${hPx}px`;
+      }
+
+      // 2. Panneau latéral
+      if (this.dom.sheetSidePanel) {
+        if (isLandscape) {
+          const wPx = Math.round((layout.sideW || 60) * pxPerMm);
+          this.dom.sheetSidePanel.style.width = `${wPx}px`;
+          this.dom.sheetSidePanel.style.height = "";
+        } else {
+          this.dom.sheetSidePanel.style.width = "100%";
+        }
+      }
+
+      // 3. Boussole / Rose des vents
+      if (this.dom.sheetCompassWrap) {
+        const compassPx = Math.round((layout.compassSize || 24) * pxPerMm);
+        this.dom.sheetCompassWrap.style.width = `${compassPx}px`;
+        this.dom.sheetCompassWrap.style.height = `${compassPx}px`;
+      }
+
+      // 4. Bloc Profil Coupe MNT
+      if (this.dom.sheetProfileBlock) {
+        const profPx = Math.round((layout.profileH || 46) * pxPerMm);
+        this.dom.sheetProfileBlock.style.height = `${profPx}px`;
+      }
+
+      // 5. Synchroniser les champs de saisie s'ils existent
+      if (this.dom.inputSizeHeaderH && document.activeElement !== this.dom.inputSizeHeaderH) {
+        this.dom.inputSizeHeaderH.value = Math.round(layout.headerH || 22);
+      }
+      if (this.dom.inputSizeSideW && document.activeElement !== this.dom.inputSizeSideW) {
+        this.dom.inputSizeSideW.value = Math.round(layout.sideW || 60);
+      }
+      if (this.dom.inputSizeCompass && document.activeElement !== this.dom.inputSizeCompass) {
+        this.dom.inputSizeCompass.value = Math.round(layout.compassSize || 24);
+      }
+      if (this.dom.inputSizeProfileH && document.activeElement !== this.dom.inputSizeProfileH) {
+        this.dom.inputSizeProfileH.value = Math.round(layout.profileH || 46);
+      }
+    }
+
+    /**
      * Exporte le gabarit actuel au format standard QGIS Print Layout (.qpt / XML)
+     * Respecte fidèlement les dimensions réelles (mm) et positions selon Layout-Composer
      */
     exportQptTemplate() {
       const isLandscape = this.state.orientation === "landscape";
@@ -1062,13 +1229,66 @@
       const pageH = isLandscape ? 215.9 : 279.4;
       const orientation = isLandscape ? "landscape" : "portrait";
       const templateName = this.state.title || "Plan de ferme";
-      const margin = 10;
-      const headerH = 22;
+
+      const layout = { ...DEFAULT_LAYOUT, ...(this.state.layout || {}) };
+      const margin = layout.margin || 10;
+      const headerH = layout.headerH || 22;
+      const sideW = layout.sideW || 60;
+      const compassSize = layout.compassSize || 24;
+      const profileH = layout.profileH || 46;
+      const hasProfile = !!this.state.showProfile;
+
       const mapTopY = margin + headerH + 3;
 
-      // Dimensions de la carte selon orientation
-      const mapW = isLandscape ? (pageW - margin * 2 - 64) : (pageW - margin * 2);
-      const mapH = isLandscape ? (pageH - mapTopY - margin - 6) : (this.state.showProfile ? 118 : 158);
+      let mapW, mapH, sideX, sideY;
+      let compassX, compassY, scaleX, scaleY, legendX, legendY, legendH, notesX, notesY, notesH, profileY;
+
+      if (isLandscape) {
+        mapW = pageW - margin * 2 - sideW - 4;
+        mapH = hasProfile ? (pageH - mapTopY - margin - profileH - 6) : (pageH - mapTopY - margin - 6);
+        sideX = margin + mapW + 4;
+        sideY = mapTopY;
+
+        compassX = sideX + (sideW - compassSize) / 2;
+        compassY = sideY + 2;
+
+        scaleX = sideX;
+        scaleY = compassY + compassSize + 4;
+
+        legendX = sideX;
+        legendY = scaleY + 16;
+        legendH = Math.max(30, pageH - legendY - margin - 35);
+
+        notesX = sideX;
+        notesY = pageH - margin - 32;
+        notesH = 30;
+
+        profileY = mapTopY + mapH + 3;
+      } else {
+        mapW = pageW - margin * 2;
+        const bottomH = 55;
+        const availableH = pageH - mapTopY - bottomH - margin - 6;
+        mapH = hasProfile ? Math.max(80, availableH - profileH - 3) : Math.max(120, availableH);
+
+        profileY = mapTopY + mapH + 3;
+        const bottomY = hasProfile ? (profileY + profileH + 3) : (mapTopY + mapH + 3);
+
+        const col1W = Math.max(38, compassSize + 10);
+        compassX = margin + (col1W - compassSize) / 2;
+        compassY = bottomY + 2;
+
+        scaleX = margin;
+        scaleY = compassY + compassSize + 4;
+
+        legendX = margin + col1W + 3;
+        legendY = bottomY;
+        const col2W = 70;
+        legendH = pageH - bottomY - margin - 6;
+
+        notesX = legendX + col2W + 3;
+        notesY = bottomY;
+        notesH = pageH - bottomY - margin - 6;
+      }
 
       // Sérialisation des paramètres PlanDeFerme dans une propriété personnalisée
       const serializedState = encodeURIComponent(JSON.stringify(this.state));
@@ -1078,6 +1298,19 @@
       if (dateStr) metaLines.push("Date : " + dateStr);
       if (this.state.location) metaLines.push("Lieu : " + this.state.location);
       if (this.state.author) metaLines.push("Auteur : " + this.state.author);
+
+      // Calcul des coordonnées internes du cartouche
+      let titleX = margin + 4;
+      let titleW = pageW - margin * 2 - 80;
+      let logoItemXml = "";
+      if (this.state.logoUrl) {
+        logoItemXml = `
+  <!-- Logo -->
+  <LayoutItem id="Logo" type="65640" position="${margin + 2},${margin + 2},mm" positionOnPage="${margin + 2},${margin + 2},mm" size="24,${headerH - 4},mm" frame="false" visibility="1" zIndex="2" file="${this.escapeXml(this.state.logoUrl)}" picturePath="${this.escapeXml(this.state.logoUrl)}" resizeMode="1" anchorPoint="0">
+  </LayoutItem>`;
+        titleX = margin + 28;
+        titleW = pageW - margin * 2 - 104;
+      }
 
       const qptXml = `<!DOCTYPE qgis_layout>
 <Layout name="${this.escapeXml(templateName)}" units="mm" worldFileMap="">
@@ -1101,55 +1334,62 @@
     </LayoutItem>
   </PageCollection>
 
-  <!-- Cadre de Carte -->
+  <!-- Cadre de Carte Principale -->
   <LayoutItem id="Carte Principale" type="65639" position="${margin},${mapTopY},mm" positionOnPage="${margin},${mapTopY},mm" size="${mapW},${mapH},mm" frame="true" outlineWidthM="0.4,mm" visibility="1" zIndex="1" background="true">
     <FrameColor alpha="255" red="15" blue="42" green="23"/>
     <BackgroundColor alpha="255" red="241" blue="249" green="245"/>
   </LayoutItem>
+
+  ${hasProfile ? `
+  <!-- Bloc Coupe Topographique (Profil MNT) -->
+  <LayoutItem id="Profil Topographique" type="65640" position="${margin},${profileY},mm" positionOnPage="${margin},${profileY},mm" size="${mapW},${profileH},mm" frame="true" outlineWidthM="0.35,mm" visibility="1" zIndex="1" background="true">
+    <FrameColor alpha="255" red="15" blue="42" green="23"/>
+    <BackgroundColor alpha="255" red="255" blue="255" green="255"/>
+  </LayoutItem>` : ""}
 
   <!-- Cartouche En-Tête -->
   <LayoutItem id="Cartouche Fond" type="65641" position="${margin},${margin},mm" positionOnPage="${margin},${margin},mm" size="${pageW - margin * 2},${headerH},mm" frame="true" outlineWidthM="0.4,mm" visibility="1" zIndex="1" background="true">
     <FrameColor alpha="255" red="15" blue="42" green="23"/>
     <BackgroundColor alpha="255" red="255" blue="255" green="255"/>
   </LayoutItem>
-
+${logoItemXml}
   <!-- Titre -->
-  <LayoutItem id="Titre" type="65641" position="${margin + 4},${margin + 2},mm" positionOnPage="${margin + 4},${margin + 2},mm" size="${pageW - margin * 2 - 80},10,mm" frame="false" visibility="1" zIndex="2" labelText="${this.escapeXml(this.state.title || "Plan de ferme")}">
+  <LayoutItem id="Titre" type="65641" position="${titleX},${margin + 2},mm" positionOnPage="${titleX},${margin + 2},mm" size="${titleW},${Math.min(10, headerH * 0.45)},mm" frame="false" visibility="1" zIndex="2" labelText="${this.escapeXml(this.state.title || "Plan de ferme")}">
     <FontDescription style="Bold" description="Helvetica,14,-1,5,75,0,0,0,0,0"/>
     <FontColor alpha="255" red="15" blue="42" green="23"/>
   </LayoutItem>
 
   <!-- Sous-titre -->
-  <LayoutItem id="SousTitre" type="65641" position="${margin + 4},${margin + 12},mm" positionOnPage="${margin + 4},${margin + 12},mm" size="${pageW - margin * 2 - 80},8,mm" frame="false" visibility="1" zIndex="2" labelText="${this.escapeXml(this.state.subtitle || "")}">
+  <LayoutItem id="SousTitre" type="65641" position="${titleX},${margin + Math.min(12, headerH * 0.52)},mm" positionOnPage="${titleX},${margin + Math.min(12, headerH * 0.52)},mm" size="${titleW},${Math.min(8, headerH * 0.38)},mm" frame="false" visibility="1" zIndex="2" labelText="${this.escapeXml(this.state.subtitle || "")}">
     <FontDescription style="Bold" description="Helvetica,9,-1,5,75,0,0,0,0,0"/>
     <FontColor alpha="255" red="22" blue="52" green="101"/>
   </LayoutItem>
 
   <!-- Métadonnées (Date, Lieu, Auteur) -->
-  <LayoutItem id="Metadonnees" type="65641" position="${pageW - margin - 75},${margin + 2},mm" positionOnPage="${pageW - margin - 75},${margin + 2},mm" size="70,18,mm" frame="false" halign="2" visibility="1" zIndex="2" labelText="${this.escapeXml(metaLines.join("\n"))}">
+  <LayoutItem id="Metadonnees" type="65641" position="${pageW - margin - 75},${margin + 2},mm" positionOnPage="${pageW - margin - 75},${margin + 2},mm" size="70,${headerH - 4},mm" frame="false" halign="2" visibility="1" zIndex="2" labelText="${this.escapeXml(metaLines.join("\n"))}">
     <FontDescription style="Regular" description="Helvetica,8,-1,5,50,0,0,0,0,0"/>
     <FontColor alpha="255" red="71" blue="105" green="85"/>
   </LayoutItem>
 
   ${this.state.showLegend !== false ? `
   <!-- Légende -->
-  <LayoutItem id="Legende" type="65642" position="${isLandscape ? (margin + mapW + 4) : (margin + 49)},${isLandscape ? (mapTopY + 49) : (mapTopY + mapH + 3)},mm" size="${isLandscape ? 60 : 72},${isLandscape ? 80 : 55},mm" frame="true" outlineWidthM="0.3,mm" visibility="1" zIndex="2" title="LÉGENDE">
+  <LayoutItem id="Legende" type="65642" position="${legendX},${legendY},mm" size="${isLandscape ? sideW : 70},${legendH},mm" frame="true" outlineWidthM="0.3,mm" visibility="1" zIndex="2" title="LÉGENDE">
     <TitleFont style="Bold" description="Helvetica,8,-1,5,75,0,0,0,0,0"/>
   </LayoutItem>` : ""}
 
   ${this.state.showScale !== false ? `
   <!-- Barre d'échelle -->
-  <LayoutItem id="Echelle" type="65646" position="${isLandscape ? (margin + mapW + 4) : margin},${isLandscape ? (mapTopY + 28) : (mapTopY + mapH + 28)},mm" size="${isLandscape ? 60 : 46},14,mm" frame="false" visibility="1" zIndex="2" unitLabel="m" numUnitsPerSegment="100" segmentMillimeters="20" numSegments="2" numSegmentsLeft="0" numMapUnitsPerScaleBarUnit="1">
+  <LayoutItem id="Echelle" type="65646" position="${scaleX},${scaleY},mm" size="${isLandscape ? sideW : (compassSize + 10)},14,mm" frame="false" visibility="1" zIndex="2" unitLabel="m" numUnitsPerSegment="100" segmentMillimeters="20" numSegments="2" numSegmentsLeft="0" numMapUnitsPerScaleBarUnit="1">
   </LayoutItem>` : ""}
 
   ${this.state.showCompass !== false ? `
-  <!-- Flèche Nord (Rose des vents) -->
-  <LayoutItem id="RoseDesVents" type="65640" position="${isLandscape ? (margin + mapW + 18) : (margin + 11)},${isLandscape ? (mapTopY + 3) : (mapTopY + mapH + 3)},mm" size="24,24,mm" frame="false" visibility="1" zIndex="2" picturePath="arrows/NorthArrow_04.svg">
+  <!-- Flèche Nord (Rose des vents) standard QGIS -->
+  <LayoutItem id="RoseDesVents" type="65640" position="${compassX},${compassY},mm" size="${compassSize},${compassSize},mm" northMode="1" pictureRotation="0" frame="false" visibility="1" zIndex="2" file="arrows/NorthArrow_04.svg" picturePath="arrows/NorthArrow_04.svg" resizeMode="0" anchorPoint="4">
   </LayoutItem>` : ""}
 
   ${(this.state.showNotes !== false && this.state.notes) ? `
   <!-- Notes de terrain -->
-  <LayoutItem id="Notes" type="65641" position="${isLandscape ? (margin + mapW + 4) : (margin + 124)},${isLandscape ? (pageH - margin - 35) : (mapTopY + mapH + 3)},mm" size="${isLandscape ? 60 : (pageW - margin * 2 - 124)},30,mm" frame="true" outlineWidthM="0.3,mm" visibility="1" zIndex="2" labelText="${this.escapeXml(this.state.notes)}">
+  <LayoutItem id="Notes" type="65641" position="${notesX},${notesY},mm" size="${isLandscape ? sideW : (pageW - margin - notesX)},${notesH},mm" frame="true" outlineWidthM="0.3,mm" visibility="1" zIndex="2" labelText="${this.escapeXml(this.state.notes)}">
     <FontDescription style="Regular" description="Helvetica,7,-1,5,50,0,0,0,0,0"/>
     <FontColor alpha="255" red="71" blue="105" green="85"/>
   </LayoutItem>` : ""}
@@ -1172,137 +1412,317 @@
     }
 
     /**
-     * Importe un fichier de composition QGIS Print Layout (.qpt / XML)
+     * Importe fidèlement un fichier de composition QGIS Print Layout (.qpt / XML)
+     * Système d'analyse universel inspiré du plugin Layout-Composer (Defani) :
+     * lecture de la rose des vents (northMode / svg), labels par ID/position, échelle, légende, dimensions précises en mm.
      */
     importQptTemplate(xmlContent, fileName) {
       try {
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
-        
-        const parseError = xmlDoc.querySelector("parsererror");
-        if (parseError) {
+        if (xmlDoc.querySelector("parsererror")) {
           throw new Error("Le fichier XML n'est pas valide ou est corrompu.");
         }
 
-        // Vérification préalable : si le fichier provient d'un export PlanDeFerme
+        const root = xmlDoc.querySelector("Layout") || xmlDoc.querySelector("Composer") || xmlDoc.documentElement;
+        if (!root) {
+          throw new Error("Aucun élément <Layout> ou <Composer> trouvé dans le gabarit QGIS.");
+        }
+
+        // Unités et helper de mesure inspiré de Layout-Composer (Defani)
+        const UNIT_MM = { mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8, pt: 25.4 / 72, pica: 25.4 / 6, px: 25.4 / 96 };
+        const qMeasure = (s) => {
+          if (!s) return [0, 0];
+          const [a, b, u = "mm"] = String(s).split(",");
+          const k = UNIT_MM[u] || 1;
+          return [Number(a) * k, Number(b) * k];
+        };
+
+        // 1. Détection de l'orientation et des dimensions de la page
+        let orientation = "landscape";
+        let pageW = 279.4;
+        let pageH = 215.9;
+        const pageItem = xmlDoc.querySelector('LayoutItem[type="65638"]') || xmlDoc.querySelector("Page") || xmlDoc.querySelector("Composition");
+        if (pageItem) {
+          const [pw, ph] = qMeasure(pageItem.getAttribute("size"));
+          const attrW = parseFloat(pageItem.getAttribute("pageWidth") || pageItem.getAttribute("width") || "0");
+          const attrH = parseFloat(pageItem.getAttribute("pageHeight") || pageItem.getAttribute("height") || "0");
+          if (pw > 0 && ph > 0) {
+            pageW = pw;
+            pageH = ph;
+          } else if (attrW > 0 && attrH > 0) {
+            pageW = attrW;
+            pageH = attrH;
+          }
+          if (pageH > pageW) orientation = "portrait";
+          else orientation = "landscape";
+        }
+
+        // 2. Scan de tous les LayoutItems
+        const items = Array.from(xmlDoc.querySelectorAll("LayoutItem, ComposerMap, ComposerLabel, ComposerPicture, ComposerLegend, ComposerScaleBar, ComposerShape, NorthArrow"));
+
+        let hasMap = false;
+        let hasLegend = false;
+        let hasScale = false;
+        let hasCompass = false;
+        let hasProfile = false;
+        let hasNotes = false;
+        let logoUrl = null;
+
+        let detectedHeaderH = null;
+        let detectedSideW = null;
+        let detectedCompassSize = null;
+        let detectedProfileH = null;
+
+        // Stockage des labels pour extraction fine
+        const labels = [];
+
+        items.forEach(item => {
+          const type = Number(item.getAttribute("type") || 0);
+          const tagName = item.tagName.toLowerCase();
+          const id = (item.getAttribute("id") || "").trim();
+          const [x, y] = qMeasure(item.getAttribute("position") || item.getAttribute("positionOnPage"));
+          const [w, h] = qMeasure(item.getAttribute("size"));
+          const file = item.getAttribute("file") || item.getAttribute("picturePath") || "";
+
+          // A. Carte
+          if (type === 65639 || tagName === "composermap" || /carte|map/i.test(id)) {
+            hasMap = true;
+          }
+
+          // B. Rose des vents / North Arrow
+          const isNorthMode = item.getAttribute("northMode") === "1";
+          const isNorthPath = /north|arrow|compass|boussole|rose/i.test(file);
+          const isNorthId = /north|arrow|compass|boussole|rose/i.test(id);
+          const isNorthTag = tagName === "northarrow" || type === 65644;
+          if (isNorthMode || isNorthPath || isNorthId || isNorthTag) {
+            hasCompass = true;
+            if (w > 10 && w < 80) {
+              detectedCompassSize = Math.round(w);
+            }
+            return;
+          }
+
+          // C. Image / Logo / Profil
+          if (type === 65640 || tagName === "composerpicture") {
+            if (/profil|coupe|elevation|chart/i.test(id)) {
+              hasProfile = true;
+              if (h >= 15 && h <= 100) detectedProfileH = Math.round(h);
+            } else if (/logo/i.test(id) || (!isNorthMode && !isNorthPath && (file.startsWith("data:") || file.startsWith("base64:") || file.startsWith("http")))) {
+              if (file.startsWith("base64:")) {
+                const b64 = file.slice(7);
+                const isSvg = /^PD94|^PHN2/.test(b64);
+                logoUrl = `data:${isSvg ? "image/svg+xml" : "image/png"};base64,${b64}`;
+              } else if (file) {
+                logoUrl = file;
+              }
+            }
+            return;
+          }
+
+          // D. Légende
+          if (type === 65642 || tagName === "composerlegend" || /legende|legend/i.test(id)) {
+            hasLegend = true;
+            if (orientation === "landscape" && w >= 35 && w <= 120) {
+              detectedSideW = Math.round(w);
+            }
+            return;
+          }
+
+          // E. Échelle
+          if (type === 65646 || tagName === "composerscalebar" || /echelle|scale/i.test(id)) {
+            hasScale = true;
+            return;
+          }
+
+          // F. Formes / Cadres (ex: Cartouche fond)
+          if (type === 65643 || tagName === "composershape") {
+            if (/cartouche|header|en-tete/i.test(id) || (y < 20 && h >= 14 && h <= 60)) {
+              detectedHeaderH = Math.round(h);
+            }
+            return;
+          }
+
+          // G. Labels / Textes
+          if (type === 65641 || tagName === "composerlabel") {
+            let text = item.getAttribute("labelText") || "";
+            if (!text) {
+              const textNode = item.querySelector("labelText, LabelText");
+              if (textNode) text = textNode.textContent;
+              else text = item.textContent || "";
+            }
+            text = this.unescapeXml(text).trim();
+
+            // Ne pas traiter les expressions internes [% ... %] vides
+            if (text.startsWith("[%") && text.endsWith("%]") && !text.includes("format_date")) {
+              return;
+            }
+
+            // Détection du cartouche si c'est un rectangle avec fond
+            if (/cartouche|header|en-tete/i.test(id) && h >= 14 && h <= 60) {
+              detectedHeaderH = Math.round(h);
+            }
+
+            // Récupération de la taille de police si présente
+            let fontSize = 10;
+            const fontDesc = item.querySelector("FontDescription, LabelFont");
+            if (fontDesc) {
+              const desc = fontDesc.getAttribute("description") || "";
+              const parts = desc.split(",");
+              if (parts[1] && parseFloat(parts[1]) > 0) fontSize = parseFloat(parts[1]);
+            }
+            const textStyle = item.querySelector("text_style");
+            if (textStyle) {
+              const sz = parseFloat(textStyle.getAttribute("fontSize"));
+              if (sz > 0) fontSize = sz;
+            }
+
+            labels.push({ id, text, x, y, w, h, fontSize });
+          }
+        });
+
+        // 3. Extraction intelligente des textes (Titre, Sous-titre, Métadonnées, Notes)
+        let title = "";
+        let subtitle = "";
+        let notes = "";
+        let location = "";
+        let author = "";
+
+        const unassignedLabels = [];
+
+        labels.forEach(lbl => {
+          const lowerId = lbl.id.toLowerCase();
+          if (/^titre$|^title$/i.test(lowerId)) {
+            title = lbl.text;
+          } else if (/^soustitre$|^subtitle$|^sous-titre$/i.test(lowerId)) {
+            subtitle = lbl.text;
+          } else if (/^metadonnees$|^metadata$|^meta$/i.test(lowerId)) {
+            // Parser les métadonnées ligne par ligne
+            const lines = this.unescapeXml(lbl.text).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+            lines.forEach(l => {
+              const trimmed = l.trim();
+              if (/^lieu\s*:/i.test(trimmed)) location = trimmed.replace(/^lieu\s*:\s*/i, "").trim();
+              else if (/^auteur\s*:/i.test(trimmed)) author = trimmed.replace(/^auteur\s*:\s*/i, "").trim();
+              else if (/^location\s*:/i.test(trimmed)) location = trimmed.replace(/^location\s*:\s*/i, "").trim();
+              else if (/^author\s*:/i.test(trimmed)) author = trimmed.replace(/^author\s*:\s*/i, "").trim();
+            });
+          } else if (/^notes?$|^observations?$/i.test(lowerId)) {
+            notes = lbl.text;
+            hasNotes = true;
+          } else {
+            unassignedLabels.push(lbl);
+          }
+        });
+
+        // Fallback si certains labels n'avaient pas d'identifiant explicite
+        if (!title || !subtitle || !notes) {
+          // Trier les labels restants par position Y (haut vers bas), puis par taille de police décroissante
+          unassignedLabels.sort((a, b) => {
+            if (Math.abs(a.y - b.y) > 8) return a.y - b.y;
+            return b.fontSize - a.fontSize;
+          });
+
+          for (const lbl of unassignedLabels) {
+            // Ignorer les petits textes techniques
+            if (lbl.text.length < 2) continue;
+
+            const cleanText = this.unescapeXml(lbl.text).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+            // Vérifier s'il contient des métadonnées
+            if (!location && (/lieu\s*:/i.test(cleanText) || /location\s*:/i.test(cleanText))) {
+              const m = cleanText.match(/(?:lieu|location)\s*:\s*([^\n\r]+)/i);
+              if (m) location = m[1].trim();
+            }
+            if (!author && (/auteur\s*:/i.test(cleanText) || /author\s*:/i.test(cleanText))) {
+              const m = cleanText.match(/(?:auteur|author)\s*:\s*([^\n\r]+)/i);
+              if (m) author = m[1].trim();
+            }
+
+            // Titre : premier texte près du haut avec grande police
+            if (!title && lbl.y < 45 && lbl.fontSize >= 11) {
+              title = lbl.text;
+              continue;
+            }
+
+            // Sous-titre : juste sous le titre avec police moyenne
+            if (!subtitle && lbl.y < 55 && lbl.fontSize >= 8 && lbl.fontSize < 14 && lbl.text !== title) {
+              subtitle = lbl.text;
+              continue;
+            }
+
+            // Notes : texte plus bas ou multilignes
+            if (!notes && (lbl.y > 60 || lbl.text.includes("\n") || lbl.text.length > 50)) {
+              notes = lbl.text;
+              hasNotes = true;
+              continue;
+            }
+          }
+        }
+
+        // Si des notes ont été trouvées
+        if (notes) hasNotes = true;
+
+        // 4. Dimensions du gabarit
+        const layout = {
+          margin: 10,
+          headerH: detectedHeaderH || 22,
+          sideW: detectedSideW || 60,
+          compassSize: detectedCompassSize || 24,
+          profileH: detectedProfileH || 46
+        };
+
+        const baseName = fileName ? fileName.replace(/\.qpt$/i, "").replace(/\.xml$/i, "") : "Modèle QGIS";
+
+        // 5. Fusion avec état PlanDeFerme existant si disponible
+        let customState = {};
         const customProp = xmlDoc.querySelector('customproperties property[key="plandeferme_state"]');
         if (customProp && customProp.getAttribute("value")) {
           try {
             const rawJson = decodeURIComponent(customProp.getAttribute("value"));
-            const importedState = JSON.parse(rawJson);
-            const templateId = "user_qpt_" + Date.now();
-            const baseName = fileName ? fileName.replace(/\.qpt$/i, "").replace(/\.xml$/i, "") : "Modèle QGIS";
-            const newTemplate = {
-              ...importedState,
-              id: templateId,
-              name: importedState.name || `QGIS - ${baseName}`
-            };
-            this.userTemplates[templateId.replace("user_", "")] = newTemplate;
-            this.saveUserTemplates();
-            this.populateTemplateSelect();
-            this.dom.templateSelect.value = templateId;
-            this.applyTemplate(templateId);
-            alert(`Gabarit QGIS "${newTemplate.name}" importé avec succès !`);
-            return;
+            customState = JSON.parse(rawJson) || {};
           } catch (e) {
-            console.warn("[Composer] Erreur lecture métadonnées PlanDeFerme dans le QPT:", e);
+            console.warn("[Composer] Erreur lecture métadonnées JSON:", e);
           }
-        }
-
-        // 1. Détection de l'orientation et des dimensions de la page
-        let orientation = "landscape";
-        const pageItem = xmlDoc.querySelector('LayoutItem[type="65638"]') || xmlDoc.querySelector("Page") || xmlDoc.querySelector("Composition");
-        if (pageItem) {
-          const sizeAttr = pageItem.getAttribute("size") || "";
-          const pW = parseFloat(pageItem.getAttribute("pageWidth") || pageItem.getAttribute("width") || "0");
-          const pH = parseFloat(pageItem.getAttribute("pageHeight") || pageItem.getAttribute("height") || "0");
-          
-          if (sizeAttr && sizeAttr.includes(",")) {
-            const parts = sizeAttr.split(",");
-            const w = parseFloat(parts[0]);
-            const h = parseFloat(parts[1]);
-            if (h > w) orientation = "portrait";
-            else orientation = "landscape";
-          } else if (pW > 0 && pH > 0) {
-            if (pH > pW) orientation = "portrait";
-            else orientation = "landscape";
-          }
-        }
-
-        // 2. Détection de la présence des éléments
-        const hasLegend = !!(xmlDoc.querySelector('LayoutItem[type="65642"]') || xmlDoc.querySelector("ComposerLegend"));
-        const hasScale = !!(xmlDoc.querySelector('LayoutItem[type="65646"]') || xmlDoc.querySelector("ComposerScaleBar"));
-        
-        let hasCompass = false;
-        const pictures = xmlDoc.querySelectorAll('LayoutItem[type="65640"], ComposerPicture');
-        pictures.forEach(p => {
-          const path = (p.getAttribute("picturePath") || p.getAttribute("file") || "").toLowerCase();
-          if (path.includes("north") || path.includes("arrow") || path.includes("compass") || path.includes("boussole")) {
-            hasCompass = true;
-          }
-        });
-        if (!hasCompass && (xmlDoc.querySelector('LayoutItem[type="65644"]') || xmlDoc.querySelector("NorthArrow"))) {
-          hasCompass = true;
-        }
-
-        // 3. Extraction des textes / étiquettes (Labels)
-        const labelNodes = xmlDoc.querySelectorAll('LayoutItem[type="65641"], ComposerLabel');
-        const extractedTexts = [];
-        labelNodes.forEach(lbl => {
-          let txt = lbl.getAttribute("labelText") || "";
-          if (!txt) {
-            const childText = lbl.querySelector("labelText") || lbl.querySelector("LabelText");
-            if (childText) txt = childText.textContent;
-          }
-          txt = (txt || "").trim();
-          if (txt && !txt.startsWith("[%") && txt.length > 1) {
-            extractedTexts.push(txt);
-          }
-        });
-
-        const baseName = fileName ? fileName.replace(/\.qpt$/i, "").replace(/\.xml$/i, "") : "Modèle QGIS";
-        let title = baseName;
-        let subtitle = "";
-        let notes = "";
-
-        if (extractedTexts.length >= 1) {
-          title = extractedTexts[0];
-        }
-        if (extractedTexts.length >= 2) {
-          subtitle = extractedTexts[1];
-        }
-        if (extractedTexts.length >= 3) {
-          notes = extractedTexts.slice(2).join("\n");
         }
 
         const templateId = "user_qpt_" + Date.now();
         const newTemplate = {
+          ...customState,
           id: templateId,
           name: `QGIS - ${baseName}`,
           format: "letter",
           orientation,
-          title: title || "Plan de ferme",
-          subtitle: subtitle || "Modèle importé de QGIS",
-          author: "",
-          location: "",
-          notes: notes || "Gabarit importé depuis un fichier QGIS Print Layout (.qpt).",
+          title: title || customState.title || baseName,
+          subtitle: subtitle || customState.subtitle || "Modèle importé de QGIS",
+          author: author || customState.author || "",
+          location: location || customState.location || "",
+          notes: notes || customState.notes || "",
           showCompass: hasCompass !== false,
           showScale: hasScale !== false,
           showLegend: hasLegend !== false,
-          showNotes: !!notes,
-          showProfile: false,
-          logoUrl: null,
-          excludedLegendIds: []
+          showNotes: hasNotes !== false && !!(notes || customState.notes),
+          showProfile: hasProfile || !!customState.showProfile,
+          logoUrl: logoUrl || customState.logoUrl || null,
+          excludedLegendIds: customState.excludedLegendIds || [],
+          layout: {
+            ...layout,
+            ...(customState.layout || {})
+          }
         };
+
+        // Si nous avons détecté des dimensions précises dans le XML, elles prévalent sur le cache
+        if (detectedHeaderH) newTemplate.layout.headerH = detectedHeaderH;
+        if (detectedSideW) newTemplate.layout.sideW = detectedSideW;
+        if (detectedCompassSize) newTemplate.layout.compassSize = detectedCompassSize;
+        if (detectedProfileH) newTemplate.layout.profileH = detectedProfileH;
 
         this.userTemplates[templateId.replace("user_", "")] = newTemplate;
         this.saveUserTemplates();
         this.populateTemplateSelect();
-
         this.dom.templateSelect.value = templateId;
-        this.applyTemplate(templateId);
+        this.loadState(newTemplate);
 
-        alert(`Gabarit QGIS importé avec succès !\n\nNom : ${newTemplate.name}\nOrientation : ${orientation === "portrait" ? "Portrait" : "Paysage"}\nÉléments : ${hasLegend ? "Légende, " : ""}${hasScale ? "Échelle, " : ""}${hasCompass ? "Rose des vents" : ""}`);
+        alert(`Gabarit QGIS importé fidèlement !\n\nNom : ${newTemplate.name}\nOrientation : ${orientation === "portrait" ? "Portrait" : "Paysage"}\nDimensions : En-tête ${newTemplate.layout.headerH} mm, Panneau ${newTemplate.layout.sideW} mm, Boussole ${newTemplate.layout.compassSize} mm\nÉléments : ${newTemplate.showLegend ? "Légende, " : ""}${newTemplate.showScale ? "Échelle, " : ""}${newTemplate.showCompass ? "Rose des vents, " : ""}${newTemplate.showNotes ? "Notes" : ""}`);
       } catch (err) {
         console.error("[Composer] Erreur import .qpt:", err);
         alert("Impossible d'importer le fichier .qpt : " + err.message);
@@ -1350,19 +1770,33 @@
 
     /**
      * Recalcule l'image recadrée selon l'orientation courante (Paysage ou Portrait)
+     * et les dimensions personnalisées réelles (mm) pour une fidélité d'affichage 100% exacte.
      */
     updateMapSnapshotForOrientation() {
       if (!this.rawMapCanvas) return;
       const isLandscape = this.state.orientation === "landscape";
       const hasProfile = !!this.state.showProfile;
-      // Ratios d'aspect réels des cadres sur papier (mapW / mapH)
-      // Paysage normal : mapW = 195.4 mm, mapH = 164.9 mm -> ratio = 1.18496
-      // Paysage avec coupe : mapW = 195.4 mm, mapH = 116 mm -> ratio = 1.68448
-      // Portrait normal : mapW = 195.9 mm, mapH = 158 mm -> ratio = 1.23987
-      // Portrait avec coupe : mapW = 195.9 mm, mapH = 118 mm -> ratio = 1.66017
-      const targetAspect = isLandscape
-        ? (hasProfile ? (195.4 / 116) : (195.4 / 164.9))
-        : (hasProfile ? (195.9 / 118) : (195.9 / 158));
+      const layout = { ...DEFAULT_LAYOUT, ...(this.state.layout || {}) };
+      const pageW = isLandscape ? 279.4 : 215.9;
+      const pageH = isLandscape ? 215.9 : 279.4;
+      const margin = layout.margin || 10;
+      const headerH = layout.headerH || 22;
+      const sideW = layout.sideW || 60;
+      const profileH = hasProfile ? (layout.profileH || 46) : 0;
+      const mapTopY = margin + headerH + 3;
+
+      let mapW, mapH;
+      if (isLandscape) {
+        mapW = pageW - margin * 2 - sideW - 4;
+        mapH = hasProfile ? (pageH - mapTopY - margin - profileH - 6) : (pageH - mapTopY - margin - 6);
+      } else {
+        mapW = pageW - margin * 2;
+        const bottomH = 55;
+        const availableH = pageH - mapTopY - bottomH - margin - 6;
+        mapH = hasProfile ? Math.max(80, availableH - profileH - 3) : Math.max(120, availableH);
+      }
+
+      const targetAspect = mapW / Math.max(30, mapH);
       this.mapSnapshotDataUrl = this.cropMapSnapshot(targetAspect);
       if (this.dom && this.dom.sheetMapImg) {
         this.dom.sheetMapImg.src = this.mapSnapshotDataUrl || "";
@@ -1385,6 +1819,7 @@
         this.dom.sheet.classList.remove("portrait");
         this.dom.sheet.classList.add("landscape");
       }
+      this.applyLayoutDimensions();
       this.updateMapSnapshotForOrientation();
       this.updateScale();
 
@@ -1420,7 +1855,18 @@
      * Charger un état de configuration dans le formulaire et la feuille
      */
     loadState(state) {
-      this.state = { ...this.state, ...state };
+      this.state = {
+        ...this.state,
+        ...state,
+        layout: {
+          ...DEFAULT_LAYOUT,
+          ...(this.state.layout || {}),
+          ...(state.layout || {})
+        }
+      };
+
+      // Appliquer les dimensions sur la feuille
+      this.applyLayoutDimensions();
 
       // Orientation
       this.setOrientation(this.state.orientation || "landscape");
@@ -1477,7 +1923,10 @@
 
       // Largeur du cadre sur la feuille imprimée (en mm)
       const isLandscape = this.state.orientation === "landscape";
-      const sheetMapWidthMm = isLandscape ? 195.4 : 195.9;
+      const layout = { ...DEFAULT_LAYOUT, ...(this.state.layout || {}) };
+      const margin = layout.margin || 10;
+      const sideW = layout.sideW || 60;
+      const sheetMapWidthMm = isLandscape ? (279.4 - margin * 2 - sideW - 4) : (215.9 - margin * 2);
 
       let rawScale = (groundWidthMeters * 1000) / sheetMapWidthMm;
       if (!isFinite(rawScale) || rawScale <= 0) rawScale = 5000;
@@ -1972,6 +2421,7 @@
         copyCtx.drawImage(canvas, 0, 0);
         this.rawMapCanvas = copyCanvas;
 
+        this.applyLayoutDimensions();
         this.updateMapSnapshotForOrientation();
       } catch (e) {
         console.warn("[Composer] Erreur capture canvas:", e);
@@ -2065,7 +2515,12 @@
 
         const pageW = doc.internal.pageSize.getWidth();
         const pageH = doc.internal.pageSize.getHeight();
-        const margin = 10;
+        const layout = { ...DEFAULT_LAYOUT, ...(this.state.layout || {}) };
+        const margin = layout.margin || 10;
+        const headerH = layout.headerH || 22;
+        const sideW = layout.sideW || 60;
+        const compassRadius = (layout.compassSize || 24) / 2;
+        const profileH = layout.profileH || 46;
 
         // Synchronisation des couches actives et de la légende
         this.updateActiveLegend();
@@ -2078,7 +2533,6 @@
         const headerX = margin;
         const headerY = margin;
         const headerW = pageW - (margin * 2);
-        const headerH = 22;
 
         doc.setDrawColor(15, 23, 42); // Noir anthracite #0f172a
         doc.setLineWidth(0.4);
@@ -2092,7 +2546,7 @@
             const naturalW = (logoImg && logoImg.naturalWidth) || 1;
             const naturalH = (logoImg && logoImg.naturalHeight) || 1;
             const maxW = 24;
-            const maxH = 16;
+            const maxH = Math.max(12, headerH - 6);
             let logoW = maxW;
             let logoH = (maxW * naturalH) / naturalW;
             if (logoH > maxH) {
@@ -2111,14 +2565,14 @@
         doc.setFont("helvetica", "bold");
         doc.setFontSize(14);
         doc.setTextColor(15, 23, 42);
-        doc.text(this.state.title || "Plan de ferme", textStartX, headerY + 7);
+        doc.text(this.state.title || "Plan de ferme", textStartX, headerY + Math.min(7.5, headerH * 0.4));
 
         // Sous-titre
         if (this.state.subtitle) {
           doc.setFont("helvetica", "bold");
           doc.setFontSize(9.5);
           doc.setTextColor(22, 101, 52); // Vert forêt #166534
-          doc.text(this.state.subtitle, textStartX, headerY + 12);
+          doc.text(this.state.subtitle, textStartX, headerY + Math.min(14, headerH * 0.7));
         }
 
         // Métadonnées à droite dans le cartouche
@@ -2127,9 +2581,9 @@
         doc.setTextColor(71, 85, 105);
         const metaX = headerX + headerW - 4;
         const dateStr = this.dom.sheetMetaDate.textContent || "";
-        doc.text(`Date : ${dateStr}`, metaX, headerY + 6, { align: "right" });
+        doc.text(`Date : ${dateStr}`, metaX, headerY + Math.min(6, headerH * 0.35), { align: "right" });
 
-        let curMetaY = headerY + 10.5;
+        let curMetaY = headerY + Math.min(10.5, headerH * 0.55);
         if (this.state.location) {
           doc.text(`Lieu : ${this.state.location}`, metaX, curMetaY, { align: "right" });
           curMetaY += 4.5;
@@ -2147,11 +2601,10 @@
 
         if (isLandscape) {
           // Disposition PAYSAGE
-          const sideW = 60;
           const mapW = headerW - sideW - 4;
           const fullMapH = pageH - mapTopY - margin - 6;
-          const profileH = hasProfile ? 46 : 0;
-          const mapH = hasProfile ? (fullMapH - profileH - 3) : fullMapH;
+          const profileBoxH = hasProfile ? profileH : 0;
+          const mapH = hasProfile ? (fullMapH - profileBoxH - 3) : fullMapH;
 
           // Image de la carte (recadrée au ratio exact du cadre pour éviter toute compression/distorsion)
           if (this.mapSnapshotDataUrl) {
@@ -2164,7 +2617,7 @@
           // Profil topographique (Coupe MNT) sous la carte
           if (hasProfile) {
             const profileY = mapTopY + mapH + 3;
-            this.drawVectorProfile(doc, headerX, profileY, mapW, profileH, profileData);
+            this.drawVectorProfile(doc, headerX, profileY, mapW, profileBoxH, profileData);
           }
 
           // Panneau latéral
@@ -2173,20 +2626,22 @@
 
           // Rose des vents & Échelle
           if (this.state.showCompass || this.state.showScale) {
-            const navBlockH = 46;
+            const navBlockH = (this.state.showCompass && this.state.showScale)
+              ? (compassRadius * 2 + 20)
+              : (this.state.showCompass || this.state.showScale ? (compassRadius * 2 + 10) : 0);
             doc.setDrawColor(203, 213, 225);
             doc.setLineWidth(0.3);
             doc.rect(sideX, currentSideY, sideW, navBlockH);
 
             // Rose des vents (Boussole)
             if (this.state.showCompass) {
-              this.drawVectorCompass(doc, sideX + (sideW / 2), currentSideY + 15, 11);
+              this.drawVectorCompass(doc, sideX + (sideW / 2), currentSideY + compassRadius + 3, compassRadius);
             }
 
             // Échelle
             if (this.state.showScale && this.scaleInfo) {
-              const scaleY = currentSideY + 34;
-              const barW = Math.min(sideW - 16, 44);
+              const scaleY = currentSideY + (this.state.showCompass ? (compassRadius * 2 + 7.5) : 5);
+              const barW = Math.min(sideW - 14, 44);
               const barStartX = sideX + (sideW - barW) / 2;
 
               // Segments noir / blanc alternés
@@ -2279,8 +2734,10 @@
         } else {
           // Disposition PORTRAIT
           const mapW = headerW;
-          const profileH = hasProfile ? 42 : 0;
-          const mapH = hasProfile ? 118 : 158;
+          const profileBoxH = hasProfile ? profileH : 0;
+          const bottomH = Math.max(55, compassRadius * 2 + 30);
+          const availableH = pageH - mapTopY - bottomH - margin - 6;
+          const mapH = hasProfile ? Math.max(80, availableH - profileBoxH - 3) : Math.max(120, availableH);
 
           // Image de carte (recadrée au ratio exact du cadre)
           if (this.mapSnapshotDataUrl) {
@@ -2294,26 +2751,26 @@
 
           // Profil topographique (Coupe MNT) sous la carte
           if (hasProfile) {
-            this.drawVectorProfile(doc, headerX, nextY, mapW, profileH, profileData);
-            nextY += profileH + 3;
+            this.drawVectorProfile(doc, headerX, nextY, mapW, profileBoxH, profileData);
+            nextY += profileBoxH + 3;
           }
 
           // Section basse
           const bottomY = nextY;
-          const bottomH = pageH - bottomY - margin - 6;
+          const realBottomH = pageH - bottomY - margin - 6;
 
-          // Colonne 1 : Rose des vents & Échelle (46 mm)
-          const col1W = 46;
+          // Colonne 1 : Rose des vents & Échelle
+          const col1W = Math.max(42, compassRadius * 2 + 14);
           doc.setDrawColor(203, 213, 225);
-          doc.rect(headerX, bottomY, col1W, bottomH);
+          doc.rect(headerX, bottomY, col1W, realBottomH);
 
           if (this.state.showCompass) {
-            this.drawVectorCompass(doc, headerX + col1W / 2, bottomY + 16, 11);
+            this.drawVectorCompass(doc, headerX + col1W / 2, bottomY + compassRadius + 4, compassRadius);
           }
 
           if (this.state.showScale && this.scaleInfo) {
-            const scaleY = bottomY + 36;
-            const barW = 34;
+            const scaleY = bottomY + (this.state.showCompass ? (compassRadius * 2 + 10) : 8);
+            const barW = Math.min(34, col1W - 8);
             const barStartX = headerX + (col1W - barW) / 2;
             const segW = barW / 4;
 
@@ -2346,7 +2803,7 @@
           doc.setDrawColor(203, 213, 225);
           doc.setLineWidth(0.3);
           doc.setFillColor(255, 255, 255);
-          doc.rect(col2X, bottomY, col2W, bottomH, "FD");
+          doc.rect(col2X, bottomY, col2W, realBottomH, "FD");
 
           doc.setFont("helvetica", "bold");
           doc.setFontSize(7.5);
@@ -2358,7 +2815,7 @@
               x: col2X,
               y: bottomY,
               w: col2W,
-              maxH: bottomH,
+              maxH: realBottomH,
               items: this.currentLegendItems,
               twoColumns: false
             });
