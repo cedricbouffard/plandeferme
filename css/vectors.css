@@ -1,0 +1,716 @@
+/**
+ * Plan de Ferme — Styles pour le Gestionnaire de Couches Vectorielles & Dessin
+ * Inspiré de GeoLibre (Édition d'entités, Table d'attributs, Stylisation & QML)
+ */
+
+/* ==========================================================================
+   1. Barre d'outils de dessin flottante sur la carte
+   ========================================================================== */
+.vector-drawing-toolbar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #ffffff;
+  padding: 6px 14px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-family: var(--font-sans, "Plus Jakarta Sans", sans-serif);
+  animation: slideDownFade 0.2s ease;
+}
+
+@keyframes slideDownFade {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.vector-drawing-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  padding-right: 6px;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.vector-drawing-icon {
+  width: 14px;
+  height: 14px;
+  color: #4ade80;
+}
+
+.vector-drawing-measure {
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fef08a;
+  background: rgba(254, 240, 138, 0.15);
+  padding: 2px 7px;
+  border-radius: 12px;
+  border: 1px solid rgba(254, 240, 138, 0.3);
+}
+
+.vector-drawing-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 16px;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.vector-drawing-btn.finish {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.vector-drawing-btn.finish:hover {
+  background: #15803d;
+}
+
+.vector-drawing-btn.undo {
+  background: rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+}
+
+.vector-drawing-btn.undo:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.vector-drawing-btn.cancel {
+  background: transparent;
+  color: #f87171;
+}
+
+.vector-drawing-btn.cancel:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* ==========================================================================
+   2. Modale Principale du Gestionnaire de Couches (Panneau Vectoriel)
+   ========================================================================== */
+.vector-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.vector-modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.vector-modal {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  font-family: var(--font-sans, "Plus Jakarta Sans", sans-serif);
+  animation: modalScaleIn 0.2s ease;
+}
+
+@keyframes modalScaleIn {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.vector-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.vector-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.vector-modal-title svg {
+  color: #166534;
+}
+
+.vector-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.vector-modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.vector-modal-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Barre d'actions en haut de la liste des couches */
+.vector-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.vector-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #166534;
+  color: #ffffff;
+  padding: 7px 13px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.08s ease;
+}
+
+.vector-btn-primary:hover {
+  background: #14532d;
+}
+
+.vector-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  color: #334155;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vector-btn-secondary:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+/* Liste des couches vectorielles */
+.vector-layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vector-layer-empty {
+  text-align: center;
+  padding: 36px 18px;
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.vector-layer-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vector-layer-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.vector-layer-card.active {
+  border-color: #86efac;
+  background: #fcfdfc;
+}
+
+.vector-layer-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vector-layer-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.vector-layer-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.vector-layer-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  outline: none;
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.vector-layer-name:focus {
+  background: #fef08a;
+}
+
+.vector-badge-type {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.vector-badge-type.polygon { background: #dbeafe; color: #1e40af; }
+.vector-badge-type.line { background: #fef3c7; color: #92400e; }
+.vector-badge-type.point { background: #fee2e2; color: #991b1b; }
+
+.vector-badge-count {
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  color: #64748b;
+  margin-left: auto;
+}
+
+/* Boutons d'action par couche */
+.vector-layer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.vector-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.vector-tool-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.vector-tool-btn.primary {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.vector-tool-btn.primary:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.vector-tool-btn.danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff5f5;
+  margin-left: auto;
+}
+
+.vector-tool-btn.danger:hover {
+  background: #fee2e2;
+}
+
+/* ==========================================================================
+   3. Modale d'Édition du Style (Symbologie & Export/Import QML)
+   ========================================================================== */
+.vector-style-modal {
+  max-width: 520px;
+}
+
+.vector-style-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 90px;
+  background: repeating-conic-gradient(#f8fafc 0% 25%, #f1f5f9 0% 50%) 50% / 16px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.vector-style-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.vector-style-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.vector-color-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vector-color-picker {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+}
+
+.vector-color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.vector-color-picker::-webkit-color-swatch { border: none; border-radius: 5px; }
+
+.vector-qml-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vector-qml-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e40af;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vector-qml-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   4. Modale Table & Formulaire des Attributs
+   ========================================================================== */
+.vector-table-modal {
+  max-width: 820px;
+}
+
+.vector-table-wrap {
+  max-height: 400px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.vector-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+
+.vector-table th {
+  background: #f8fafc;
+  padding: 9px 12px;
+  font-weight: 700;
+  color: #0f172a;
+  border-bottom: 2px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+.vector-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.vector-table tr:hover td {
+  background: #f0fdf4;
+}
+
+.vector-attr-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  padding: 4px 7px;
+  font-family: inherit;
+  font-size: 11.5px;
+  box-sizing: border-box;
+}
+
+.vector-attr-input:focus {
+  outline: none;
+  border-color: #166534;
+  box-shadow: 0 0 0 2px rgba(22, 101, 52, 0.15);
+}
+
+/* Formulaire d'édition d'une entité spécifique */
+.vector-feature-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vector-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vector-form-row label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #334155;
+}
+
+/* Bouton du toolbar principal */
+.btn-vector-mode {
+  border-color: #86efac !important;
+  color: #166534 !important;
+}
+
+.btn-vector-mode:hover {
+  background: #f0fdf4 !important;
+}
+
+.btn-vector-mode.active {
+  background: #166534 !important;
+  color: #ffffff !important;
+}
+
+/* ==========================================================================
+   5. Glisser-Déposer (Drag and Drop) — Plein écran et Zones de dépôt
+   ========================================================================== */
+.vector-drag-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 24px;
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vector-drag-drop-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.vector-drop-card {
+  width: 100%;
+  max-width: 520px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 2.5px dashed #4ade80;
+  border-radius: 20px;
+  padding: 36px 28px;
+  text-align: center;
+  color: #ffffff;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(74, 222, 128, 0.25);
+  animation: dropCardPulse 2s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes dropCardPulse {
+  0%, 100% {
+    transform: scale(1);
+    border-color: #4ade80;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 20px rgba(74, 222, 128, 0.2);
+  }
+  50% {
+    transform: scale(1.02);
+    border-color: #86efac;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 35px rgba(74, 222, 128, 0.35);
+  }
+}
+
+.vector-drop-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  margin-bottom: 16px;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.vector-drop-title {
+  font-family: var(--font-sans, "Plus Jakarta Sans", sans-serif);
+  font-size: 19px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 6px;
+  letter-spacing: -0.3px;
+}
+
+.vector-drop-desc {
+  font-size: 13px;
+  color: #cbd5e1;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.vector-drop-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: center;
+}
+
+.vector-drop-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.vector-drop-badge.highlight {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+/* Zone de glisser-déposer dans la modale */
+.vector-modal-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 16px 14px;
+  text-align: center;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.vector-modal-dropzone:hover,
+.vector-modal-dropzone.dragover {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.vector-modal-dropzone-icon {
+  color: #16a34a;
+}
+
+.vector-modal-dropzone-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.vector-modal-dropzone-sub {
+  font-size: 10.5px;
+  color: #64748b;
+}

@@ -68,11 +68,13 @@
   <link rel="stylesheet" href="style.css"/>
   <link rel="stylesheet" href="geolibre-contour.css"/>
   <link rel="stylesheet" href="css/composer.css"/>
+  <link rel="stylesheet" href="css/vectors.css"/>
 
   <!-- MapLibre GL JS & PMTiles -->
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="https://unpkg.com/pmtiles@3.0.7/dist/pmtiles.js"></script>
+  <script src="shp.min.js"></script>
   <script src="geolibre-contour.js"></script>
   <script src="flatgeobuf-geojson.min.js"></script>
   <script src="marked.min.js"></script>
@@ -92,6 +94,23 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
           </a>
           <button id="btn-close-tools" class="tools-close-btn" type="button" aria-label="Fermer le panneau">&times;</button>
+        </div>
+      </div>
+
+      <!-- Couche personnelle (Dessin, Import SHP, FGB, GeoJSON, KML, QML) -->
+      <div class="tool-card" id="card-custom-vectors" style="border: 1.5px solid #93c5fd; background: #f0f9ff;">
+        <div class="tool-card-header">
+          <div class="tool-card-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            <span style="color: #0369a1; font-weight: 700;">Couche personnelle</span>
+          </div>
+          <button id="btn-panel-open-vectors" class="profile-dock-btn" type="button" style="padding: 2px 8px; font-size: 11px; font-weight: 600; color: #0284c7; background: #ffffff; border-color: #7dd3fc;" title="Gérer vos couches personnelles, importer ou dessiner">Gérer</button>
+        </div>
+        <div class="tool-sublabel" style="line-height: 1.4; color: #475569;">
+          Dessin d'entités et glisser-déposer de fichiers (Shapefile .zip, FlatGeobuf, GeoJSON, KML, Style QML).
+        </div>
+        <div id="panel-vector-layers-quick" style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px;">
+          <!-- Liste dynamique des couches personnelles -->
         </div>
       </div>
 
@@ -744,6 +763,11 @@
       <span id="rag-btn-text">Agri-Réseau</span>
     </button>
     <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
+    <button id="btn-quick-vectors" class="floating-profile-btn" type="button" title="Couche personnelle (Dessin, SHP, FGB, GeoJSON, KML, QML)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+      <span>Couche perso</span>
+    </button>
+    <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
     <button id="btn-toggle-search" class="floating-profile-btn" type="button" title="Rechercher un lieu, une adresse ou une ville">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
       <span>Rechercher</span>
@@ -831,7 +855,18 @@
         </div>
       </button>
 
-      <!-- 4. Impression & Mise en page PDF -->
+      <!-- 4. Couche personnelle -->
+      <button type="button" id="mobile-tool-vectors" class="mobile-tool-card">
+        <div class="mobile-tool-icon" style="background: rgba(2, 132, 199, 0.1); color: #0284c7;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+        </div>
+        <div class="mobile-tool-info">
+          <div class="mobile-tool-name">Couche personnelle</div>
+          <div class="mobile-tool-desc">Dessin, SHP zippé, FlatGeobuf, GeoJSON &amp; QML</div>
+        </div>
+      </button>
+
+      <!-- 5. Impression & Mise en page PDF -->
       <button type="button" id="mobile-tool-composer" class="mobile-tool-card">
         <div class="mobile-tool-icon composer-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
@@ -907,6 +942,7 @@
     <script src="js/ndvi.js"></script>
     <script src="js/soil-ai.js"></script>
     <script src="js/wms.js"></script>
+    <script src="js/vectors.js"></script>
     <script src="js/composer.js"></script>
     <script src="js/app.js"></script>
 </body>

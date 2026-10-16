@@ -2297,6 +2297,31 @@ ${logoItemXml}
         });
       });
 
+      // 13. Couches vectorielles personnalisées (Plan de Ferme / GeoLibre)
+      if (window.vectorManager && window.vectorManager.layers) {
+        const visibleVectorLayers = window.vectorManager.layers.filter(l => l.visible);
+        if (visibleVectorLayers.length > 0) {
+          items.push({
+            id: "hdr_vectors",
+            groupId: "vectors",
+            isHeader: true,
+            label: "Couche personnelle"
+          });
+          visibleVectorLayers.forEach(vl => {
+            const isLine = vl.geometryType === "LineString";
+            const color = vl.style.fillColor || vl.style.strokeColor || "#16a34a";
+            items.push({
+              id: "vec_" + vl.id,
+              groupId: "vectors",
+              type: isLine ? "line" : "swatch",
+              line: isLine,
+              label: vl.name || "Couche vectorielle",
+              color: color
+            });
+          });
+        }
+      }
+
       this.allDetectedLegendItems = items;
 
       // Filtrage des éléments exclus par l'utilisateur

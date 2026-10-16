@@ -460,8 +460,16 @@
         window.composer.init(map, wmsManager);
       }
 
+      // Instantiate Vector Manager (Couches vectorielles, Dessin, Import/Export QML & glisser-déposer)
+      if (window.vectorManager) {
+        window.vectorManager.init(map);
+      }
+
       // Map click handler for transect line drawing & NDVI mode
       map.on("click", (e) => {
+        if (window.vectorManager && window.vectorManager.isDrawing) {
+          return;
+        }
         if (ndviManager && ndviManager.isActiveMode) {
           let parcelProps = null;
           const parcelFeatures = map.queryRenderedFeatures(e.point, { layers: ["parcelles-fill"] });
@@ -478,6 +486,9 @@
 
       // Double-click to complete drawing and calculate profile
       map.on("dblclick", (e) => {
+        if (window.vectorManager && window.vectorManager.isDrawing) {
+          return;
+        }
         if (profileManager && profileManager.isDrawing) {
           e.preventDefault();
           if (profileManager.line.length >= 2) {
@@ -488,6 +499,11 @@
 
       // Right-click to complete drawing and calculate profile
       map.on("contextmenu", (e) => {
+        if (window.vectorManager && window.vectorManager.isDrawing) {
+          e.preventDefault();
+          window.vectorManager.finishDrawing();
+          return;
+        }
         if (profileManager && profileManager.isDrawing) {
           e.preventDefault();
           if (profileManager.line.length >= 2) {
@@ -1841,6 +1857,21 @@
       });
     }
 
+    // Vector Manager triggers
+    const btnQuickVectors = document.getElementById("btn-quick-vectors");
+    if (btnQuickVectors) {
+      btnQuickVectors.addEventListener("click", () => {
+        if (window.vectorManager) window.vectorManager.openManagerModal();
+      });
+    }
+
+    const btnPanelOpenVectors = document.getElementById("btn-panel-open-vectors");
+    if (btnPanelOpenVectors) {
+      btnPanelOpenVectors.addEventListener("click", () => {
+        if (window.vectorManager) window.vectorManager.openManagerModal();
+      });
+    }
+
     window.addEventListener("resize", () => {
       if (profileManager && profileManager.profile.length >= 2) {
         const dock = document.getElementById("elevation-profile-dock");
@@ -2119,7 +2150,16 @@
       });
     }
 
-    // 4. Impression & Mise en page PDF
+    // 4. Couches vectorielles & Dessin
+    const mobileToolVectors = document.getElementById("mobile-tool-vectors");
+    if (mobileToolVectors) {
+      mobileToolVectors.addEventListener("click", () => {
+        closeMobileToolsSheet();
+        if (window.vectorManager) window.vectorManager.openManagerModal();
+      });
+    }
+
+    // 5. Impression & Mise en page PDF
     if (mobileToolComposer) {
       mobileToolComposer.addEventListener("click", () => {
         closeMobileToolsSheet();
