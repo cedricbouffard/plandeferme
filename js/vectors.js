@@ -1370,6 +1370,10 @@
           } catch (e) {}
         }
       });
+
+      if (typeof this.map.triggerRepaint === "function") {
+        this.map.triggerRepaint();
+      }
     }
 
     /**
@@ -1682,7 +1686,22 @@
       };
 
       if (type === "Polygon") {
-        const ring = [...coords];
+        // Enlever les points consécutifs identiques (double-clic)
+        const cleanCoords = [];
+        for (let i = 0; i < coords.length; i++) {
+          const pt = coords[i];
+          if (cleanCoords.length === 0) {
+            cleanCoords.push(pt);
+          } else {
+            const prev = cleanCoords[cleanCoords.length - 1];
+            if (Math.abs(prev[0] - pt[0]) > 1e-7 || Math.abs(prev[1] - pt[1]) > 1e-7) {
+              cleanCoords.push(pt);
+            }
+          }
+        }
+        if (cleanCoords.length < 3) return;
+
+        const ring = [...cleanCoords];
         if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
           ring.push([...ring[0]]);
         }
@@ -1691,8 +1710,21 @@
         props.superficie_ha = area.ha;
         props.superficie_m2 = area.m2;
       } else if (type === "LineString") {
-        geom = { type: "LineString", coordinates: coords };
-        const dist = computeLineDistance(coords);
+        const cleanCoords = [];
+        for (let i = 0; i < coords.length; i++) {
+          const pt = coords[i];
+          if (cleanCoords.length === 0) {
+            cleanCoords.push(pt);
+          } else {
+            const prev = cleanCoords[cleanCoords.length - 1];
+            if (Math.abs(prev[0] - pt[0]) > 1e-7 || Math.abs(prev[1] - pt[1]) > 1e-7) {
+              cleanCoords.push(pt);
+            }
+          }
+        }
+        if (cleanCoords.length < 2) return;
+        geom = { type: "LineString", coordinates: cleanCoords };
+        const dist = computeLineDistance(cleanCoords);
         props.longueur_m = dist.m;
       } else {
         geom = { type: "Point", coordinates: coords[0] };
@@ -1708,8 +1740,14 @@
       layer.data.features.push(newFeature);
       this.syncLayerToMap(layer);
       this.bringToFront();
+      if (typeof window.bringTopLayersToFront === "function") {
+        window.bringTopLayersToFront();
+      }
       this.renderLayersList();
       this.renderInlineLayersList();
+      if (typeof this.map.triggerRepaint === "function") {
+        this.map.triggerRepaint();
+      }
 
       // Sélectionner l'entité nouvellement créée avec ses sommets et son popup d'options
       this.selectFeature(layer.id, featId, props);
@@ -2286,7 +2324,7 @@
       const geomType = (layer.geometryType || "Polygon").toLowerCase();
       const style = layer.style || {};
 
-      // 1. Source GeoJSON avec promoteId pour identifier fidèlement chaque entité cliquée
+      // 1. Source GeoJSON standard (feature.id natif)
       const featureCollection = {
         type: "FeatureCollection",
         features: Array.isArray(layer.data?.features) ? [...layer.data.features] : []
@@ -2296,8 +2334,7 @@
       if (!src) {
         this.map.addSource(sourceId, {
           type: "geojson",
-          data: featureCollection,
-          promoteId: "__pf_id"
+          data: featureCollection
         });
       } else {
         src.setData(featureCollection);
@@ -2308,6 +2345,10 @@
         const fillId = `vector-fill-${layer.id}`;
         const strokeId = `vector-stroke-${layer.id}`;
 
+        const fillOp = style.fillOpacity !== undefined ? Math.max(0, Math.min(1, Number(style.fillOpacity))) : 0.45;
+        const strokeCol = style.strokeColor || "#1d4ed8";
+        const strokeW = Math.max(1, Number(style.strokeWidth || 2.5));
+
         if (!this.map.getLayer(fillId)) {
           this.map.addLayer({
             id: fillId,
@@ -2315,12 +2356,14 @@
             source: sourceId,
             paint: {
               "fill-color": style.fillColor || "#3b82f6",
-              "fill-opacity": style.fillOpacity ?? 0.45
+              "fill-opacity": fillOp,
+              "fill-outline-color": strokeCol
             }
           });
         } else {
           this.map.setPaintProperty(fillId, "fill-color", style.fillColor || "#3b82f6");
-          this.map.setPaintProperty(fillId, "fill-opacity", style.fillOpacity ?? 0.45);
+          this.map.setPaintProperty(fillId, "fill-opacity", fillOp);
+          try { this.map.setPaintProperty(fillId, "fill-outline-color", strokeCol); } catch (e) {}
         }
 
         const dash = style.strokeStyle === "dashed" ? [3, 2] : style.strokeStyle === "dotted" ? [1, 1.5] : undefined;
@@ -2330,68 +2373,80 @@
             type: "line",
             source: sourceId,
             paint: {
-              "line-color": style.strokeColor || "#1d4ed8",
-              "line-width": style.strokeWidth || 2,
+              "line-color": strokeCol,
+              "line-width": strokeW,
+              "line-opacity": 1,
               ...(dash ? { "line-dasharray": dash } : {})
             }
           });
         } else {
-          this.map.setPaintProperty(strokeId, "line-color", style.strokeColor || "#1d4ed8");
-          this.map.setPaintProperty(strokeId, "line-width", style.strokeWidth || 2);
+          this.map.setPaintProperty(strokeId, "line-color", strokeCol);
+          this.map.setPaintProperty(strokeId, "line-width", strokeW);
+          try { this.map.setPaintProperty(strokeId, "line-opacity", 1); } catch (e) {}
           if (dash) {
             this.map.setPaintProperty(strokeId, "line-dasharray", dash);
           } else {
-            try { this.map.setPaintProperty(strokeId, "line-dasharray", undefined); } catch (e) {}
+            try { this.map.setPaintProperty(strokeId, "line-dasharray", null); } catch (e) {}
           }
         }
       } else if (geomType.includes("line")) {
         const lineId = `vector-line-${layer.id}`;
         const dash = style.strokeStyle === "dashed" ? [3, 2] : style.strokeStyle === "dotted" ? [1, 1.5] : undefined;
+        const lineCol = style.strokeColor || "#0284c7";
+        const lineW = Math.max(1, Number(style.strokeWidth || 3));
+        const lineOp = style.strokeOpacity !== undefined ? Math.max(0, Math.min(1, Number(style.strokeOpacity))) : 1;
+
         if (!this.map.getLayer(lineId)) {
           this.map.addLayer({
             id: lineId,
             type: "line",
             source: sourceId,
             paint: {
-              "line-color": style.strokeColor || "#0284c7",
-              "line-width": style.strokeWidth || 3,
+              "line-color": lineCol,
+              "line-width": lineW,
+              "line-opacity": lineOp,
               ...(dash ? { "line-dasharray": dash } : {})
             }
           });
         } else {
-          this.map.setPaintProperty(lineId, "line-color", style.strokeColor || "#0284c7");
-          this.map.setPaintProperty(lineId, "line-width", style.strokeWidth || 3);
+          this.map.setPaintProperty(lineId, "line-color", lineCol);
+          this.map.setPaintProperty(lineId, "line-width", lineW);
+          try { this.map.setPaintProperty(lineId, "line-opacity", lineOp); } catch (e) {}
           if (dash) {
             this.map.setPaintProperty(lineId, "line-dasharray", dash);
           } else {
-            try { this.map.setPaintProperty(lineId, "line-dasharray", undefined); } catch (e) {}
+            try { this.map.setPaintProperty(lineId, "line-dasharray", null); } catch (e) {}
           }
         }
       } else {
         const pointId = `vector-point-${layer.id}`;
+        const markerR = Math.max(3, Number(style.markerSize || 8));
+        const pointOp = style.fillOpacity !== undefined ? Math.max(0, Math.min(1, Number(style.fillOpacity))) : 0.9;
+        const strokeW = Math.max(0.5, Number(style.strokeWidth || 1.5));
+
         if (!this.map.getLayer(pointId)) {
           this.map.addLayer({
             id: pointId,
             type: "circle",
             source: sourceId,
             paint: {
-              "circle-radius": style.markerSize || 8,
+              "circle-radius": markerR,
               "circle-color": style.fillColor || "#ef4444",
-              "circle-opacity": style.fillOpacity ?? 0.9,
+              "circle-opacity": pointOp,
               "circle-stroke-color": style.strokeColor || "#ffffff",
-              "circle-stroke-width": style.strokeWidth || 1.5
+              "circle-stroke-width": strokeW
             }
           });
         } else {
-          this.map.setPaintProperty(pointId, "circle-radius", style.markerSize || 8);
+          this.map.setPaintProperty(pointId, "circle-radius", markerR);
           this.map.setPaintProperty(pointId, "circle-color", style.fillColor || "#ef4444");
-          this.map.setPaintProperty(pointId, "circle-opacity", style.fillOpacity ?? 0.9);
+          this.map.setPaintProperty(pointId, "circle-opacity", pointOp);
           this.map.setPaintProperty(pointId, "circle-stroke-color", style.strokeColor || "#ffffff");
-          this.map.setPaintProperty(pointId, "circle-stroke-width", style.strokeWidth || 1.5);
+          this.map.setPaintProperty(pointId, "circle-stroke-width", strokeW);
         }
       }
 
-      // Calque d'étiquette textuelle (utilise les polices Noto Sans supportées et force text-allow-overlap)
+      // Calque d'étiquette textuelle (utilise la police "Noto Sans Regular" disponible et stable)
       const labelId = `vector-label-${layer.id}`;
       const textField = ["to-string", ["coalesce", ["get", style.labelProperty || "nom"], ["get", "nom"], ["get", "name"], ""]];
       if (style.labelProperty) {
@@ -2403,7 +2458,7 @@
             layout: {
               "text-field": textField,
               "text-size": 12,
-              "text-font": ["Noto Sans Bold", "Noto Sans Regular"],
+              "text-font": ["Noto Sans Regular"],
               "text-anchor": "center",
               "text-offset": [0, 0],
               "text-allow-overlap": true,
@@ -2418,7 +2473,7 @@
           });
         } else {
           this.map.setLayoutProperty(labelId, "text-field", textField);
-          this.map.setLayoutProperty(labelId, "text-font", ["Noto Sans Bold", "Noto Sans Regular"]);
+          this.map.setLayoutProperty(labelId, "text-font", ["Noto Sans Regular"]);
           this.map.setLayoutProperty(labelId, "text-allow-overlap", true);
           this.map.setLayoutProperty(labelId, "text-ignore-placement", true);
         }
@@ -2428,6 +2483,9 @@
 
       this.setLayerVisibility(layer.id, layer.visible);
       this.bringToFront();
+      if (typeof this.map.triggerRepaint === "function") {
+        this.map.triggerRepaint();
+      }
     }
 
     updateLayerOnMap(layer) {
@@ -2710,6 +2768,9 @@
           this.activeLayerId = newLayer.id;
           this.syncLayerToMap(newLayer);
           this.bringToFront();
+          if (typeof window.bringTopLayersToFront === "function") {
+            window.bringTopLayersToFront();
+          }
           this.renderLayersList();
           this.renderInlineLayersList();
           this.zoomToLayer(newLayer.id);

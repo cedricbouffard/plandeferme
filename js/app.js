@@ -1225,8 +1225,19 @@
         }
       }
 
+      // Helper to check if click should be ignored by background analysis layers
+      const isVectorInteraction = (e) => {
+        if (window.vectorManager && window.vectorManager.isDrawing) return true;
+        try {
+          const vectorHits = map.queryRenderedFeatures(e.point).filter(f => f.layer && f.layer.id && f.layer.id.startsWith("vector-") && !f.layer.id.startsWith("vector-draw"));
+          if (vectorHits.length > 0) return true;
+        } catch (err) {}
+        return false;
+      };
+
       // Click on drainage-fill
       map.on("click", "drainage-fill", (e) => {
+        if (isVectorInteraction(e)) return;
         if (e.originalEvent && e.originalEvent._handled) return;
         if (e.originalEvent) e.originalEvent._handled = true;
         openTabbedFeaturePopup(e, "drainage");
@@ -1234,6 +1245,7 @@
 
       // Click on pedologie-fill
       map.on("click", "pedologie-fill", (e) => {
+        if (isVectorInteraction(e)) return;
         if (e.originalEvent && e.originalEvent._handled) return;
         const drainageFeatures = map.queryRenderedFeatures(e.point, { layers: ["drainage-fill"].filter(l => map.getLayer(l)) });
         if (drainageFeatures && drainageFeatures.length > 0) {
@@ -1247,6 +1259,7 @@
 
       // Click on parcelles-fill
       map.on("click", "parcelles-fill", (e) => {
+        if (isVectorInteraction(e)) return;
         if (e.originalEvent && e.originalEvent._handled) return;
         const drainageFeatures = map.queryRenderedFeatures(e.point, { layers: ["drainage-fill"].filter(l => map.getLayer(l)) });
         if (drainageFeatures && drainageFeatures.length > 0) {
@@ -1262,6 +1275,7 @@
 
       // Click on cadastre-fill
       map.on("click", "cadastre-fill", (e) => {
+        if (isVectorInteraction(e)) return;
         if (e.originalEvent && e.originalEvent._handled) return;
         const drainageFeatures = map.queryRenderedFeatures(e.point, { layers: ["drainage-fill"].filter(l => map.getLayer(l)) });
         if (drainageFeatures && drainageFeatures.length > 0) {
