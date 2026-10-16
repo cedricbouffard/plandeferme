@@ -581,6 +581,16 @@
   flex-direction: column;
 }
 
+/* Colonne carte + profil éventuel */
+.sheet-map-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  min-width: 0;
+}
+
 /* Cadre de carte MapLibre */
 .sheet-map-frame {
   flex: 1;
@@ -592,6 +602,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 0;
 }
 
 .sheet-map-img {
@@ -599,6 +610,75 @@
   height: 100%;
   object-fit: fill;
   display: block;
+}
+
+/* Bloc Profil Topographique MNT sur la feuille */
+.sheet-profile-block {
+  border: 1.5px solid #0f172a;
+  border-radius: 4px;
+  background: #ffffff;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 130px;
+  flex-shrink: 0;
+}
+
+.composer-sheet.portrait .sheet-profile-block {
+  height: 110px;
+}
+
+.sheet-profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 3px;
+  gap: 8px;
+}
+
+.sheet-profile-title {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #0f172a;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.sheet-profile-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sheet-profile-chip {
+  font-size: 7.5px;
+  padding: 1px 4px;
+  background: #f1f5f9;
+  border-radius: 3px;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.sheet-profile-chip strong {
+  color: #0f172a;
+}
+
+.sheet-profile-chart-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sheet-profile-chart-wrap svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
 /* Panneau latéral de la feuille (Paysage) ou section basse (Portrait) */
@@ -953,7 +1033,12 @@
   flex-shrink: 0;
 }
 
-/* Responsiveness pour écrans plus étroits */
+/* Barre d'onglets pour mobile (Réglages vs Aperçu) */
+.composer-mobile-nav {
+  display: none;
+}
+
+/* Responsiveness pour écrans mobiles et étroits (Mode Onglets Réglages / Aperçu) */
 @media (max-width: 900px) {
   .composer-overlay {
     padding: 0;
@@ -963,17 +1048,80 @@
     height: 100vh;
     max-width: 100vw;
     border-radius: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .composer-header {
+    padding: 8px 12px;
+  }
+  .composer-header-title span {
+    font-size: 13px;
+  }
+  .composer-mobile-nav {
+    display: flex;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 6px 12px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .composer-tab-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .composer-tab-btn:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+  .composer-tab-btn.active {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #0f172a;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   }
   .composer-body {
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
-  .composer-sidebar {
-    width: 100%;
-    max-height: 38vh;
+
+  /* Onglet Réglages actif : la barre latérale prend 100% de la hauteur */
+  .composer-body[data-active-tab="settings"] .composer-sidebar {
+    display: flex !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    flex: 1 !important;
     border-right: none;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: none;
+    overflow-y: auto;
   }
-  .composer-preview-viewport {
-    padding: 12px;
+  .composer-body[data-active-tab="settings"] .composer-preview-viewport {
+    display: none !important;
+  }
+
+  /* Onglet Aperçu actif : la feuille et le zoom prennent 100% de la hauteur */
+  .composer-body[data-active-tab="preview"] .composer-sidebar {
+    display: none !important;
+  }
+  .composer-body[data-active-tab="preview"] .composer-preview-viewport {
+    display: flex !important;
+    width: 100% !important;
+    flex: 1 !important;
+    padding: 8px;
+    overflow: auto;
   }
 }

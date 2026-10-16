@@ -433,6 +433,7 @@
 
       // Instantiate Elevation Profile Manager
       profileManager = new ProfileManager(map);
+      window.profileManager = profileManager;
 
       // Instantiate Parcel Hydrology Manager (Écoulement & Raster de cuvettes à la volée)
       parcelHydrologyManager = new ParcelHydrologyManager(map);

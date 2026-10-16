@@ -25,6 +25,7 @@
       showScale: true,
       showLegend: true,
       showNotes: true,
+      showProfile: false,
       logoUrl: null,
       excludedLegendIds: []
     },
@@ -42,6 +43,7 @@
       showScale: true,
       showLegend: true,
       showNotes: true,
+      showProfile: false,
       logoUrl: null,
       excludedLegendIds: []
     },
@@ -59,6 +61,25 @@
       showScale: true,
       showLegend: true,
       showNotes: true,
+      showProfile: false,
+      logoUrl: null,
+      excludedLegendIds: []
+    },
+    coupe_topo: {
+      id: "coupe_topo",
+      name: "Coupe Topographique (MNT & Profil)",
+      format: "letter",
+      orientation: "landscape",
+      title: "Coupe Topographique & Profil Altimétrique",
+      subtitle: "Modèle numérique de terrain (MNT LiDAR 1 m)",
+      author: "",
+      location: "",
+      notes: "Profil altimétrique et pentes calculés à partir du MNT LiDAR 1 m.",
+      showCompass: true,
+      showScale: true,
+      showLegend: true,
+      showNotes: true,
+      showProfile: true,
       logoUrl: null,
       excludedLegendIds: []
     }
@@ -71,6 +92,7 @@
       this.isOpen = false;
       this.state = {
         ...DEFAULT_TEMPLATES.standard_paysage,
+        showProfile: false,
         excludedLegendIds: []
       };
       this.userTemplates = {};
@@ -141,8 +163,20 @@
             </div>
           </div>
 
+          <!-- Onglets Mobiles (Réglages vs Aperçu) -->
+          <div class="composer-mobile-nav" id="composer-mobile-nav">
+            <button type="button" class="composer-tab-btn active" id="composer-tab-settings" data-tab="settings">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span>Réglages</span>
+            </button>
+            <button type="button" class="composer-tab-btn" id="composer-tab-preview" data-tab="preview">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              <span>Aperçu de la feuille</span>
+            </button>
+          </div>
+
           <!-- Corps : Paramètres (gauche) + Prévisualisation (droite) -->
-          <div class="composer-body">
+          <div class="composer-body" id="composer-body" data-active-tab="settings">
             <!-- Sidebar Paramètres -->
             <div class="composer-sidebar">
               <!-- 1. Format & Orientation -->
@@ -183,11 +217,16 @@
                     <span>Export JSON</span>
                   </button>
                 </div>
-                <div style="display: flex; gap: 6px;">
-                  <label class="composer-btn-action" style="flex: 1; cursor: pointer; text-align: center;">
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                  <label class="composer-btn-action" style="flex: 1; min-width: 130px; cursor: pointer; text-align: center;">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                     <span>Charger un fichier .json</span>
                     <input type="file" id="composer-input-import-json" accept=".json" style="display: none;" />
+                  </label>
+                  <label class="composer-btn-action" style="flex: 1; min-width: 130px; cursor: pointer; text-align: center; border-color: #86efac; background: #f0fdf4; color: #166534;" title="Importer un modèle de mise en page QGIS (.qpt)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                    <span>Importer gabarit QGIS (.qpt)</span>
+                    <input type="file" id="composer-input-import-qpt" accept=".qpt,.xml" style="display: none;" />
                   </label>
                 </div>
               </div>
@@ -272,6 +311,10 @@
                   <span>Bloc des notes de terrain</span>
                   <input type="checkbox" id="composer-check-notes" checked />
                 </label>
+                <label class="composer-checkbox-row" id="composer-row-check-profile">
+                  <span>Coupe topographique (Profil MNT)</span>
+                  <input type="checkbox" id="composer-check-profile" />
+                </label>
               </div>
             </div>
 
@@ -297,9 +340,20 @@
 
                   <!-- 2. Zone centrale : Carte + Éléments latéraux -->
                   <div class="sheet-content-row">
-                    <!-- Cadre de carte -->
-                    <div class="sheet-map-frame" id="sheet-map-frame">
-                      <img id="sheet-map-img" class="sheet-map-img" alt="Capture de la carte" />
+                    <!-- Colonne Carte & Profil MNT éventuel -->
+                    <div class="sheet-map-column" id="sheet-map-column">
+                      <div class="sheet-map-frame" id="sheet-map-frame">
+                        <img id="sheet-map-img" class="sheet-map-img" alt="Capture de la carte" />
+                      </div>
+
+                      <!-- Bloc Profil Topographique MNT (si coupe active) -->
+                      <div id="sheet-profile-block" class="sheet-profile-block" style="display: none;">
+                        <div class="sheet-profile-header">
+                          <div class="sheet-profile-title">Profil altimétrique de la coupe (MNT LiDAR 1 m)</div>
+                          <div id="sheet-profile-chips" class="sheet-profile-chips"></div>
+                        </div>
+                        <div id="sheet-profile-chart-wrap" class="sheet-profile-chart-wrap"></div>
+                      </div>
                     </div>
 
                     <!-- Panneau latéral sur la feuille -->
@@ -432,7 +486,19 @@
         sheetLegendBlock: document.getElementById("sheet-legend-block"),
         sheetLegendItems: document.getElementById("sheet-legend-items"),
         sheetNotesBlock: document.getElementById("sheet-notes-block"),
-        sheetNotesText: document.getElementById("sheet-notes-text")
+        sheetNotesText: document.getElementById("sheet-notes-text"),
+
+        // Onglets mobiles & QGIS & Profil coupe MNT
+        composerBody: document.getElementById("composer-body"),
+        tabSettings: document.getElementById("composer-tab-settings"),
+        tabPreview: document.getElementById("composer-tab-preview"),
+        inputImportQpt: document.getElementById("composer-input-import-qpt"),
+        checkProfile: document.getElementById("composer-check-profile"),
+        rowCheckProfile: document.getElementById("composer-row-check-profile"),
+        sheetMapColumn: document.getElementById("sheet-map-column"),
+        sheetProfileBlock: document.getElementById("sheet-profile-block"),
+        sheetProfileChips: document.getElementById("sheet-profile-chips"),
+        sheetProfileChartWrap: document.getElementById("sheet-profile-chart-wrap")
       };
 
       this.populateTemplateSelect();
@@ -440,47 +506,78 @@
     }
 
     /**
-     * Rendu vectoriel de la Rose des vents (SVG)
+     * Rendu vectoriel géodésique haute précision de la Rose des vents (SVG)
      */
     renderCompass() {
       const bearing = this.map ? this.map.getBearing() : 0;
+      
+      // Génération dynamique des 36 graduations du cadran (tous les 10°)
+      let ticksHtml = "";
+      for (let deg = 0; deg < 360; deg += 10) {
+        const isCardinal = deg % 90 === 0;
+        const isSemi = deg % 45 === 0 && !isCardinal;
+        const tickLen = isCardinal ? 4.8 : isSemi ? 3.2 : 1.8;
+        const strokeW = isCardinal ? 1.1 : isSemi ? 0.75 : 0.45;
+        const strokeColor = isCardinal ? "#0f172a" : isSemi ? "#475569" : "#94a3b8";
+        const rad = (deg * Math.PI) / 180;
+        const rOuter = 46.5;
+        const rInner = rOuter - tickLen;
+        const x1 = (50 + rOuter * Math.sin(rad)).toFixed(2);
+        const y1 = (50 - rOuter * Math.cos(rad)).toFixed(2);
+        const x2 = (50 + rInner * Math.sin(rad)).toFixed(2);
+        const y2 = (50 - rInner * Math.cos(rad)).toFixed(2);
+        ticksHtml += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${strokeColor}" stroke-width="${strokeW}"/>`;
+      }
+
       this.dom.sheetCompassWrap.innerHTML = `
         <svg class="sheet-compass-svg" viewBox="0 0 100 100" style="transform: rotate(${bearing}deg); width: 100%; height: 100%;">
-          <!-- Cercles extérieurs gradués -->
-          <circle cx="50" cy="50" r="46" fill="none" stroke="#0f172a" stroke-width="1.2" stroke-dasharray="2 2" />
-          <circle cx="50" cy="50" r="41" fill="none" stroke="#0f172a" stroke-width="0.8" />
+          <!-- Cadran extérieur et cercle gradué -->
+          <circle cx="50" cy="50" r="48" fill="#ffffff" stroke="#0f172a" stroke-width="1.2"/>
+          <circle cx="50" cy="50" r="46.5" fill="none" stroke="#cbd5e1" stroke-width="0.5"/>
+          <circle cx="50" cy="50" r="41.5" fill="none" stroke="#e2e8f0" stroke-width="0.75"/>
           
-          <!-- Nord (Grande flèche bicolore) -->
-          <polygon points="50,6 44,48 50,44" fill="#0f172a" />
-          <polygon points="50,6 56,48 50,44" fill="#475569" />
-          
-          <!-- Sud -->
-          <polygon points="50,94 44,52 50,56" fill="#94a3b8" />
-          <polygon points="50,94 56,52 50,56" fill="#cbd5e1" />
-          
-          <!-- Est -->
-          <polygon points="94,50 52,44 56,50" fill="#94a3b8" />
-          <polygon points="94,50 52,56 56,50" fill="#cbd5e1" />
-          
-          <!-- Ouest (O) -->
-          <polygon points="6,50 48,44 44,50" fill="#94a3b8" />
-          <polygon points="6,50 48,56 44,50" fill="#cbd5e1" />
-          
+          <!-- Graduations d'azimut -->
+          ${ticksHtml}
+
           <!-- 4 pointes intermédiaires NE, SE, SO, NO -->
-          <polygon points="80,20 50,50 53,47" fill="#cbd5e1" />
-          <polygon points="80,80 50,50 53,53" fill="#cbd5e1" />
-          <polygon points="20,80 50,50 47,53" fill="#cbd5e1" />
-          <polygon points="20,20 50,50 47,47" fill="#cbd5e1" />
-          
-          <!-- Centre -->
-          <circle cx="50" cy="50" r="4.5" fill="#0f172a" />
-          <circle cx="50" cy="50" r="1.5" fill="#ffffff" />
-          
-          <!-- Lettres N, S, E, O -->
-          <text x="50" y="20" font-size="11" font-weight="800" font-family="'Plus Jakarta Sans', sans-serif" text-anchor="middle" fill="#0f172a">N</text>
-          <text x="50" y="87" font-size="8.5" font-weight="600" font-family="'Plus Jakarta Sans', sans-serif" text-anchor="middle" fill="#64748b">S</text>
-          <text x="85" y="53" font-size="8.5" font-weight="600" font-family="'Plus Jakarta Sans', sans-serif" text-anchor="middle" fill="#64748b">E</text>
-          <text x="15" y="53" font-size="8.5" font-weight="600" font-family="'Plus Jakarta Sans', sans-serif" text-anchor="middle" fill="#64748b">O</text>
+          <polygon points="50,50 69,31 52,48" fill="#94a3b8" />
+          <polygon points="50,50 69,31 48,52" fill="#cbd5e1" />
+          <polygon points="50,50 69,69 52,52" fill="#94a3b8" />
+          <polygon points="50,50 69,69 48,48" fill="#cbd5e1" />
+          <polygon points="50,50 31,69 48,52" fill="#94a3b8" />
+          <polygon points="50,50 31,69 52,48" fill="#cbd5e1" />
+          <polygon points="50,50 31,31 48,48" fill="#94a3b8" />
+          <polygon points="50,50 31,31 52,52" fill="#cbd5e1" />
+
+          <!-- Sud -->
+          <polygon points="50,86 46,50 50,53" fill="#94a3b8" />
+          <polygon points="50,86 54,50 50,53" fill="#cbd5e1" />
+
+          <!-- Est -->
+          <polygon points="86,50 50,46 53,50" fill="#94a3b8" />
+          <polygon points="86,50 50,54 53,50" fill="#cbd5e1" />
+
+          <!-- Ouest (O) -->
+          <polygon points="14,50 50,46 47,50" fill="#94a3b8" />
+          <polygon points="14,50 50,54 47,50" fill="#cbd5e1" />
+
+          <!-- Nord (Grande flèche bicolore contrastée) -->
+          <polygon points="50,14 44,50 50,47" fill="#0f172a" />
+          <polygon points="50,14 56,50 50,47" fill="#475569" />
+
+          <!-- Pointeau rouge supérieur Nord -->
+          <polygon points="50,10.5 47.5,15 52.5,15" fill="#dc2626" />
+
+          <!-- Anneau central multi-épaisseurs -->
+          <circle cx="50" cy="50" r="5" fill="#0f172a" stroke="#ffffff" stroke-width="0.8"/>
+          <circle cx="50" cy="50" r="2.2" fill="#ffffff" />
+          <circle cx="50" cy="50" r="1.1" fill="#0f172a" />
+
+          <!-- Lettres cardinales élégantes et distinctes -->
+          <text x="50" y="8" font-size="8.5" font-weight="900" font-family="'Plus Jakarta Sans', system-ui, sans-serif" text-anchor="middle" fill="#0f172a">N</text>
+          <text x="50" y="96" font-size="6.5" font-weight="700" font-family="'Plus Jakarta Sans', system-ui, sans-serif" text-anchor="middle" fill="#64748b">S</text>
+          <text x="94" y="52.2" font-size="6.5" font-weight="700" font-family="'Plus Jakarta Sans', system-ui, sans-serif" text-anchor="middle" fill="#64748b">E</text>
+          <text x="6" y="52.2" font-size="6.5" font-weight="700" font-family="'Plus Jakarta Sans', system-ui, sans-serif" text-anchor="middle" fill="#64748b">O</text>
         </svg>
       `;
     }
@@ -533,6 +630,32 @@
       window.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && this.isOpen) this.close();
       });
+
+      // Navigation par onglets sur mobile (Réglages vs Aperçu)
+      if (this.dom.tabSettings && this.dom.tabPreview) {
+        this.dom.tabSettings.addEventListener("click", () => {
+          this.dom.tabSettings.classList.add("active");
+          this.dom.tabPreview.classList.remove("active");
+          if (this.dom.composerBody) {
+            this.dom.composerBody.dataset.activeTab = "settings";
+          }
+        });
+
+        this.dom.tabPreview.addEventListener("click", () => {
+          this.dom.tabPreview.classList.add("active");
+          this.dom.tabSettings.classList.remove("active");
+          if (this.dom.composerBody) {
+            this.dom.composerBody.dataset.activeTab = "preview";
+          }
+          setTimeout(() => {
+            if (this.zoomMode === "fit") {
+              this.fitSheetToViewport();
+            } else {
+              this.applyScale(this.currentScale, false);
+            }
+          }, 40);
+        });
+      }
 
       // Changement d'orientation
       this.dom.btnOrientLandscape.addEventListener("click", () => this.setOrientation("landscape"));
@@ -606,6 +729,20 @@
         };
         reader.readAsText(file);
       });
+
+      // Importer depuis un gabarit QGIS (.qpt)
+      if (this.dom.inputImportQpt) {
+        this.dom.inputImportQpt.addEventListener("change", (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            this.importQptTemplate(evt.target.result, file.name);
+            e.target.value = "";
+          };
+          reader.readAsText(file);
+        });
+      }
 
       // Upload de logo
       this.dom.inputLogo.addEventListener("change", (e) => {
@@ -702,6 +839,13 @@
         this.state.showNotes = e.target.checked;
         this.dom.sheetNotesBlock.style.display = e.target.checked ? "flex" : "none";
       });
+
+      if (this.dom.checkProfile) {
+        this.dom.checkProfile.addEventListener("change", (e) => {
+          this.state.showProfile = e.target.checked;
+          this.updateProfileBlockVisibility();
+        });
+      }
 
       // Contrôles de zoom & ajustement de la prévisualisation
       if (this.dom.zoomFit) {
@@ -824,6 +968,239 @@
     }
 
     /**
+     * Mise à jour de la visibilité du bloc profil topographique sur la feuille
+     */
+    updateProfileBlockVisibility() {
+      const block = this.dom.sheetProfileBlock;
+      if (!block) return;
+      const isVisible = !!this.state.showProfile;
+      block.style.display = isVisible ? "flex" : "none";
+      if (isVisible) {
+        this.renderSheetProfile();
+      }
+      this.updateMapSnapshotForOrientation();
+    }
+
+    /**
+     * Rendu du graphique de la coupe topographique sur la feuille de composition
+     */
+    renderSheetProfile() {
+      const block = this.dom.sheetProfileBlock;
+      const chipsEl = this.dom.sheetProfileChips;
+      const wrapEl = this.dom.sheetProfileChartWrap;
+      if (!block || !chipsEl || !wrapEl) return;
+
+      const profile = window.profileManager ? window.profileManager.profile : null;
+      if (!profile || profile.length < 2) {
+        chipsEl.innerHTML = "";
+        wrapEl.innerHTML = `<div style="font-size: 8px; color: #94a3b8; font-style: italic; padding: 12px; text-align: center;">Tracez une coupe sur la carte avec l'outil Coupe MNT pour afficher le profil altimétrique ici.</div>`;
+        return;
+      }
+
+      const elevations = profile.map(p => p.elevation);
+      const minElev = Math.min(...elevations);
+      const maxElev = Math.max(...elevations);
+      const deltaElev = maxElev - minElev;
+      const totalDist = profile[profile.length - 1].distance;
+
+      // Régression linéaire pour la pente moyenne
+      const n = profile.length;
+      const meanX = profile.reduce((acc, p) => acc + p.distance, 0) / n;
+      const meanY = elevations.reduce((acc, e) => acc + e, 0) / n;
+      let num = 0, den = 0;
+      for (const p of profile) {
+        const dx = p.distance - meanX;
+        num += dx * (p.elevation - meanY);
+        den += dx * dx;
+      }
+      const slope = den === 0 ? 0 : num / den;
+      const intercept = meanY - slope * meanX;
+      const slopePct = slope * 100;
+
+      // Badges statistiques
+      const distStr = totalDist >= 1000 ? (totalDist / 1000).toFixed(2) + " km" : Math.round(totalDist) + " m";
+      chipsEl.innerHTML = `
+        <span class="sheet-profile-chip">Min : <strong>${minElev.toFixed(1)} m</strong></span>
+        <span class="sheet-profile-chip">Max : <strong>${maxElev.toFixed(1)} m</strong></span>
+        <span class="sheet-profile-chip">Dénivelé &Delta; : <strong>${deltaElev.toFixed(1)} m</strong></span>
+        <span class="sheet-profile-chip">Pente moy. : <strong>${slopePct >= 0 ? '+' : ''}${slopePct.toFixed(1)}%</strong></span>
+        <span class="sheet-profile-chip">Distance : <strong>${distStr}</strong></span>
+      `;
+
+      // Graphique SVG vectoriel
+      const w = 550;
+      const h = 88;
+      const pad = { left: 40, right: 15, top: 10, bottom: 20 };
+      const plotW = w - pad.left - pad.right;
+      const plotH = h - pad.top - pad.bottom;
+      const span = deltaElev || 1;
+
+      const points = profile.map(p => [
+        pad.left + (p.distance / totalDist) * plotW,
+        pad.top + (1 - (p.elevation - minElev) / span) * plotH
+      ]);
+
+      const pathD = points.map((pt, i) => `${i === 0 ? "M" : "L"}${pt[0].toFixed(1)} ${pt[1].toFixed(1)}`).join(" ");
+      const axisBottom = pad.top + plotH;
+      const axisLeft = pad.left;
+
+      const trendY1 = pad.top + (1 - (intercept - minElev) / span) * plotH;
+      const trendY2 = pad.top + (1 - (intercept + slope * totalDist - minElev) / span) * plotH;
+      const trendD = `M${pad.left.toFixed(1)} ${trendY1.toFixed(1)} L${(pad.left + plotW).toFixed(1)} ${trendY2.toFixed(1)}`;
+
+      let gridHtml = "";
+      for (let i = 0; i <= 3; i++) {
+        const gy = pad.top + (i / 3) * plotH;
+        gridHtml += `<line x1="${axisLeft}" y1="${gy.toFixed(1)}" x2="${(axisLeft + plotW).toFixed(1)}" y2="${gy.toFixed(1)}" stroke="#f1f5f9" stroke-width="1"/>`;
+      }
+      for (let i = 0; i <= 4; i++) {
+        const gx = axisLeft + (i / 4) * plotW;
+        gridHtml += `<line x1="${gx.toFixed(1)}" y1="${pad.top}" x2="${gx.toFixed(1)}" y2="${axisBottom}" stroke="#f1f5f9" stroke-width="1"/>`;
+      }
+
+      wrapEl.innerHTML = `
+        <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="sheet-profile-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#0284c7" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#0284c7" stop-opacity="0.04"/>
+            </linearGradient>
+          </defs>
+          ${gridHtml}
+          <!-- Aire colorée sous le profil -->
+          <path d="${pathD} L ${(axisLeft + plotW).toFixed(1)} ${axisBottom} L ${axisLeft} ${axisBottom} Z" fill="url(#sheet-profile-grad)"/>
+          <!-- Ligne de tendance -->
+          <path d="${trendD}" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="3 3"/>
+          <!-- Ligne du profil altimétrique -->
+          <path d="${pathD}" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Axes -->
+          <line x1="${axisLeft}" y1="${axisBottom}" x2="${(axisLeft + plotW).toFixed(1)}" y2="${axisBottom}" stroke="#94a3b8" stroke-width="0.8"/>
+          <line x1="${axisLeft}" y1="${pad.top}" x2="${axisLeft}" y2="${axisBottom}" stroke="#94a3b8" stroke-width="0.8"/>
+          <!-- Étiquettes d'élévation -->
+          <text x="${axisLeft - 4}" y="${pad.top + 3}" text-anchor="end" font-size="7.5" fill="#64748b" font-weight="600">${maxElev.toFixed(1)} m</text>
+          <text x="${axisLeft - 4}" y="${(pad.top + plotH / 2 + 2.5).toFixed(1)}" text-anchor="end" font-size="7.5" fill="#64748b">${((minElev + maxElev) / 2).toFixed(1)} m</text>
+          <text x="${axisLeft - 4}" y="${axisBottom + 1}" text-anchor="end" font-size="7.5" fill="#64748b" font-weight="600">${minElev.toFixed(1)} m</text>
+          <!-- Étiquettes de distance -->
+          <text x="${axisLeft}" y="${h - 4}" text-anchor="start" font-size="7.5" fill="#64748b" font-weight="600">0 m</text>
+          <text x="${(axisLeft + plotW).toFixed(1)}" y="${h - 4}" text-anchor="end" font-size="7.5" fill="#64748b" font-weight="600">${distStr}</text>
+        </svg>
+      `;
+    }
+
+    /**
+     * Importe un fichier de composition QGIS Print Layout (.qpt / XML)
+     */
+    importQptTemplate(xmlContent, fileName) {
+      try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
+        
+        const parseError = xmlDoc.querySelector("parsererror");
+        if (parseError) {
+          throw new Error("Le fichier XML n'est pas valide ou est corrompu.");
+        }
+
+        // 1. Détection de l'orientation et des dimensions de la page
+        let orientation = "landscape";
+        const pageItem = xmlDoc.querySelector('LayoutItem[type="65638"]') || xmlDoc.querySelector("Page") || xmlDoc.querySelector("Composition");
+        if (pageItem) {
+          const sizeAttr = pageItem.getAttribute("size") || "";
+          const pW = parseFloat(pageItem.getAttribute("pageWidth") || pageItem.getAttribute("width") || "0");
+          const pH = parseFloat(pageItem.getAttribute("pageHeight") || pageItem.getAttribute("height") || "0");
+          
+          if (sizeAttr && sizeAttr.includes(",")) {
+            const parts = sizeAttr.split(",");
+            const w = parseFloat(parts[0]);
+            const h = parseFloat(parts[1]);
+            if (h > w) orientation = "portrait";
+            else orientation = "landscape";
+          } else if (pW > 0 && pH > 0) {
+            if (pH > pW) orientation = "portrait";
+            else orientation = "landscape";
+          }
+        }
+
+        // 2. Détection de la présence des éléments
+        const hasLegend = !!(xmlDoc.querySelector('LayoutItem[type="65642"]') || xmlDoc.querySelector("ComposerLegend"));
+        const hasScale = !!(xmlDoc.querySelector('LayoutItem[type="65646"]') || xmlDoc.querySelector("ComposerScaleBar"));
+        
+        let hasCompass = false;
+        const pictures = xmlDoc.querySelectorAll('LayoutItem[type="65640"], ComposerPicture');
+        pictures.forEach(p => {
+          const path = (p.getAttribute("picturePath") || p.getAttribute("file") || "").toLowerCase();
+          if (path.includes("north") || path.includes("arrow") || path.includes("compass") || path.includes("boussole")) {
+            hasCompass = true;
+          }
+        });
+        if (!hasCompass && (xmlDoc.querySelector('LayoutItem[type="65644"]') || xmlDoc.querySelector("NorthArrow"))) {
+          hasCompass = true;
+        }
+
+        // 3. Extraction des textes / étiquettes (Labels)
+        const labelNodes = xmlDoc.querySelectorAll('LayoutItem[type="65641"], ComposerLabel');
+        const extractedTexts = [];
+        labelNodes.forEach(lbl => {
+          let txt = lbl.getAttribute("labelText") || "";
+          if (!txt) {
+            const childText = lbl.querySelector("labelText") || lbl.querySelector("LabelText");
+            if (childText) txt = childText.textContent;
+          }
+          txt = (txt || "").trim();
+          if (txt && !txt.startsWith("[%") && txt.length > 1) {
+            extractedTexts.push(txt);
+          }
+        });
+
+        const baseName = fileName ? fileName.replace(/\.qpt$/i, "").replace(/\.xml$/i, "") : "Modèle QGIS";
+        let title = baseName;
+        let subtitle = "";
+        let notes = "";
+
+        if (extractedTexts.length >= 1) {
+          title = extractedTexts[0];
+        }
+        if (extractedTexts.length >= 2) {
+          subtitle = extractedTexts[1];
+        }
+        if (extractedTexts.length >= 3) {
+          notes = extractedTexts.slice(2).join("\n");
+        }
+
+        const templateId = "user_qpt_" + Date.now();
+        const newTemplate = {
+          id: templateId,
+          name: `QGIS - ${baseName}`,
+          format: "letter",
+          orientation,
+          title: title || "Plan de ferme",
+          subtitle: subtitle || "Modèle importé de QGIS",
+          author: "",
+          location: "",
+          notes: notes || "Gabarit importé depuis un fichier QGIS Print Layout (.qpt).",
+          showCompass: hasCompass !== false,
+          showScale: hasScale !== false,
+          showLegend: hasLegend !== false,
+          showNotes: !!notes,
+          showProfile: false,
+          logoUrl: null,
+          excludedLegendIds: []
+        };
+
+        this.userTemplates[templateId.replace("user_", "")] = newTemplate;
+        this.saveUserTemplates();
+        this.populateTemplateSelect();
+
+        this.dom.templateSelect.value = templateId;
+        this.applyTemplate(templateId);
+
+        alert(`Gabarit QGIS importé avec succès !\n\nNom : ${newTemplate.name}\nOrientation : ${orientation === "portrait" ? "Portrait" : "Paysage"}\nÉléments : ${hasLegend ? "Légende, " : ""}${hasScale ? "Échelle, " : ""}${hasCompass ? "Rose des vents" : ""}`);
+      } catch (err) {
+        console.error("[Composer] Erreur import .qpt:", err);
+        alert("Impossible d'importer le fichier .qpt : " + err.message);
+      }
+    }
+
+    /**
      * Recadre le snapshot de la carte selon le ratio d'aspect exact du cadre de la feuille
      * pour éviter toute distorsion ou écrasement (horizontal/vertical) à l'export PDF.
      */
@@ -868,10 +1245,15 @@
     updateMapSnapshotForOrientation() {
       if (!this.rawMapCanvas) return;
       const isLandscape = this.state.orientation === "landscape";
+      const hasProfile = !!this.state.showProfile;
       // Ratios d'aspect réels des cadres sur papier (mapW / mapH)
-      // Paysage : mapW = 195.4 mm, mapH = 164.9 mm -> ratio = 1.18496
-      // Portrait : mapW = 195.9 mm, mapH = 158 mm -> ratio = 1.23987
-      const targetAspect = isLandscape ? (195.4 / 164.9) : (195.9 / 158);
+      // Paysage normal : mapW = 195.4 mm, mapH = 164.9 mm -> ratio = 1.18496
+      // Paysage avec coupe : mapW = 195.4 mm, mapH = 116 mm -> ratio = 1.68448
+      // Portrait normal : mapW = 195.9 mm, mapH = 158 mm -> ratio = 1.23987
+      // Portrait avec coupe : mapW = 195.9 mm, mapH = 118 mm -> ratio = 1.66017
+      const targetAspect = isLandscape
+        ? (hasProfile ? (195.4 / 116) : (195.4 / 164.9))
+        : (hasProfile ? (195.9 / 118) : (195.9 / 158));
       this.mapSnapshotDataUrl = this.cropMapSnapshot(targetAspect);
       if (this.dom && this.dom.sheetMapImg) {
         this.dom.sheetMapImg.src = this.mapSnapshotDataUrl || "";
@@ -955,12 +1337,16 @@
       this.dom.checkScale.checked = this.state.showScale !== false;
       this.dom.checkLegend.checked = this.state.showLegend !== false;
       this.dom.checkNotes.checked = this.state.showNotes !== false;
+      if (this.dom.checkProfile) {
+        this.dom.checkProfile.checked = !!this.state.showProfile;
+      }
 
       this.dom.sheetCompassWrap.style.display = this.dom.checkCompass.checked ? "flex" : "none";
       this.dom.sheetScaleWrap.style.display = this.dom.checkScale.checked ? "flex" : "none";
       this.updateNavBlockVisibility();
       this.dom.sheetLegendBlock.style.display = this.dom.checkLegend.checked ? "flex" : "none";
       this.dom.sheetNotesBlock.style.display = this.dom.checkNotes.checked ? "flex" : "none";
+      this.updateProfileBlockVisibility();
 
       // Logo
       this.updateLogoDisplay();
@@ -1492,7 +1878,26 @@
       this.updateScale();
       this.updateActiveLegend();
 
-      // 4. Affichage
+      // 4. Profil topographique MNT
+      const hasProfileData = !!(window.profileManager && window.profileManager.profile && window.profileManager.profile.length >= 2);
+      if (this.dom.rowCheckProfile) {
+        const labelText = this.dom.rowCheckProfile.querySelector("span:last-child");
+        if (labelText) {
+          labelText.innerHTML = hasProfileData
+            ? `Graphique de coupe topographique <span style="font-size:10px; color:#166534; font-weight:700;">(Profil actif)</span>`
+            : `Graphique de coupe topographique <span style="font-size:10px; color:#64748b;">(Aucun tracé)</span>`;
+        }
+      }
+      this.updateProfileBlockVisibility();
+
+      // Réinitialisation de l'onglet actif sur mobile vers "Réglages"
+      if (this.dom.tabSettings && this.dom.tabPreview && this.dom.composerBody) {
+        this.dom.tabSettings.classList.add("active");
+        this.dom.tabPreview.classList.remove("active");
+        this.dom.composerBody.dataset.activeTab = "settings";
+      }
+
+      // 5. Affichage
       this.dom.overlay.classList.add("active");
       this.isOpen = true;
 
@@ -1626,12 +2031,18 @@
 
         // 3. Cadre de carte & Panneau d'informations
         const mapTopY = headerY + headerH + 3;
+        const hasProfile = !!this.state.showProfile;
+        const profileData = (window.profileManager && window.profileManager.profile && window.profileManager.profile.length >= 2)
+          ? window.profileManager.profile
+          : null;
 
         if (isLandscape) {
           // Disposition PAYSAGE
           const sideW = 60;
           const mapW = headerW - sideW - 4;
-          const mapH = pageH - mapTopY - margin - 6;
+          const fullMapH = pageH - mapTopY - margin - 6;
+          const profileH = hasProfile ? 46 : 0;
+          const mapH = hasProfile ? (fullMapH - profileH - 3) : fullMapH;
 
           // Image de la carte (recadrée au ratio exact du cadre pour éviter toute compression/distorsion)
           if (this.mapSnapshotDataUrl) {
@@ -1640,6 +2051,12 @@
           doc.setDrawColor(15, 23, 42);
           doc.setLineWidth(0.4);
           doc.rect(headerX, mapTopY, mapW, mapH);
+
+          // Profil topographique (Coupe MNT) sous la carte
+          if (hasProfile) {
+            const profileY = mapTopY + mapH + 3;
+            this.drawVectorProfile(doc, headerX, profileY, mapW, profileH, profileData);
+          }
 
           // Panneau latéral
           const sideX = headerX + mapW + 4;
@@ -1753,7 +2170,8 @@
         } else {
           // Disposition PORTRAIT
           const mapW = headerW;
-          const mapH = 158;
+          const profileH = hasProfile ? 42 : 0;
+          const mapH = hasProfile ? 118 : 158;
 
           // Image de carte (recadrée au ratio exact du cadre)
           if (this.mapSnapshotDataUrl) {
@@ -1763,11 +2181,19 @@
           doc.setLineWidth(0.4);
           doc.rect(headerX, mapTopY, mapW, mapH);
 
+          let nextY = mapTopY + mapH + 3;
+
+          // Profil topographique (Coupe MNT) sous la carte
+          if (hasProfile) {
+            this.drawVectorProfile(doc, headerX, nextY, mapW, profileH, profileData);
+            nextY += profileH + 3;
+          }
+
           // Section basse
-          const bottomY = mapTopY + mapH + 3;
+          const bottomY = nextY;
           const bottomH = pageH - bottomY - margin - 6;
 
-          // Colonne 1 : Rose des vents & Échelle (48 mm)
+          // Colonne 1 : Rose des vents & Échelle (46 mm)
           const col1W = 46;
           doc.setDrawColor(203, 213, 225);
           doc.rect(headerX, bottomY, col1W, bottomH);
@@ -1874,16 +2300,10 @@
     }
 
     /**
-     * Dessin vectoriel direct de la Rose des vents dans jsPDF
+     * Dessin vectoriel direct de la Rose des vents dans jsPDF (Étoile géodésique à 8 pointes & cadran 36 graduations)
      */
     drawVectorCompass(doc, cx, cy, r) {
       const bearing = this.map ? (this.map.getBearing() * Math.PI) / 180 : 0;
-
-      // Cercle extérieur
-      doc.setDrawColor(15, 23, 42);
-      doc.setLineWidth(0.2);
-      doc.circle(cx, cy, r, "S");
-      doc.circle(cx, cy, r * 0.9, "S");
 
       const rotPoint = (x, y) => {
         const cos = Math.cos(-bearing);
@@ -1891,50 +2311,273 @@
         return [cx + (x * cos - y * sin), cy + (x * sin + y * cos)];
       };
 
-      // Nord (Pointe foncée + grise)
-      const [nx, ny] = rotPoint(0, -r * 0.95);
-      const [slx, sly] = rotPoint(-r * 0.2, 0);
-      const [srx, srxY] = rotPoint(r * 0.2, 0);
+      // 1. Cadrans concentriques
+      doc.setFillColor(255, 255, 255);
+      doc.circle(cx, cy, r, "F");
 
+      doc.setDrawColor(15, 23, 42); // Noir anthracite
+      doc.setLineWidth(0.3);
+      doc.circle(cx, cy, r, "S");
+
+      doc.setDrawColor(203, 213, 225); // #cbd5e1
+      doc.setLineWidth(0.18);
+      doc.circle(cx, cy, r * 0.94, "S");
+
+      doc.setDrawColor(226, 232, 240); // #e2e8f0
+      doc.setLineWidth(0.15);
+      doc.circle(cx, cy, r * 0.84, "S");
+
+      // 2. Graduations d'azimut (36 graduations tous les 10°)
+      for (let deg = 0; deg < 360; deg += 10) {
+        const isCardinal = deg % 90 === 0;
+        const isSemi = deg % 45 === 0 && !isCardinal;
+        const tickLen = isCardinal ? (r * 0.12) : isSemi ? (r * 0.08) : (r * 0.04);
+        const rOuter = r * 0.94;
+        const rInner = rOuter - tickLen;
+        const rad = (deg * Math.PI) / 180;
+
+        const x1Local = rOuter * Math.sin(rad);
+        const y1Local = -rOuter * Math.cos(rad);
+        const x2Local = rInner * Math.sin(rad);
+        const y2Local = -rInner * Math.cos(rad);
+
+        const p1 = rotPoint(x1Local, y1Local);
+        const p2 = rotPoint(x2Local, y2Local);
+
+        if (isCardinal) {
+          doc.setDrawColor(15, 23, 42);
+          doc.setLineWidth(0.24);
+        } else if (isSemi) {
+          doc.setDrawColor(71, 85, 105);
+          doc.setLineWidth(0.18);
+        } else {
+          doc.setDrawColor(148, 163, 184);
+          doc.setLineWidth(0.12);
+        }
+        doc.line(p1[0], p1[1], p2[0], p2[1]);
+      }
+
+      // 3. Les 4 pointes secondaires intermédiaires (NE, SE, SO, NO) à 45°, 135°, 225°, 315°
+      const subAngles = [45, 135, 225, 315];
+      const rSub = r * 0.60;
+      const wSub = r * 0.10;
+      for (const a of subAngles) {
+        const radCenter = (a * Math.PI) / 180;
+        const radL = ((a - 20) * Math.PI) / 180;
+        const radR = ((a + 20) * Math.PI) / 180;
+
+        const tip = rotPoint(rSub * Math.sin(radCenter), -rSub * Math.cos(radCenter));
+        const wingL = rotPoint(wSub * Math.sin(radL), -wSub * Math.cos(radL));
+        const wingR = rotPoint(wSub * Math.sin(radR), -wSub * Math.cos(radR));
+
+        doc.setFillColor(148, 163, 184); // #94a3b8
+        doc.triangle(cx, cy, wingL[0], wingL[1], tip[0], tip[1], "F");
+        doc.setFillColor(203, 213, 225); // #cbd5e1
+        doc.triangle(cx, cy, wingR[0], wingR[1], tip[0], tip[1], "F");
+      }
+
+      // 4. Pointes cardinales Sud, Est, Ouest
+      const rCard = r * 0.74;
+      const wCard = r * 0.13;
+
+      // Sud (180°)
+      const tipS = rotPoint(0, rCard);
+      const wingSL = rotPoint(-wCard, 0);
+      const wingSR = rotPoint(wCard, 0);
+      doc.setFillColor(148, 163, 184);
+      doc.triangle(cx, cy, wingSL[0], wingSL[1], tipS[0], tipS[1], "F");
+      doc.setFillColor(203, 213, 225);
+      doc.triangle(cx, cy, wingSR[0], wingSR[1], tipS[0], tipS[1], "F");
+
+      // Est (90°)
+      const tipE = rotPoint(rCard, 0);
+      const wingET = rotPoint(0, -wCard);
+      const wingEB = rotPoint(0, wCard);
+      doc.setFillColor(148, 163, 184);
+      doc.triangle(cx, cy, wingET[0], wingET[1], tipE[0], tipE[1], "F");
+      doc.setFillColor(203, 213, 225);
+      doc.triangle(cx, cy, wingEB[0], wingEB[1], tipE[0], tipE[1], "F");
+
+      // Ouest (270°)
+      const tipW = rotPoint(-rCard, 0);
+      doc.setFillColor(148, 163, 184);
+      doc.triangle(cx, cy, wingET[0], wingET[1], tipW[0], tipW[1], "F");
+      doc.setFillColor(203, 213, 225);
+      doc.triangle(cx, cy, wingEB[0], wingEB[1], tipW[0], tipW[1], "F");
+
+      // 5. Nord (Grande flèche bicolore contrastée)
+      const rNorth = r * 0.80;
+      const tipN = rotPoint(0, -rNorth);
+      doc.setFillColor(15, 23, 42); // Noir anthracite
+      doc.triangle(cx, cy, wingSL[0], wingSL[1], tipN[0], tipN[1], "F");
+      doc.setFillColor(71, 85, 105); // Slate foncé
+      doc.triangle(cx, cy, wingSR[0], wingSR[1], tipN[0], tipN[1], "F");
+
+      // 6. Pointeau supérieur rouge Nord (apex)
+      const apexTop = rotPoint(0, -r * 0.88);
+      const apexL = rotPoint(-r * 0.05, -r * 0.77);
+      const apexR = rotPoint(r * 0.05, -r * 0.77);
+      doc.setFillColor(220, 38, 38); // Rouge vif #dc2626
+      doc.triangle(apexTop[0], apexTop[1], apexL[0], apexL[1], apexR[0], apexR[1], "F");
+
+      // 7. Anneau central multi-épaisseurs
       doc.setFillColor(15, 23, 42);
-      doc.triangle(cx, cy, slx, sly, nx, ny, "F");
-
-      doc.setFillColor(100, 116, 139);
-      doc.triangle(cx, cy, srx, srxY, nx, ny, "F");
-
-      // Sud
-      const [sx, sy] = rotPoint(0, r * 0.9);
-      doc.setFillColor(148, 163, 184);
-      doc.triangle(cx, cy, slx, sly, sx, sy, "F");
-      doc.setFillColor(203, 213, 225);
-      doc.triangle(cx, cy, srx, srxY, sx, sy, "F");
-
-      // Est & Ouest
-      const [ex, ey] = rotPoint(r * 0.9, 0);
-      const [stx, sty] = rotPoint(0, -r * 0.2);
-      const [sbx, sby] = rotPoint(0, r * 0.2);
-
-      doc.setFillColor(148, 163, 184);
-      doc.triangle(cx, cy, stx, sty, ex, ey, "F");
-      doc.setFillColor(203, 213, 225);
-      doc.triangle(cx, cy, sbx, sby, ex, ey, "F");
-
-      const [wx, wy] = rotPoint(-r * 0.9, 0);
-      doc.setFillColor(148, 163, 184);
-      doc.triangle(cx, cy, stx, sty, wx, wy, "F");
-      doc.setFillColor(203, 213, 225);
-      doc.triangle(cx, cy, sbx, sby, wx, wy, "F");
-
-      // Centre
+      doc.circle(cx, cy, r * 0.12, "F");
+      doc.setFillColor(255, 255, 255);
+      doc.circle(cx, cy, r * 0.06, "F");
       doc.setFillColor(15, 23, 42);
-      doc.circle(cx, cy, 1, "F");
+      doc.circle(cx, cy, r * 0.025, "F");
 
-      // Lettre N
-      const [labelNx, labelNy] = rotPoint(0, -r * 0.55);
+      // 8. Lettres cardinales élégantes
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
+
+      // N
+      const [lxN, lyN] = rotPoint(0, -r * 0.60);
+      doc.setFontSize(6.8);
       doc.setTextColor(15, 23, 42);
-      doc.text("N", labelNx, labelNy + 1, { align: "center" });
+      doc.text("N", lxN, lyN + 0.8, { align: "center" });
+
+      // S
+      const [lxS, lyS] = rotPoint(0, r * 0.70);
+      doc.setFontSize(5);
+      doc.setTextColor(100, 116, 139);
+      doc.text("S", lxS, lyS + 0.8, { align: "center" });
+
+      // E
+      const [lxE, lyE] = rotPoint(r * 0.70, 0);
+      doc.text("E", lxE, lyE + 0.8, { align: "center" });
+
+      // O (Ouest)
+      const [lxO, lyO] = rotPoint(-r * 0.70, 0);
+      doc.text("O", lxO, lyO + 0.8, { align: "center" });
+    }
+
+    /**
+     * Dessin vectoriel haute précision du profil altimétrique (Coupe MNT) dans jsPDF
+     */
+    drawVectorProfile(doc, x, y, w, h, profile) {
+      // 1. Cadre du bloc
+      doc.setDrawColor(15, 23, 42);
+      doc.setLineWidth(0.35);
+      doc.setFillColor(255, 255, 255);
+      doc.rect(x, y, w, h, "FD");
+
+      // 2. En-tête : Titre
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text("COUPE TOPOGRAPHIQUE (PROFIL MNT)", x + 3.5, y + 4.5);
+
+      if (!profile || profile.length < 2) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(6.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text("Tracez une coupe sur la carte avec l'outil Coupe MNT pour afficher le profil altimétrique ici.", x + 3.5, y + 12);
+        return;
+      }
+
+      // Calcul des statistiques altimétriques
+      const elevations = profile.map(p => p.elevation);
+      const minElev = Math.min(...elevations);
+      const maxElev = Math.max(...elevations);
+      const deltaElev = maxElev - minElev;
+      const totalDist = profile[profile.length - 1].distance;
+
+      // Régression linéaire (Pente moyenne)
+      const n = profile.length;
+      const meanX = profile.reduce((acc, p) => acc + p.distance, 0) / n;
+      const meanY = elevations.reduce((acc, e) => acc + e, 0) / n;
+      let num = 0, den = 0;
+      for (const p of profile) {
+        const dx = p.distance - meanX;
+        num += dx * (p.elevation - meanY);
+        den += dx * dx;
+      }
+      const slope = den === 0 ? 0 : num / den;
+      const intercept = meanY - slope * meanX;
+      const slopePct = slope * 100;
+
+      const distStr = totalDist >= 1000 ? (totalDist / 1000).toFixed(2) + " km" : Math.round(totalDist) + " m";
+      const statText = `Min : ${minElev.toFixed(1)} m  |  Max : ${maxElev.toFixed(1)} m  |  Dénivelé Δ : ${deltaElev.toFixed(1)} m  |  Pente moy. : ${slopePct >= 0 ? '+' : ''}${slopePct.toFixed(1)}%  |  Distance : ${distStr}`;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6);
+      doc.setTextColor(71, 85, 105);
+      doc.text(statText, x + w - 3.5, y + 4.5, { align: "right" });
+
+      // 3. Zone du graphique
+      const padLeft = 14;
+      const padRight = 6;
+      const padTop = 7.5;
+      const padBottom = 5.5;
+
+      const plotX = x + padLeft;
+      const plotY = y + padTop;
+      const plotW = w - padLeft - padRight;
+      const plotH = h - padTop - padBottom;
+      const baseY = plotY + plotH;
+      const span = deltaElev > 0.01 ? deltaElev : 1;
+
+      // Grille de fond
+      doc.setDrawColor(241, 245, 249);
+      doc.setLineWidth(0.2);
+      for (let i = 0; i <= 3; i++) {
+        const gy = plotY + (i / 3) * plotH;
+        doc.line(plotX, gy, plotX + plotW, gy);
+      }
+      for (let i = 0; i <= 4; i++) {
+        const gx = plotX + (i / 4) * plotW;
+        doc.line(gx, plotY, gx, baseY);
+      }
+
+      // Calcul des coordonnées des points
+      const points = profile.map(p => [
+        plotX + (p.distance / totalDist) * plotW,
+        plotY + (1 - (p.elevation - minElev) / span) * plotH
+      ]);
+
+      // Aire remplie sous la courbe (teinte douce bleu ciel #e0f2fe = [224, 242, 254])
+      doc.setFillColor(224, 242, 254);
+      for (let i = 0; i < points.length - 1; i++) {
+        const x1 = points[i][0];
+        const y1 = points[i][1];
+        const x2 = points[i + 1][0];
+        const y2 = points[i + 1][1];
+        doc.triangle(x1, baseY, x1, y1, x2, y1, "F");
+        doc.triangle(x1, baseY, x2, y1, x2, baseY, "F");
+      }
+
+      // Ligne de tendance de régression (orange #ea580c = [234, 88, 12])
+      const trendY1 = plotY + (1 - (intercept - minElev) / span) * plotH;
+      const trendY2 = plotY + (1 - (intercept + slope * totalDist - minElev) / span) * plotH;
+      doc.setDrawColor(234, 88, 12);
+      doc.setLineWidth(0.3);
+      doc.line(plotX, trendY1, plotX + plotW, trendY2);
+
+      // Courbe altimétrique principale (bleu roi #0284c7 = [2, 132, 199])
+      doc.setDrawColor(2, 132, 199);
+      doc.setLineWidth(0.55);
+      for (let i = 0; i < points.length - 1; i++) {
+        doc.line(points[i][0], points[i][1], points[i + 1][0], points[i + 1][1]);
+      }
+
+      // Axes X et Y
+      doc.setDrawColor(148, 163, 184);
+      doc.setLineWidth(0.25);
+      doc.line(plotX, baseY, plotX + plotW, baseY);
+      doc.line(plotX, plotY, plotX, baseY);
+
+      // Étiquettes altimétriques
+      doc.setFont("courier", "bold");
+      doc.setFontSize(5.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(maxElev.toFixed(1) + " m", plotX - 1.2, plotY + 1.2, { align: "right" });
+      doc.text(((minElev + maxElev) / 2).toFixed(1) + " m", plotX - 1.2, plotY + (plotH / 2) + 0.8, { align: "right" });
+      doc.text(minElev.toFixed(1) + " m", plotX - 1.2, baseY, { align: "right" });
+
+      // Étiquettes de distance
+      doc.text("0 m", plotX, baseY + 3.6, { align: "left" });
+      doc.text(distStr, plotX + plotW, baseY + 3.6, { align: "right" });
     }
 
     /**
