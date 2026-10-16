@@ -448,38 +448,39 @@
   margin: auto;
   position: relative;
   flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  transition: width 0.15s ease, height 0.15s ease;
 }
 
 /* Feuille de papier format Lettre */
 .composer-sheet {
+  position: absolute;
+  top: 0;
+  left: 0;
   background: #ffffff;
   box-shadow: 0 12px 30px -6px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  position: relative;
   overflow: hidden;
   font-family: var(--font-sans, "Plus Jakarta Sans", sans-serif);
   color: #0f172a;
   transform-origin: top left;
   user-select: text;
+  flex-shrink: 0;
 }
 
 /* Proportions réelles Format Lettre (8.5 × 11 pouces = ratio 1:1.2941) */
+/* Échelle Paysage : 880px / 279.4mm = 3.1496 px/mm -> Marges 10mm = 31.5px */
 .composer-sheet.landscape {
   width: 880px;
   height: 680px; /* Ratio 1.294 */
-  padding: 18px 22px;
+  padding: 31.5px;
 }
 
+/* Échelle Portrait : 650px / 215.9mm = 3.01065 px/mm -> Marges 10mm = 30px */
 .composer-sheet.portrait {
   width: 650px;
-  height: 840px; /* Ratio 1.292 */
-  padding: 20px 18px;
+  height: 841px; /* Ratio 1.294 */
+  padding: 30px;
 }
 
 /* Barre d'outils de Zoom flottante */
@@ -541,13 +542,14 @@
   border: 1.5px solid #0f172a;
   border-radius: 4px;
   background: #ffffff;
-  padding: 8px 12px;
+  padding: 6px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 9.5px;
   gap: 12px;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .sheet-cartouche-main {
@@ -557,11 +559,11 @@
 
 .sheet-title {
   font-family: var(--font-serif, "Newsreader", "Cinzel", Georgia, serif);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: #0f172a;
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.15;
   letter-spacing: -0.01em;
   outline: none;
   border-radius: 3px;
@@ -573,11 +575,11 @@
 }
 
 .sheet-subtitle {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: #166534;
   margin-top: 2px;
-  line-height: 1.2;
+  line-height: 1.15;
   outline: none;
   border-radius: 3px;
   padding: 1px 3px;
@@ -622,7 +624,7 @@
 .sheet-content-row {
   display: flex;
   flex: 1;
-  gap: 12px;
+  gap: 12.5px;
   min-height: 0;
   position: relative;
 }
@@ -630,6 +632,7 @@
 /* En mode Portrait, disposition verticale */
 .composer-sheet.portrait .sheet-content-row {
   flex-direction: column;
+  gap: 9px;
 }
 
 /* Colonne carte + profil éventuel */
@@ -637,7 +640,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
   min-height: 0;
   min-width: 0;
 }
@@ -654,13 +657,15 @@
   align-items: center;
   justify-content: center;
   min-height: 0;
+  min-width: 0;
 }
 
 .sheet-map-img {
   width: 100%;
   height: 100%;
-  object-fit: fill;
+  object-fit: contain;
   display: block;
+  background: #e2e8f0;
 }
 
 /* Bloc Profil Topographique MNT sur la feuille */
@@ -734,17 +739,21 @@
 
 /* Panneau latéral de la feuille (Paysage) ou section basse (Portrait) */
 .sheet-side-panel {
-  width: 200px;
+  width: 189px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .composer-sheet.portrait .sheet-side-panel {
   width: 100%;
   flex-direction: row;
-  height: 175px;
+  height: 165px;
+  min-height: 165px;
+  max-height: 165px;
+  gap: 9px;
 }
 
 /* Bloc Rose des vents et échelle */
@@ -759,10 +768,12 @@
   justify-content: center;
   gap: 6px;
   text-align: center;
+  box-sizing: border-box;
 }
 
 .composer-sheet.portrait .sheet-nav-block {
-  width: 140px;
+  width: 126px;
+  min-width: 126px;
   flex-shrink: 0;
 }
 
@@ -1172,7 +1183,25 @@
     display: flex !important;
     width: 100% !important;
     flex: 1 !important;
-    padding: 8px;
+    padding: 12px;
     overflow: auto;
+    align-items: center;
+    justify-content: center;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .composer-zoom-toolbar {
+    bottom: 12px;
+    right: 12px;
+    padding: 3px 6px;
+    gap: 2px;
+  }
+  .composer-zoom-btn {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+  .composer-zoom-level {
+    font-size: 9.5px;
+    min-width: 30px;
   }
 }

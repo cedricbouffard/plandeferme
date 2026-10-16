@@ -701,13 +701,19 @@
           if (this.dom.composerBody) {
             this.dom.composerBody.dataset.activeTab = "preview";
           }
-          setTimeout(() => {
-            if (this.zoomMode === "fit") {
-              this.fitSheetToViewport();
-            } else {
-              this.applyScale(this.currentScale, false);
-            }
-          }, 40);
+          // Double rAF pour laisser le moteur CSS déployer display: flex et calculer la géométrie réelle
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (this.zoomMode === "fit") {
+                this.fitSheetToViewport();
+              } else {
+                this.applyScale(this.currentScale, false);
+              }
+              if (this.dom.previewViewport) {
+                this.dom.previewViewport.scrollTop = 0;
+              }
+            });
+          });
         });
       }
 
@@ -929,6 +935,20 @@
         }
       });
 
+      // Observer les changements de taille du viewport (redimensionnement / onglets mobiles)
+      if (window.ResizeObserver && this.dom.previewViewport) {
+        this.resizeObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.contentRect.width > 50 && entry.contentRect.height > 50) {
+              if (this.isOpen && this.zoomMode === "fit") {
+                this.fitSheetToViewport();
+              }
+            }
+          }
+        });
+        this.resizeObserver.observe(this.dom.previewViewport);
+      }
+
       // Bouton de génération PDF
       this.dom.btnGeneratePdf.addEventListener("click", () => this.generatePdf());
     }
@@ -937,12 +957,12 @@
      * Applique une échelle de zoom fluide à la feuille et adapte le conteneur scaler
      */
     applyScale(scale, isFit = false) {
-      this.currentScale = Math.max(0.25, Math.min(scale, 1.6));
+      this.currentScale = Math.max(0.2, Math.min(scale, 1.8));
       if (!this.dom.sheetScaler || !this.dom.sheet) return;
 
       const isLandscape = this.state.orientation === "landscape";
       const sheetW = isLandscape ? 880 : 650;
-      const sheetH = isLandscape ? 680 : 840;
+      const sheetH = isLandscape ? 680 : 841;
 
       const scaledW = Math.round(sheetW * this.currentScale);
       const scaledH = Math.round(sheetH * this.currentScale);
@@ -976,14 +996,14 @@
       if (vpW <= 50 || vpH <= 50) return;
 
       // Marge de confort pour éviter tout ascenseur parasite
-      const padX = vpW <= 600 ? 16 : 48;
-      const padY = vpW <= 600 ? 16 : 48;
+      const padX = vpW <= 600 ? 16 : 40;
+      const padY = vpW <= 600 ? 16 : 40;
       const availW = Math.max(100, vpW - padX);
       const availH = Math.max(100, vpH - padY);
 
       const isLandscape = this.state.orientation === "landscape";
       const sheetW = isLandscape ? 880 : 650;
-      const sheetH = isLandscape ? 680 : 840;
+      const sheetH = isLandscape ? 680 : 841;
 
       const scale = Math.min(availW / sheetW, availH / sheetH, 1.0);
       this.applyScale(scale, true);
@@ -1174,20 +1194,35 @@
       const isLandscape = this.state.orientation === "landscape";
       const pxPerMm = isLandscape ? (880 / 279.4) : (650 / 215.9);
 
-      // 1. En-tête / Cartouche
+      // 1. En-tête / Cartouche (Hauteur stricte et gap de 3mm vers le contenu)
       if (this.dom.sheetCartouche) {
         const hPx = Math.round((layout.headerH || 22) * pxPerMm);
+        const gapPx = Math.round(3 * pxPerMm);
+        this.dom.sheetCartouche.style.height = `${hPx}px`;
         this.dom.sheetCartouche.style.minHeight = `${hPx}px`;
+        this.dom.sheetCartouche.style.maxHeight = `${hPx}px`;
+        this.dom.sheetCartouche.style.marginBottom = `${gapPx}px`;
+        this.dom.sheetCartouche.style.boxSizing = "border-box";
       }
 
-      // 2. Panneau latéral
+      // 2. Panneau latéral (Paysage: largeur sideW / Portrait: section basse 55mm = 165px)
       if (this.dom.sheetSidePanel) {
         if (isLandscape) {
           const wPx = Math.round((layout.sideW || 60) * pxPerMm);
           this.dom.sheetSidePanel.style.width = `${wPx}px`;
+          this.dom.sheetSidePanel.style.minWidth = `${wPx}px`;
+          this.dom.sheetSidePanel.style.maxWidth = `${wPx}px`;
           this.dom.sheetSidePanel.style.height = "";
+          this.dom.sheetSidePanel.style.minHeight = "";
+          this.dom.sheetSidePanel.style.maxHeight = "";
         } else {
+          const bottomHPx = Math.round(55 * pxPerMm);
           this.dom.sheetSidePanel.style.width = "100%";
+          this.dom.sheetSidePanel.style.minWidth = "100%";
+          this.dom.sheetSidePanel.style.maxWidth = "100%";
+          this.dom.sheetSidePanel.style.height = `${bottomHPx}px`;
+          this.dom.sheetSidePanel.style.minHeight = `${bottomHPx}px`;
+          this.dom.sheetSidePanel.style.maxHeight = `${bottomHPx}px`;
         }
       }
 
@@ -1198,10 +1233,24 @@
         this.dom.sheetCompassWrap.style.height = `${compassPx}px`;
       }
 
+      // 3b. Nav Block en mode portrait (largeur col1W)
+      if (this.dom.sheetNavBlock) {
+        if (!isLandscape) {
+          const col1WPx = Math.round(Math.max(42, (layout.compassSize || 24) + 14) * pxPerMm);
+          this.dom.sheetNavBlock.style.width = `${col1WPx}px`;
+          this.dom.sheetNavBlock.style.minWidth = `${col1WPx}px`;
+        } else {
+          this.dom.sheetNavBlock.style.width = "100%";
+          this.dom.sheetNavBlock.style.minWidth = "";
+        }
+      }
+
       // 4. Bloc Profil Coupe MNT
       if (this.dom.sheetProfileBlock) {
         const profPx = Math.round((layout.profileH || 46) * pxPerMm);
         this.dom.sheetProfileBlock.style.height = `${profPx}px`;
+        this.dom.sheetProfileBlock.style.minHeight = `${profPx}px`;
+        this.dom.sheetProfileBlock.style.maxHeight = `${profPx}px`;
       }
 
       // 5. Synchroniser les champs de saisie s'ils existent
@@ -2466,16 +2515,18 @@ ${logoItemXml}
       }
 
       // Ajustement dynamique de l'échelle à la taille exacte du viewport
-      setTimeout(() => {
-        if (this.zoomMode === "fit") {
-          this.fitSheetToViewport();
-        } else {
-          this.applyScale(this.currentScale, false);
-        }
-        if (this.dom.previewViewport) {
-          this.dom.previewViewport.scrollTop = 0;
-        }
-      }, 40);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (this.zoomMode === "fit") {
+            this.fitSheetToViewport();
+          } else {
+            this.applyScale(this.currentScale, false);
+          }
+          if (this.dom.previewViewport) {
+            this.dom.previewViewport.scrollTop = 0;
+          }
+        });
+      });
     }
 
     /**
