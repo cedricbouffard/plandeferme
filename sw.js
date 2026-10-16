@@ -1,13 +1,15 @@
-const CACHE_NAME = "plandeferme-v5";
+const CACHE_NAME = "plandeferme-v6";
 
 const ASSETS = [
   "/",
   "/index.html",
   "/style.css",
   "/geolibre-contour.css",
+  "/css/composer.css",
   "/geolibre-contour.js",
   "/flatgeobuf-geojson.min.js",
   "/marked.min.js",
+  "/jspdf.umd.min.js",
   "/manifest.webmanifest",
   "/favicon/favicon.ico",
   "/favicon/favicon-192.png",
@@ -20,6 +22,7 @@ const ASSETS = [
   "/js/ndvi.js",
   "/js/soil-ai.js",
   "/js/wms.js",
+  "/js/composer.js",
   "/js/app.js"
 ];
 

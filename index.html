@@ -67,6 +67,7 @@
   
   <link rel="stylesheet" href="style.css"/>
   <link rel="stylesheet" href="geolibre-contour.css"/>
+  <link rel="stylesheet" href="css/composer.css"/>
 
   <!-- MapLibre GL JS & PMTiles -->
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
@@ -75,6 +76,7 @@
   <script src="geolibre-contour.js"></script>
   <script src="flatgeobuf-geojson.min.js"></script>
   <script src="marked.min.js"></script>
+  <script src="jspdf.umd.min.js"></script>
 
 </head>
 <body>
@@ -471,8 +473,12 @@
         </div>
       </div>
 
-      <!-- Boutons d'action : Partager la vue & GitHub -->
+      <!-- Boutons d'action : Mise en page PDF, Partager la vue & GitHub -->
       <div style="padding-top: 2px; display: flex; flex-direction: column; gap: 6px;">
+        <button id="btn-panel-composer" type="button" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 12px; background: #0f172a; border: 1.5px solid #0f172a; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: #ffffff; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 2px 4px rgba(15,23,42,0.15);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          <span>Mise en page &amp; Export PDF</span>
+        </button>
         <button id="btn-panel-share" type="button" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 12px; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: #166534; cursor: pointer; transition: all 0.15s ease;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
           <span>Partager cette vue (lien direct)</span>
@@ -742,6 +748,11 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
       <span>Rechercher</span>
     </button>
+    <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
+    <button id="btn-quick-export" class="floating-profile-btn" type="button" title="Mise en page &amp; Exportation PDF (Format Lettre)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+      <span>Export PDF</span>
+    </button>
   </div>
 
   <!-- Floating Search Panel on Map -->
@@ -850,6 +861,7 @@
     <script src="js/ndvi.js"></script>
     <script src="js/soil-ai.js"></script>
     <script src="js/wms.js"></script>
+    <script src="js/composer.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

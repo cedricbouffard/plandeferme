@@ -132,8 +132,10 @@
       style: "https://tiles.openfreemap.org/styles/liberty",
       center: initialCenter,
       zoom: initialZoom,
-      attributionControl: true
+      attributionControl: true,
+      preserveDrawingBuffer: true
     });
+    window.map = map;
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
     map.addControl(
@@ -449,6 +451,13 @@
       // Instantiate WMS Layer Manager (Info-Sols & Québec services)
       wmsManager = new WmsLayerManager(map);
       wmsManager.init();
+      window.wmsManager = wmsManager;
+
+      // Instantiate Cartographic Layout Composer & PDF Exporter
+      if (window.PlanDeFermeComposer) {
+        window.composer = new window.PlanDeFermeComposer();
+        window.composer.init(map, wmsManager);
+      }
 
       // Map click handler for transect line drawing & NDVI mode
       map.on("click", (e) => {
@@ -1801,6 +1810,21 @@
     // Agri-Réseau RAG Manager
     const ragManager = new RagManager();
     window.ragManager = ragManager;
+
+    // Cartographic Layout Composer & PDF Export triggers
+    const btnQuickExport = document.getElementById("btn-quick-export");
+    if (btnQuickExport) {
+      btnQuickExport.addEventListener("click", () => {
+        if (window.composer) window.composer.open();
+      });
+    }
+
+    const btnPanelComposer = document.getElementById("btn-panel-composer");
+    if (btnPanelComposer) {
+      btnPanelComposer.addEventListener("click", () => {
+        if (window.composer) window.composer.open();
+      });
+    }
 
     window.addEventListener("resize", () => {
       if (profileManager && profileManager.profile.length >= 2) {
