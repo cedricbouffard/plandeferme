@@ -25,7 +25,8 @@
       showScale: true,
       showLegend: true,
       showNotes: true,
-      logoUrl: null
+      logoUrl: null,
+      excludedLegendIds: []
     },
     fiche_portrait: {
       id: "fiche_portrait",
@@ -41,7 +42,8 @@
       showScale: true,
       showLegend: true,
       showNotes: true,
-      logoUrl: null
+      logoUrl: null,
+      excludedLegendIds: []
     },
     drainage_paysage: {
       id: "drainage_paysage",
@@ -57,7 +59,8 @@
       showScale: true,
       showLegend: true,
       showNotes: true,
-      logoUrl: null
+      logoUrl: null,
+      excludedLegendIds: []
     }
   };
 
@@ -66,12 +69,18 @@
       this.map = null;
       this.wmsManager = null;
       this.isOpen = false;
-      this.state = { ...DEFAULT_TEMPLATES.standard_paysage };
+      this.state = {
+        ...DEFAULT_TEMPLATES.standard_paysage,
+        excludedLegendIds: []
+      };
       this.userTemplates = {};
       this.mapSnapshotDataUrl = null;
       this.rawMapCanvas = null;
       this.croppedVisibleWidthPx = null;
       this.scaleInfo = null;
+      this.zoomMode = "fit";
+      this.currentScale = 1.0;
+      this.allDetectedLegendItems = [];
 
       this.dom = {};
       this.loadUserTemplates();
@@ -247,6 +256,18 @@
                   <span>Légende dynamique des couches actives</span>
                   <input type="checkbox" id="composer-check-legend" checked />
                 </label>
+
+                <!-- Personnalisation / Retrait d'éléments de la légende -->
+                <div id="composer-legend-customizer" class="composer-legend-customizer">
+                  <div class="composer-legend-customizer-header">
+                    <span>Éléments de la légende</span>
+                    <button type="button" id="composer-btn-reset-legend" class="composer-btn-mini-reset" title="Réafficher tous les éléments masqués">Tout afficher</button>
+                  </div>
+                  <div id="composer-legend-checklist" class="composer-legend-checklist">
+                    <!-- Rempli dynamiquement -->
+                  </div>
+                </div>
+
                 <label class="composer-checkbox-row">
                   <span>Bloc des notes de terrain</span>
                   <input type="checkbox" id="composer-check-notes" checked />
@@ -255,75 +276,94 @@
             </div>
 
             <!-- Viewport de Prévisualisation (Feuille de papier) -->
-            <div class="composer-preview-viewport">
-              <div id="composer-sheet" class="composer-sheet landscape">
-                <!-- 1. En-tête / Cartouche -->
-                <div class="sheet-cartouche">
-                  <div id="sheet-logo-container" class="sheet-logo-container" style="display: none;">
-                    <img id="sheet-logo-img" alt="Logo" />
-                  </div>
-                  <div class="sheet-cartouche-main">
-                    <h1 id="sheet-title" class="sheet-title" contenteditable="true" spellcheck="false" title="Cliquez pour éditer directement">Plan de ferme</h1>
-                    <div id="sheet-subtitle" class="sheet-subtitle" contenteditable="true" spellcheck="false" title="Cliquez pour éditer directement">Parcelles principales</div>
-                  </div>
-                  <div class="sheet-cartouche-meta">
-                    <div>Date : <strong id="sheet-meta-date">16 oct. 2026</strong></div>
-                    <div id="sheet-meta-location-row">Lieu : <strong id="sheet-meta-location">Québec</strong></div>
-                    <div id="sheet-meta-author-row" style="display: none;">Auteur : <strong id="sheet-meta-author"></strong></div>
-                  </div>
-                </div>
-
-                <!-- 2. Zone centrale : Carte + Éléments latéraux -->
-                <div class="sheet-content-row">
-                  <!-- Cadre de carte -->
-                  <div class="sheet-map-frame" id="sheet-map-frame">
-                    <img id="sheet-map-img" class="sheet-map-img" alt="Capture de la carte" />
+            <div class="composer-preview-viewport" id="composer-preview-viewport">
+              <div id="composer-sheet-scaler" class="composer-sheet-scaler">
+                <div id="composer-sheet" class="composer-sheet landscape">
+                  <!-- 1. En-tête / Cartouche -->
+                  <div class="sheet-cartouche">
+                    <div id="sheet-logo-container" class="sheet-logo-container" style="display: none;">
+                      <img id="sheet-logo-img" alt="Logo" />
+                    </div>
+                    <div class="sheet-cartouche-main">
+                      <h1 id="sheet-title" class="sheet-title" contenteditable="true" spellcheck="false" title="Cliquez pour éditer directement">Plan de ferme</h1>
+                      <div id="sheet-subtitle" class="sheet-subtitle" contenteditable="true" spellcheck="false" title="Cliquez pour éditer directement">Parcelles principales</div>
+                    </div>
+                    <div class="sheet-cartouche-meta">
+                      <div>Date : <strong id="sheet-meta-date">16 oct. 2026</strong></div>
+                      <div id="sheet-meta-location-row">Lieu : <strong id="sheet-meta-location">Québec</strong></div>
+                      <div id="sheet-meta-author-row" style="display: none;">Auteur : <strong id="sheet-meta-author"></strong></div>
+                    </div>
                   </div>
 
-                  <!-- Panneau latéral sur la feuille -->
-                  <div class="sheet-side-panel">
-                    <!-- Rose des vents & Échelle -->
-                    <div id="sheet-nav-block" class="sheet-nav-block">
-                      <div id="sheet-compass-wrap" class="sheet-compass-wrap">
-                        <!-- SVG Rose des vents injecté ici -->
-                      </div>
-                      <div id="sheet-scale-wrap" class="sheet-scale-wrap">
-                        <div class="sheet-scale-bar">
-                          <div class="sheet-scale-bar-seg"></div>
-                          <div class="sheet-scale-bar-seg"></div>
-                          <div class="sheet-scale-bar-seg"></div>
-                          <div class="sheet-scale-bar-seg"></div>
+                  <!-- 2. Zone centrale : Carte + Éléments latéraux -->
+                  <div class="sheet-content-row">
+                    <!-- Cadre de carte -->
+                    <div class="sheet-map-frame" id="sheet-map-frame">
+                      <img id="sheet-map-img" class="sheet-map-img" alt="Capture de la carte" />
+                    </div>
+
+                    <!-- Panneau latéral sur la feuille -->
+                    <div class="sheet-side-panel">
+                      <!-- Rose des vents & Échelle -->
+                      <div id="sheet-nav-block" class="sheet-nav-block">
+                        <div id="sheet-compass-wrap" class="sheet-compass-wrap">
+                          <!-- SVG Rose des vents injecté ici -->
                         </div>
-                        <div class="sheet-scale-labels">
-                          <span>0</span>
-                          <span id="sheet-scale-mid">100m</span>
-                          <span id="sheet-scale-max">200m</span>
+                        <div id="sheet-scale-wrap" class="sheet-scale-wrap">
+                          <div class="sheet-scale-bar">
+                            <div class="sheet-scale-bar-seg"></div>
+                            <div class="sheet-scale-bar-seg"></div>
+                            <div class="sheet-scale-bar-seg"></div>
+                            <div class="sheet-scale-bar-seg"></div>
+                          </div>
+                          <div class="sheet-scale-labels">
+                            <span>0</span>
+                            <span id="sheet-scale-mid">100m</span>
+                            <span id="sheet-scale-max">200m</span>
+                          </div>
+                          <div id="sheet-scale-ratio" class="sheet-scale-ratio">Échelle 1 : 5 000</div>
                         </div>
-                        <div id="sheet-scale-ratio" class="sheet-scale-ratio">Échelle 1 : 5 000</div>
                       </div>
-                    </div>
 
-                    <!-- Légende dynamique -->
-                    <div id="sheet-legend-block" class="sheet-legend-block">
-                      <div class="sheet-legend-title">Légende</div>
-                      <div id="sheet-legend-items" class="sheet-legend-items">
-                        <!-- Rempli selon les couches actives -->
+                      <!-- Légende dynamique -->
+                      <div id="sheet-legend-block" class="sheet-legend-block">
+                        <div class="sheet-legend-title">Légende</div>
+                        <div id="sheet-legend-items" class="sheet-legend-items">
+                          <!-- Rempli selon les couches actives -->
+                        </div>
                       </div>
-                    </div>
 
-                    <!-- Bloc de notes -->
-                    <div id="sheet-notes-block" class="sheet-notes-block">
-                      <div class="sheet-notes-title">Notes &amp; Interventions</div>
-                      <div id="sheet-notes-text" class="sheet-notes-text" contenteditable="true" spellcheck="false" title="Cliquez pour éditer les notes">Observations agronomiques et prévisions des travaux.</div>
+                      <!-- Bloc de notes -->
+                      <div id="sheet-notes-block" class="sheet-notes-block">
+                        <div class="sheet-notes-title">Notes &amp; Interventions</div>
+                        <div id="sheet-notes-text" class="sheet-notes-text" contenteditable="true" spellcheck="false" title="Cliquez pour éditer les notes">Observations agronomiques et prévisions des travaux.</div>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- 3. Pied de page -->
-                <div class="sheet-footer">
-                  <span>Plan de Ferme • <a href="https://plandeferme.ca" target="_blank" style="color: inherit; text-decoration: none;">plandeferme.ca</a></span>
-                  <span>Données : LiDAR HRDEM Canada 1 m, IRDA, BDPPAD</span>
+                  <!-- 3. Pied de page -->
+                  <div class="sheet-footer">
+                    <span>Plan de Ferme • <a href="https://plandeferme.ca" target="_blank" style="color: inherit; text-decoration: none;">plandeferme.ca</a></span>
+                    <span>Données : LiDAR HRDEM Canada 1 m, IRDA, BDPPAD</span>
+                  </div>
                 </div>
+              </div>
+
+              <!-- Barre d'outils de Zoom (Ajuster, 100%, + / -) -->
+              <div class="composer-zoom-toolbar">
+                <button type="button" id="composer-zoom-out" class="composer-zoom-btn" title="Zoom arrière">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <button type="button" id="composer-zoom-fit" class="composer-zoom-btn active" title="Ajuster la feuille entière à l'écran">
+                  <span>Ajuster</span>
+                </button>
+                <button type="button" id="composer-zoom-100" class="composer-zoom-btn" title="Taille réelle (100%)">
+                  <span>100%</span>
+                </button>
+                <button type="button" id="composer-zoom-in" class="composer-zoom-btn" title="Zoom avant">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <span id="composer-zoom-level" class="composer-zoom-level">100%</span>
               </div>
             </div>
           </div>
@@ -355,6 +395,20 @@
         checkScale: document.getElementById("composer-check-scale"),
         checkLegend: document.getElementById("composer-check-legend"),
         checkNotes: document.getElementById("composer-check-notes"),
+
+        // Personnalisation de la légende
+        legendCustomizer: document.getElementById("composer-legend-customizer"),
+        btnResetLegend: document.getElementById("composer-btn-reset-legend"),
+        legendChecklist: document.getElementById("composer-legend-checklist"),
+
+        // Éléments du viewport & échelle
+        previewViewport: document.getElementById("composer-preview-viewport"),
+        sheetScaler: document.getElementById("composer-sheet-scaler"),
+        zoomFit: document.getElementById("composer-zoom-fit"),
+        zoom100: document.getElementById("composer-zoom-100"),
+        zoomIn: document.getElementById("composer-zoom-in"),
+        zoomOut: document.getElementById("composer-zoom-out"),
+        zoomLevel: document.getElementById("composer-zoom-level"),
 
         // Éléments de la feuille (aperçu)
         sheet: document.getElementById("composer-sheet"),
@@ -633,15 +687,118 @@
       this.dom.checkLegend.addEventListener("change", (e) => {
         this.state.showLegend = e.target.checked;
         this.dom.sheetLegendBlock.style.display = e.target.checked ? "flex" : "none";
+        if (this.dom.legendCustomizer) {
+          this.dom.legendCustomizer.style.display = e.target.checked ? "block" : "none";
+        }
       });
+
+      if (this.dom.btnResetLegend) {
+        this.dom.btnResetLegend.addEventListener("click", () => {
+          this.resetExcludedLegendItems();
+        });
+      }
 
       this.dom.checkNotes.addEventListener("change", (e) => {
         this.state.showNotes = e.target.checked;
         this.dom.sheetNotesBlock.style.display = e.target.checked ? "flex" : "none";
       });
 
+      // Contrôles de zoom & ajustement de la prévisualisation
+      if (this.dom.zoomFit) {
+        this.dom.zoomFit.addEventListener("click", () => {
+          this.zoomMode = "fit";
+          this.fitSheetToViewport();
+          if (this.dom.previewViewport) this.dom.previewViewport.scrollTop = 0;
+        });
+      }
+
+      if (this.dom.zoom100) {
+        this.dom.zoom100.addEventListener("click", () => {
+          this.zoomMode = "100";
+          this.applyScale(1.0, false);
+          if (this.dom.previewViewport) this.dom.previewViewport.scrollTop = 0;
+        });
+      }
+
+      if (this.dom.zoomIn) {
+        this.dom.zoomIn.addEventListener("click", () => {
+          this.zoomMode = "custom";
+          this.applyScale(this.currentScale + 0.15, false);
+        });
+      }
+
+      if (this.dom.zoomOut) {
+        this.dom.zoomOut.addEventListener("click", () => {
+          this.zoomMode = "custom";
+          this.applyScale(this.currentScale - 0.15, false);
+        });
+      }
+
+      // Redimensionnement automatique si le mode "Ajuster" est actif
+      window.addEventListener("resize", () => {
+        if (this.isOpen && this.zoomMode === "fit") {
+          this.fitSheetToViewport();
+        }
+      });
+
       // Bouton de génération PDF
       this.dom.btnGeneratePdf.addEventListener("click", () => this.generatePdf());
+    }
+
+    /**
+     * Applique une échelle de zoom fluide à la feuille et adapte le conteneur scaler
+     */
+    applyScale(scale, isFit = false) {
+      this.currentScale = Math.max(0.25, Math.min(scale, 1.6));
+      if (!this.dom.sheetScaler || !this.dom.sheet) return;
+
+      const isLandscape = this.state.orientation === "landscape";
+      const sheetW = isLandscape ? 880 : 650;
+      const sheetH = isLandscape ? 680 : 840;
+
+      const scaledW = Math.round(sheetW * this.currentScale);
+      const scaledH = Math.round(sheetH * this.currentScale);
+
+      this.dom.sheetScaler.style.width = scaledW + "px";
+      this.dom.sheetScaler.style.height = scaledH + "px";
+      this.dom.sheet.style.transform = `scale(${this.currentScale})`;
+      this.dom.sheet.style.transformOrigin = "top left";
+
+      if (this.dom.zoomLevel) {
+        this.dom.zoomLevel.textContent = `${Math.round(this.currentScale * 100)}%`;
+      }
+
+      if (this.dom.zoomFit) {
+        this.dom.zoomFit.classList.toggle("active", isFit);
+      }
+      if (this.dom.zoom100) {
+        this.dom.zoom100.classList.toggle("active", !isFit && Math.abs(this.currentScale - 1.0) < 0.02);
+      }
+    }
+
+    /**
+     * Calcule l'échelle idéale pour que l'intégralité de la page (haut et bas)
+     * tienne parfaitement dans la fenêtre de prévisualisation, sans tronquer le cartouche en haut.
+     */
+    fitSheetToViewport() {
+      if (!this.dom.previewViewport || !this.isOpen) return;
+
+      const vpW = this.dom.previewViewport.clientWidth;
+      const vpH = this.dom.previewViewport.clientHeight;
+      if (vpW <= 50 || vpH <= 50) return;
+
+      // Marge de confort pour éviter tout ascenseur parasite
+      const padX = vpW <= 600 ? 16 : 48;
+      const padY = vpW <= 600 ? 16 : 48;
+      const availW = Math.max(100, vpW - padX);
+      const availH = Math.max(100, vpH - padY);
+
+      const isLandscape = this.state.orientation === "landscape";
+      const sheetW = isLandscape ? 880 : 650;
+      const sheetH = isLandscape ? 680 : 840;
+
+      const scale = Math.min(availW / sheetW, availH / sheetH, 1.0);
+      this.applyScale(scale, true);
     }
 
     updateNavBlockVisibility() {
@@ -739,6 +896,16 @@
       }
       this.updateMapSnapshotForOrientation();
       this.updateScale();
+
+      // Recalcule du cadrage pour que la feuille entière soit immédiatement visible
+      if (this.zoomMode === "fit") {
+        this.fitSheetToViewport();
+      } else {
+        this.applyScale(this.currentScale, false);
+      }
+      if (this.dom.previewViewport) {
+        this.dom.previewViewport.scrollTop = 0;
+      }
     }
 
     /**
@@ -851,87 +1018,447 @@
     }
 
     /**
-     * Détecte les couches actives et peuple la légende
+     * Détecte les couches actives et peuple la légende avec symbologie informative
+     * et gestion de l'exclusion / personnalisation des éléments.
      */
     updateActiveLegend() {
       const container = this.dom.sheetLegendItems;
+      if (!container) return;
       container.innerHTML = "";
 
       const items = [];
 
-      // Fond de carte
+      // 1. Fond de carte
       const btnSat = document.getElementById("btn-basemap-sat");
       const isSat = btnSat && btnSat.classList.contains("active");
       items.push({
-        label: isSat ? "Fond : Google Hybride (Satellite)" : "Fond : Plan OpenFreeMap",
+        id: "basemap",
+        groupId: "basemap",
+        type: "swatch",
+        label: isSat ? "Fond : Satellite (Google Hybride)" : "Fond : Plan OpenFreeMap",
         color: isSat ? "#065f46" : "#cbd5e1"
       });
 
-      // 1. Sols (Pédologie)
-      const togglePedo = document.getElementById("toggle-pedo");
-      if (togglePedo && togglePedo.checked) {
-        items.push({ label: "Sols de surface (IRDA / AAC)", color: "#a16207" });
-      }
-
-      // 2. Parcelles BDPPAD
-      const toggleParcelles = document.getElementById("toggle-parcelles");
-      if (toggleParcelles && toggleParcelles.checked) {
-        items.push({ label: "Parcelles agricoles (BDPPAD)", color: "#000000" });
-      }
-
-      // 3. Carte des pentes (%)
-      const togglePentes = document.getElementById("toggle-pentes");
-      if (togglePentes && togglePentes.checked) {
-        items.push(
-          { label: "Pentes 0 – 0,3 % (Stagnation)", color: "#0284c7" },
-          { label: "Pentes 0,3 – 1 % (Très faible)", color: "#22c55e" },
-          { label: "Pentes 1 – 3 % (Faible)", color: "#84cc16" },
-          { label: "Pentes 3 – 10 % (Modérée)", color: "#eab308" },
-          { label: "Pentes 10 – 30 % (Forte)", color: "#ea580c" },
-          { label: "Pentes > 30 % (Talus / Escarp.)", color: "#b91c1c" }
-        );
-      }
-
-      // 4. Écoulement & Dépressions
-      const toggleHydro = document.getElementById("toggle-hydro-parcelle");
-      if (toggleHydro && toggleHydro.checked) {
-        items.push(
-          { label: "Flèches de ruissellement", color: "#0284c7" },
-          { label: "Dépressions / zones plates (<0.1%)", color: "rgba(2,132,199,0.85)" }
-        );
-      }
-
-      // 5. Courbes de niveau
-      const toggleContour = document.getElementById("toggle-contour");
-      if (toggleContour && toggleContour.checked) {
-        items.push({ label: "Courbes de niveau MNT (1 m)", color: "#d97706" });
-      }
-
-      // 6. Couches WMS actives
-      if (this.wmsManager && this.wmsManager.activeLayerIds) {
-        this.wmsManager.activeLayerIds.forEach(id => {
-          const cfg = this.wmsManager.registry.get(id);
-          if (cfg) {
-            items.push({
-              label: cfg.title || id,
-              color: id.includes("eau") ? "#0284c7" : id.includes("foret") ? "#15803d" : "#64748b"
-            });
+      // 2. Topographie & Relief MNE (LiDAR 1 m)
+      const toggleTopo = document.getElementById("toggle-topo");
+      if (toggleTopo && toggleTopo.checked) {
+        const altBadge = document.getElementById("topo-alt-badge");
+        let minText = "30 m";
+        let midText = "75 m";
+        let maxText = "120 m";
+        if (altBadge && altBadge.textContent && altBadge.textContent.includes("→")) {
+          const match = altBadge.textContent.match(/([\d.,]+)\s*m[^→]+→\s*([\d.,]+)\s*m/);
+          if (match) {
+            const minVal = parseFloat(match[1].replace(",", "."));
+            const maxVal = parseFloat(match[2].replace(",", "."));
+            minText = Math.round(minVal) + " m";
+            maxText = Math.round(maxVal) + " m";
+            midText = Math.round((minVal + maxVal) / 2) + " m";
           }
+        }
+
+        items.push({
+          id: "hdr_topo",
+          groupId: "topo",
+          isHeader: true,
+          label: "Relief & Topographie (LiDAR 1 m)"
+        });
+
+        items.push({
+          id: "topo_mne",
+          groupId: "topo",
+          type: "gradient",
+          gradient: true,
+          label: "Relief altimétrique MNE",
+          minText,
+          midText,
+          maxText,
+          color: "#7c3aed"
+        });
+
+        const toggleHillshade = document.getElementById("toggle-topo-hillshade");
+        if (toggleHillshade && toggleHillshade.checked) {
+          items.push({
+            id: "topo_hillshade",
+            groupId: "topo",
+            type: "swatch",
+            label: "Ombrage 3D du relief (azimut 315°)",
+            color: "#64748b"
+          });
+        }
+      }
+
+      // 3. Courbes de niveau
+      const toggleContours = document.getElementById("toggle-contours") || document.getElementById("toggle-contour");
+      if (toggleContours && toggleContours.checked) {
+        const activePill = document.querySelector(".pills-group .pill-btn.active") || document.querySelector(".seg-btn.active");
+        const intervalText = activePill ? activePill.textContent.trim() : "1 m";
+        items.push({
+          id: "contours",
+          groupId: "topo",
+          type: "line",
+          line: true,
+          label: `Courbes de niveau MNT (${intervalText})`,
+          color: "#d97706"
         });
       }
 
-      // Rendu dans le DOM de la légende
-      items.forEach(it => {
-        const div = document.createElement("div");
-        div.className = "sheet-legend-item";
-        div.innerHTML = `
-          <span class="sheet-legend-color" style="background: ${it.color};"></span>
-          <span>${it.label}</span>
-        `;
-        container.appendChild(div);
+      // 4. Milieux humides (MELCCFP / CIC)
+      let hasWetlands = false;
+      const checkWetlandId = (id) => {
+        const s = (id || "").toLowerCase();
+        return s.includes("humide") || s.includes("wetland") || s.includes("marais") || s.includes("tourbiere");
+      };
+
+      if (this.wmsManager && this.wmsManager.activeLayerIds) {
+        hasWetlands = Array.from(this.wmsManager.activeLayerIds).some(checkWetlandId);
+      }
+      if (!hasWetlands && window.wmsManager && window.wmsManager.activeLayerIds) {
+        hasWetlands = Array.from(window.wmsManager.activeLayerIds).some(checkWetlandId);
+      }
+
+      if (hasWetlands) {
+        items.push({
+          id: "hdr_wetlands",
+          groupId: "wetlands",
+          isHeader: true,
+          label: "Milieux humides (MELCCFP / CIC)"
+        });
+        items.push({
+          id: "wetlands_marsh",
+          groupId: "wetlands",
+          type: "swatch",
+          label: "Marais (végétation herbacée)",
+          color: "#10b981"
+        });
+        items.push({
+          id: "wetlands_swamp",
+          groupId: "wetlands",
+          type: "swatch",
+          label: "Marécage (arborescent / arbustif)",
+          color: "#059669"
+        });
+        items.push({
+          id: "wetlands_peat",
+          groupId: "wetlands",
+          type: "swatch",
+          label: "Tourbière (sphaigne / dépôts)",
+          color: "#b45309"
+        });
+        items.push({
+          id: "wetlands_water",
+          groupId: "wetlands",
+          type: "swatch",
+          label: "Plan d'eau peu profond",
+          color: "#0284c7"
+        });
+      }
+
+      // 5. Indice d'humidité du sol / TWI (Topographic Wetness Index)
+      let hasTwi = false;
+      const checkTwiId = (id) => {
+        const s = (id || "").toLowerCase();
+        return s.includes("twi") || s.includes("humidite");
+      };
+      if (this.wmsManager && this.wmsManager.activeLayerIds) {
+        hasTwi = Array.from(this.wmsManager.activeLayerIds).some(checkTwiId);
+      }
+      if (!hasTwi && window.wmsManager && window.wmsManager.activeLayerIds) {
+        hasTwi = Array.from(window.wmsManager.activeLayerIds).some(checkTwiId);
+      }
+      if (hasTwi) {
+        items.push({
+          id: "hdr_twi",
+          groupId: "twi",
+          isHeader: true,
+          label: "Humidité du sol (TWI LiDAR)"
+        });
+        items.push({
+          id: "twi_high",
+          groupId: "twi",
+          type: "swatch",
+          label: "Accumulation / Bas-fond (> 9)",
+          color: "#0369a1"
+        });
+        items.push({
+          id: "twi_med",
+          groupId: "twi",
+          type: "swatch",
+          label: "Humidité modérée (6 – 9)",
+          color: "#38bdf8"
+        });
+        items.push({
+          id: "twi_low",
+          groupId: "twi",
+          type: "swatch",
+          label: "Évacuation en crête (< 6)",
+          color: "#bae6fd"
+        });
+      }
+
+      // 6. Carte des pentes (%)
+      const togglePentes = document.getElementById("toggle-pentes");
+      if (togglePentes && togglePentes.checked) {
+        items.push({
+          id: "hdr_pentes",
+          groupId: "pentes",
+          isHeader: true,
+          label: "Pentes du terrain (%)"
+        });
+        items.push(
+          { id: "pente_0", groupId: "pentes", type: "swatch", label: "0 – 0,3 % (Stagnation)", color: "#0284c7" },
+          { id: "pente_1", groupId: "pentes", type: "swatch", label: "0,3 – 1 % (Très faible)", color: "#22c55e" },
+          { id: "pente_2", groupId: "pentes", type: "swatch", label: "1 – 3 % (Faible)", color: "#84cc16" },
+          { id: "pente_3", groupId: "pentes", type: "swatch", label: "3 – 10 % (Modérée)", color: "#eab308" },
+          { id: "pente_4", groupId: "pentes", type: "swatch", label: "10 – 30 % (Forte)", color: "#ea580c" },
+          { id: "pente_5", groupId: "pentes", type: "swatch", label: "> 30 % (Talus / Escarp.)", color: "#b91c1c" }
+        );
+      }
+
+      // 7. Écoulement & Dépressions
+      const toggleHydro = document.getElementById("toggle-hydro-parcelle");
+      if (toggleHydro && toggleHydro.checked) {
+        items.push({
+          id: "hydro_arrows",
+          groupId: "hydro",
+          type: "swatch",
+          label: "Flèches de ruissellement",
+          color: "#0284c7"
+        });
+        items.push({
+          id: "hydro_depr",
+          groupId: "hydro",
+          type: "swatch",
+          label: "Dépressions / zones plates (<0,1%)",
+          color: "rgba(2,132,199,0.85)"
+        });
+      }
+
+      // 8. Hauteur de canopée (LiDAR 1 m)
+      const toggleCanopee = document.getElementById("toggle-canopee");
+      if (toggleCanopee && toggleCanopee.checked) {
+        items.push({
+          id: "hdr_canopee",
+          groupId: "canopee",
+          isHeader: true,
+          label: "Hauteur de canopée LiDAR"
+        });
+        items.push(
+          { id: "canopee_1", groupId: "canopee", type: "swatch", label: "0,5 – 5 m (Régénération)", color: "#22c55e" },
+          { id: "canopee_2", groupId: "canopee", type: "swatch", label: "5 – 12 m (Jeune peuplement)", color: "#16a34a" },
+          { id: "canopee_3", groupId: "canopee", type: "swatch", label: "12 – 20 m (Peuplement mature)", color: "#15803d" },
+          { id: "canopee_4", groupId: "canopee", type: "swatch", label: "> 20 m (Haute canopée)", color: "#064e3b" }
+        );
+      }
+
+      // 9. Sols (Pédologie)
+      const togglePedo = document.getElementById("toggle-pedo");
+      if (togglePedo && togglePedo.checked) {
+        items.push({
+          id: "pedo",
+          groupId: "pedo",
+          type: "swatch",
+          label: "Séries de sols de surface (IRDA)",
+          color: "#a16207"
+        });
+      }
+
+      // 10. Parcelles BDPPAD
+      const toggleParcelles = document.getElementById("toggle-parcelles");
+      if (toggleParcelles && toggleParcelles.checked) {
+        items.push({
+          id: "parcelles",
+          groupId: "parcelles",
+          type: "swatch",
+          label: "Parcelles agricoles (BDPPAD)",
+          color: "#000000"
+        });
+      }
+
+      // 11. Cadastre du Québec (Lots rénovés)
+      const isCadastreActive = (this.wmsManager && this.wmsManager.isCadastreActive) || (window.wmsManager && window.wmsManager.isCadastreActive);
+      if (isCadastreActive) {
+        items.push({
+          id: "cadastre_quebec",
+          groupId: "cadastre",
+          type: "line",
+          line: true,
+          label: "Cadastre du Québec (Lots rénovés)",
+          color: "#9333ea"
+        });
+      }
+
+      // 12. Autres couches WMS actives
+      const activeWmsIds = (this.wmsManager && this.wmsManager.activeLayerIds) || (window.wmsManager && window.wmsManager.activeLayerIds) || [];
+      activeWmsIds.forEach(id => {
+        if (id === "cadastre_quebec" || checkWetlandId(id) || checkTwiId(id)) return;
+        const cfg = (this.wmsManager && this.wmsManager.registry && this.wmsManager.registry.get(id))
+          || (window.wmsManager && window.wmsManager.registry && window.wmsManager.registry.get(id))
+          || null;
+        items.push({
+          id: "wms_" + id,
+          groupId: "wms",
+          type: "swatch",
+          label: (cfg && (cfg.name || cfg.title)) || id,
+          color: id.includes("eau") ? "#0284c7" : id.includes("foret") ? "#15803d" : "#64748b"
+        });
       });
 
-      this.currentLegendItems = items;
+      this.allDetectedLegendItems = items;
+
+      // Filtrage des éléments exclus par l'utilisateur
+      const excluded = new Set(this.state.excludedLegendIds || []);
+      const visibleNonHeaders = items.filter(it => !it.isHeader && !excluded.has(it.id));
+      const visibleGroupIds = new Set(visibleNonHeaders.map(it => it.groupId));
+
+      // Les en-têtes ne sont conservés que si leur groupe a au moins un élément visible
+      const visibleItems = items.filter(it => {
+        if (excluded.has(it.id)) return false;
+        if (it.isHeader) {
+          return visibleGroupIds.has(it.groupId);
+        }
+        return true;
+      });
+
+      this.currentLegendItems = visibleItems;
+
+      // Rendu dans le DOM de la feuille (WYSIWYG)
+      if (visibleItems.length === 0) {
+        container.innerHTML = `<div style="font-size:7.5px; color:#94a3b8; font-style:italic; padding:4px 0;">Aucun élément affiché</div>`;
+      } else {
+        visibleItems.forEach(it => {
+          if (it.isHeader) {
+            const hdr = document.createElement("div");
+            hdr.className = "sheet-legend-group-header";
+            hdr.textContent = it.label;
+            container.appendChild(hdr);
+            return;
+          }
+
+          const div = document.createElement("div");
+          div.className = "sheet-legend-item";
+          div.dataset.id = it.id;
+
+          let leftHtml = "";
+          if (it.type === "gradient" || it.gradient) {
+            leftHtml = `
+              <div class="sheet-legend-gradient-block">
+                <div style="font-weight:600; font-size:7.5px; color:#1e293b;">${it.label}</div>
+                <div class="sheet-legend-gradient-bar"></div>
+                <div class="sheet-legend-gradient-labels">
+                  <span>${it.minText || "Bas"}</span>
+                  <span>${it.midText || "Moyen"}</span>
+                  <span>${it.maxText || "Haut"}</span>
+                </div>
+              </div>
+            `;
+          } else if (it.type === "line" || it.line) {
+            leftHtml = `
+              <div class="sheet-legend-item-left">
+                <span class="sheet-legend-line" style="background: ${it.color};"></span>
+                <span>${it.label}</span>
+              </div>
+            `;
+          } else {
+            leftHtml = `
+              <div class="sheet-legend-item-left">
+                <span class="sheet-legend-color" style="background: ${it.color};"></span>
+                <span>${it.label}</span>
+              </div>
+            `;
+          }
+
+          div.innerHTML = `
+            ${leftHtml}
+            <button type="button" class="sheet-legend-remove-btn" title="Masquer cet élément de la légende">&times;</button>
+          `;
+
+          const removeBtn = div.querySelector(".sheet-legend-remove-btn");
+          if (removeBtn) {
+            removeBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              this.excludeLegendItem(it.id);
+            });
+          }
+
+          container.appendChild(div);
+        });
+      }
+
+      // Synchronisation de la liste à cocher dans le panneau latéral
+      this.renderLegendChecklist();
+    }
+
+    /**
+     * Rendu de la liste à cocher des éléments de légende dans la barre latérale
+     */
+    renderLegendChecklist() {
+      const checklist = this.dom.legendChecklist;
+      if (!checklist) return;
+      checklist.innerHTML = "";
+
+      const nonHeaders = (this.allDetectedLegendItems || []).filter(it => !it.isHeader);
+      if (nonHeaders.length === 0) {
+        checklist.innerHTML = `<span style="font-size:10.5px; color:#94a3b8; font-style:italic;">Aucune couche active détectée</span>`;
+        return;
+      }
+
+      const excluded = new Set(this.state.excludedLegendIds || []);
+
+      nonHeaders.forEach(it => {
+        const labelEl = document.createElement("label");
+        labelEl.className = "composer-legend-check-item";
+
+        const isChecked = !excluded.has(it.id);
+        const swatchStyle = (it.type === "gradient" || it.gradient)
+          ? "background: linear-gradient(to right, #7c3aed, #0284c7, #22c55e, #eab308, #dc2626);"
+          : `background: ${it.color || "#64748b"};`;
+
+        labelEl.innerHTML = `
+          <input type="checkbox" data-id="${it.id}" ${isChecked ? "checked" : ""} />
+          <span class="composer-legend-check-swatch" style="${swatchStyle}"></span>
+          <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${it.label}">${it.label}</span>
+        `;
+
+        const cb = labelEl.querySelector("input");
+        cb.addEventListener("change", (e) => {
+          if (e.target.checked) {
+            this.includeLegendItem(it.id);
+          } else {
+            this.excludeLegendItem(it.id);
+          }
+        });
+
+        checklist.appendChild(labelEl);
+      });
+    }
+
+    /**
+     * Exclure un élément de la légende
+     */
+    excludeLegendItem(id) {
+      if (!this.state.excludedLegendIds) this.state.excludedLegendIds = [];
+      if (!this.state.excludedLegendIds.includes(id)) {
+        this.state.excludedLegendIds.push(id);
+        this.updateActiveLegend();
+      }
+    }
+
+    /**
+     * Réinclure un élément dans la légende
+     */
+    includeLegendItem(id) {
+      if (!this.state.excludedLegendIds) return;
+      this.state.excludedLegendIds = this.state.excludedLegendIds.filter(x => x !== id);
+      this.updateActiveLegend();
+    }
+
+    /**
+     * Réafficher tous les éléments masqués
+     */
+    resetExcludedLegendItems() {
+      this.state.excludedLegendIds = [];
+      this.updateActiveLegend();
     }
 
     /**
@@ -968,6 +1495,23 @@
       // 4. Affichage
       this.dom.overlay.classList.add("active");
       this.isOpen = true;
+
+      // Toujours démarrer le défilement tout en haut pour que l'en-tête soit visible
+      if (this.dom.previewViewport) {
+        this.dom.previewViewport.scrollTop = 0;
+      }
+
+      // Ajustement dynamique de l'échelle à la taille exacte du viewport
+      setTimeout(() => {
+        if (this.zoomMode === "fit") {
+          this.fitSheetToViewport();
+        } else {
+          this.applyScale(this.currentScale, false);
+        }
+        if (this.dom.previewViewport) {
+          this.dom.previewViewport.scrollTop = 0;
+        }
+      }, 40);
     }
 
     /**
@@ -1008,6 +1552,9 @@
         const pageW = doc.internal.pageSize.getWidth();
         const pageH = doc.internal.pageSize.getHeight();
         const margin = 10;
+
+        // Synchronisation des couches actives et de la légende
+        this.updateActiveLegend();
 
         // 1. Fond blanc
         doc.setFillColor(255, 255, 255);
@@ -1149,7 +1696,18 @@
 
           // Légende
           if (this.state.showLegend && this.currentLegendItems && this.currentLegendItems.length > 0) {
-            const legendH = Math.min(68, this.currentLegendItems.length * 4.5 + 8);
+            let neededContentH = 9;
+            for (const it of this.currentLegendItems) {
+              if (it.isHeader) neededContentH += 4.2;
+              else if (it.type === "gradient" || it.gradient) neededContentH += 8.5;
+              else neededContentH += 3.6;
+            }
+
+            const maxAvailableH = (mapTopY + mapH) - currentSideY;
+            const reservedNotesH = (this.state.showNotes && this.state.notes) ? 26 : 0;
+            const maxLegendH = Math.max(25, maxAvailableH - reservedNotesH);
+            const legendH = Math.min(neededContentH, maxLegendH);
+
             doc.setDrawColor(203, 213, 225);
             doc.setLineWidth(0.3);
             doc.setFillColor(255, 255, 255);
@@ -1158,22 +1716,15 @@
             doc.setFont("helvetica", "bold");
             doc.setFontSize(7.5);
             doc.setTextColor(15, 23, 42);
-            doc.text("LÉGENDE", sideX + 3, currentSideY + 5);
+            doc.text("LÉGENDE", sideX + 3.5, currentSideY + 5);
 
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(6.5);
-            doc.setTextColor(51, 65, 85);
-
-            let legY = currentSideY + 8.5;
-            this.currentLegendItems.slice(0, 12).forEach(it => {
-              // Pastille de couleur
-              doc.setFillColor(it.color.startsWith("#") ? it.color : "#0284c7");
-              doc.setDrawColor(180, 180, 180);
-              doc.rect(sideX + 3, legY - 2.2, 2.5, 2.5, "FD");
-
-              const truncated = it.label.length > 32 ? it.label.substring(0, 30) + "..." : it.label;
-              doc.text(truncated, sideX + 7, legY);
-              legY += 4.5;
+            this.drawPdfLegend(doc, {
+              x: sideX,
+              y: currentSideY,
+              w: sideW,
+              maxH: legendH,
+              items: this.currentLegendItems,
+              twoColumns: false
             });
 
             currentSideY += legendH + 3;
@@ -1258,27 +1809,29 @@
           const col2X = headerX + col1W + 3;
           const col2W = 72;
           doc.setDrawColor(203, 213, 225);
-          doc.rect(col2X, bottomY, col2W, bottomH);
+          doc.setLineWidth(0.3);
+          doc.setFillColor(255, 255, 255);
+          doc.rect(col2X, bottomY, col2W, bottomH, "FD");
 
           doc.setFont("helvetica", "bold");
           doc.setFontSize(7.5);
           doc.setTextColor(15, 23, 42);
-          doc.text("LÉGENDE", col2X + 3, bottomY + 5);
+          doc.text("LÉGENDE", col2X + 3.5, bottomY + 5);
 
-          if (this.currentLegendItems) {
-            let legY = bottomY + 9;
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(6.5);
-            doc.setTextColor(51, 65, 85);
-
-            this.currentLegendItems.slice(0, 10).forEach(it => {
-              doc.setFillColor(it.color.startsWith("#") ? it.color : "#0284c7");
-              doc.setDrawColor(180, 180, 180);
-              doc.rect(col2X + 3, legY - 2.2, 2.5, 2.5, "FD");
-              const truncated = it.label.length > 34 ? it.label.substring(0, 32) + "..." : it.label;
-              doc.text(truncated, col2X + 7, legY);
-              legY += 4.2;
+          if (this.state.showLegend && this.currentLegendItems && this.currentLegendItems.length > 0) {
+            this.drawPdfLegend(doc, {
+              x: col2X,
+              y: bottomY,
+              w: col2W,
+              maxH: bottomH,
+              items: this.currentLegendItems,
+              twoColumns: false
             });
+          } else {
+            doc.setFont("helvetica", "italic");
+            doc.setFontSize(6.5);
+            doc.setTextColor(148, 163, 184);
+            doc.text("Aucun élément affiché", col2X + 3.5, bottomY + 12);
           }
 
           // Colonne 3 : Notes (reste de la largeur)
@@ -1382,6 +1935,279 @@
       doc.setFontSize(7);
       doc.setTextColor(15, 23, 42);
       doc.text("N", labelNx, labelNy + 1, { align: "center" });
+    }
+
+    /**
+     * Analyse une chaîne de couleur (hex, rgb, rgba) en triplet [r, g, b] compatible jsPDF.
+     */
+    parseRgbColor(str) {
+      if (!str) return [100, 116, 139];
+      if (Array.isArray(str)) return str;
+      str = String(str).trim();
+      if (str.startsWith("#")) {
+        const hex = str.replace("#", "");
+        if (hex.length === 3) {
+          return [
+            parseInt(hex[0] + hex[0], 16),
+            parseInt(hex[1] + hex[1], 16),
+            parseInt(hex[2] + hex[2], 16)
+          ];
+        }
+        return [
+          parseInt(hex.substring(0, 2), 16) || 0,
+          parseInt(hex.substring(2, 4), 16) || 0,
+          parseInt(hex.substring(4, 6), 16) || 0
+        ];
+      }
+      const matchRgb = str.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (matchRgb) {
+        return [parseInt(matchRgb[1], 10), parseInt(matchRgb[2], 10), parseInt(matchRgb[3], 10)];
+      }
+      return [100, 116, 139];
+    }
+
+    /**
+     * Tronque un texte pour qu'il tienne dans une largeur max en millimètres.
+     */
+    truncateText(doc, text, maxW) {
+      if (!text) return "";
+      try {
+        if (doc.getTextWidth && doc.getTextWidth(text) <= maxW) return text;
+        let t = text;
+        while (t.length > 3 && doc.getTextWidth && doc.getTextWidth(t + "...") > maxW) {
+          t = t.substring(0, t.length - 1);
+        }
+        return t + "...";
+      } catch (e) {
+        const approx = Math.max(8, Math.floor(maxW / 1.35));
+        return text.length > approx ? text.substring(0, approx - 2) + "..." : text;
+      }
+    }
+
+    /**
+     * Rendu vectoriel complet et adaptatif de la légende dans jsPDF.
+     */
+    drawPdfLegend(doc, { x, y, w, maxH, items, twoColumns = false }) {
+      if (!items || items.length === 0) return;
+
+      // Calcul de la hauteur totale requise sur 1 colonne
+      let totalNeededH = 0;
+      for (const it of items) {
+        if (it.isHeader) totalNeededH += 4.2;
+        else if (it.type === "gradient" || it.gradient) totalNeededH += 8.5;
+        else totalNeededH += 3.6;
+      }
+
+      // Si le mode deux colonnes est demandé ou si la hauteur dépasse maxH
+      const useTwoCols = twoColumns || (w >= 68 && totalNeededH > (maxH - 10));
+
+      const maxY = y + maxH - 2.5;
+
+      if (!useTwoCols) {
+        // --- Disposition sur une seule colonne ---
+        let curY = y + 8.5;
+        for (const it of items) {
+          const itemH = it.isHeader ? 4.2 : (it.type === "gradient" || it.gradient) ? 8.5 : 3.6;
+          if (curY + itemH > maxY) {
+            doc.setFont("helvetica", "italic");
+            doc.setFontSize(5.5);
+            doc.setTextColor(148, 163, 184);
+            doc.text("...", x + 4, curY + 2);
+            break;
+          }
+
+          if (it.isHeader) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(5.8);
+            doc.setTextColor(71, 85, 105);
+            const truncated = this.truncateText(doc, it.label.toUpperCase(), w - 7);
+            doc.text(truncated, x + 3.5, curY + 2.5);
+            curY += itemH;
+          } else if (it.type === "gradient" || it.gradient) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(6.2);
+            doc.setTextColor(30, 41, 59);
+            const truncated = this.truncateText(doc, it.label, w - 7);
+            doc.text(truncated, x + 3.5, curY + 1.8);
+
+            const barX = x + 3.5;
+            const barW = w - 7;
+            const barY = curY + 2.8;
+            const barH = 2.2;
+            const segW = barW / 5;
+
+            const gradColors = [
+              [124, 58, 237], // Mauve
+              [2, 132, 199],  // Bleu
+              [34, 197, 94],  // Vert
+              [234, 179, 8],  // Jaune
+              [220, 38, 38]   // Rouge
+            ];
+            for (let c = 0; c < 5; c++) {
+              doc.setFillColor(gradColors[c][0], gradColors[c][1], gradColors[c][2]);
+              doc.rect(barX + segW * c, barY, segW, barH, "F");
+            }
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.15);
+            doc.rect(barX, barY, barW, barH, "S");
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(5.2);
+            doc.setTextColor(100, 116, 139);
+            doc.text(it.minText || "Bas", barX, barY + barH + 2.4);
+            doc.text(it.midText || "Moyen", barX + barW / 2, barY + barH + 2.4, { align: "center" });
+            doc.text(it.maxText || "Haut", barX + barW, barY + barH + 2.4, { align: "right" });
+
+            curY += itemH;
+          } else if (it.type === "line" || it.line) {
+            const [r, g, b] = this.parseRgbColor(it.color);
+            doc.setDrawColor(r, g, b);
+            doc.setLineWidth(0.8);
+            doc.line(x + 3.5, curY + 1.2, x + 7.5, curY + 1.2);
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(6.2);
+            doc.setTextColor(51, 65, 85);
+            const truncated = this.truncateText(doc, it.label, w - 12);
+            doc.text(truncated, x + 9, curY + 2);
+            curY += itemH;
+          } else {
+            const [r, g, b] = this.parseRgbColor(it.color);
+            doc.setFillColor(r, g, b);
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.15);
+            doc.rect(x + 3.5, curY, 2.5, 2.5, "FD");
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(6.2);
+            doc.setTextColor(51, 65, 85);
+            const truncated = this.truncateText(doc, it.label, w - 10);
+            doc.text(truncated, x + 7.5, curY + 2);
+            curY += itemH;
+          }
+        }
+      } else {
+        // --- Disposition sur deux sous-colonnes adaptatives ---
+        const subW = (w - 6) / 2;
+        let col = 0;
+        let col1Y = y + 8.5;
+        let col2Y = y + 8.5;
+
+        for (const it of items) {
+          // Dégradé en pleine largeur si au début
+          if ((it.type === "gradient" || it.gradient) && col1Y === y + 8.5 && col2Y === y + 8.5) {
+            const itemH = 8.5;
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(6.2);
+            doc.setTextColor(30, 41, 59);
+            const truncated = this.truncateText(doc, it.label, w - 7);
+            doc.text(truncated, x + 3.5, col1Y + 1.8);
+
+            const barX = x + 3.5;
+            const barW = w - 7;
+            const barY = col1Y + 2.8;
+            const barH = 2.2;
+            const segW = barW / 5;
+
+            const gradColors = [
+              [124, 58, 237], [2, 132, 199], [34, 197, 94], [234, 179, 8], [220, 38, 38]
+            ];
+            for (let c = 0; c < 5; c++) {
+              doc.setFillColor(gradColors[c][0], gradColors[c][1], gradColors[c][2]);
+              doc.rect(barX + segW * c, barY, segW, barH, "F");
+            }
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.15);
+            doc.rect(barX, barY, barW, barH, "S");
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(5.2);
+            doc.setTextColor(100, 116, 139);
+            doc.text(it.minText || "Bas", barX, barY + barH + 2.4);
+            doc.text(it.midText || "Moyen", barX + barW / 2, barY + barH + 2.4, { align: "center" });
+            doc.text(it.maxText || "Haut", barX + barW, barY + barH + 2.4, { align: "right" });
+
+            col1Y += itemH;
+            col2Y += itemH;
+            continue;
+          }
+
+          const itemH = it.isHeader ? 4.2 : (it.type === "gradient" || it.gradient) ? 8.5 : 3.6;
+
+          let activeX = x + 2;
+          let activeY = col1Y;
+          if (col === 0) {
+            if (col1Y + itemH > maxY) {
+              col = 1;
+              activeX = x + subW + 4;
+              activeY = col2Y;
+            }
+          } else {
+            activeX = x + subW + 4;
+            activeY = col2Y;
+          }
+
+          if (activeY + itemH > maxY) {
+            continue;
+          }
+
+          if (it.isHeader) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(5.5);
+            doc.setTextColor(71, 85, 105);
+            const truncated = this.truncateText(doc, it.label.toUpperCase(), subW - 3);
+            doc.text(truncated, activeX, activeY + 2.5);
+          } else if (it.type === "gradient" || it.gradient) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(5.8);
+            doc.setTextColor(30, 41, 59);
+            const truncated = this.truncateText(doc, it.label, subW - 3);
+            doc.text(truncated, activeX, activeY + 1.8);
+
+            const barX = activeX;
+            const barW = subW - 3;
+            const barY = activeY + 2.8;
+            const barH = 2.0;
+            const segW = barW / 5;
+            const gradColors = [
+              [124, 58, 237], [2, 132, 199], [34, 197, 94], [234, 179, 8], [220, 38, 38]
+            ];
+            for (let c = 0; c < 5; c++) {
+              doc.setFillColor(gradColors[c][0], gradColors[c][1], gradColors[c][2]);
+              doc.rect(barX + segW * c, barY, segW, barH, "F");
+            }
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.15);
+            doc.rect(barX, barY, barW, barH, "S");
+          } else if (it.type === "line" || it.line) {
+            const [r, g, b] = this.parseRgbColor(it.color);
+            doc.setDrawColor(r, g, b);
+            doc.setLineWidth(0.8);
+            doc.line(activeX, activeY + 1.2, activeX + 4.5, activeY + 1.2);
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(5.8);
+            doc.setTextColor(51, 65, 85);
+            const truncated = this.truncateText(doc, it.label, subW - 7);
+            doc.text(truncated, activeX + 5.5, activeY + 2);
+          } else {
+            const [r, g, b] = this.parseRgbColor(it.color);
+            doc.setFillColor(r, g, b);
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.15);
+            doc.rect(activeX, activeY, 2.3, 2.3, "FD");
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(5.8);
+            doc.setTextColor(51, 65, 85);
+            const truncated = this.truncateText(doc, it.label, subW - 5.5);
+            doc.text(truncated, activeX + 3.8, activeY + 2);
+          }
+
+          if (col === 0) col1Y += itemH;
+          else col2Y += itemH;
+        }
+      }
     }
   }
 

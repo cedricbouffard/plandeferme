@@ -1562,9 +1562,14 @@
       const mobileProfileBtn = document.getElementById("mobile-btn-profile");
       const mobileProfileLabel = document.getElementById("mobile-profile-label");
       const mobileDrawingActions = document.getElementById("mobile-drawing-actions");
+      const mobileBtnTools = document.getElementById("mobile-btn-tools");
+      const mobileToolProfileBadge = document.getElementById("mobile-tool-profile-badge");
+
       if (mobileProfileBtn) mobileProfileBtn.classList.add("active-blue");
       if (mobileProfileLabel) mobileProfileLabel.textContent = "Annuler";
       if (mobileDrawingActions) mobileDrawingActions.classList.add("visible");
+      if (mobileBtnTools) mobileBtnTools.classList.add("active-blue");
+      if (mobileToolProfileBadge) mobileToolProfileBadge.style.display = "inline-block";
 
       map.getCanvas().style.cursor = "crosshair";
       updateToolbarButtons();
@@ -1582,11 +1587,20 @@
       const mobileProfileBtn = document.getElementById("mobile-btn-profile");
       const mobileProfileLabel = document.getElementById("mobile-profile-label");
       const mobileDrawingActions = document.getElementById("mobile-drawing-actions");
+      const mobileBtnTools = document.getElementById("mobile-btn-tools");
+      const mobileToolProfileBadge = document.getElementById("mobile-tool-profile-badge");
+
       if (mobileProfileBtn) mobileProfileBtn.classList.remove("active-blue");
       if (mobileProfileLabel) {
         mobileProfileLabel.textContent = profileManager.line.length >= 2 ? "Retracer" : "Coupe MNT";
       }
       if (mobileDrawingActions) mobileDrawingActions.classList.remove("visible");
+      if (mobileBtnTools) {
+        mobileBtnTools.classList.remove("active-blue");
+        const isNdviActive = ndviManager && ndviManager.isActiveMode;
+        mobileBtnTools.classList.toggle("active", isNdviActive);
+      }
+      if (mobileToolProfileBadge) mobileToolProfileBadge.style.display = "none";
 
       map.getCanvas().style.cursor = "";
       updateToolbarButtons();
@@ -2000,19 +2014,61 @@
       });
     }
 
-    // Mobile Bottom Navigation Bar & Action Listeners
+    // Mobile Bottom Navigation Bar & Tools Action Sheet
     const mobileBtnLayers = document.getElementById("mobile-btn-layers");
-    const mobileBtnNdvi = document.getElementById("mobile-btn-ndvi");
-    const mobileBtnProfile = document.getElementById("mobile-btn-profile");
+    const mobileBtnTools = document.getElementById("mobile-btn-tools");
     const mobileBtnSearch = document.getElementById("mobile-btn-search");
     const mobileBtnLocate = document.getElementById("mobile-btn-locate");
+
+    const mobileToolsSheet = document.getElementById("mobile-tools-sheet");
+    const mobileToolsBackdrop = document.getElementById("mobile-tools-backdrop");
+    const mobileToolsClose = document.getElementById("mobile-tools-close");
+
+    const mobileToolNdvi = document.getElementById("mobile-tool-ndvi");
+    const mobileToolProfile = document.getElementById("mobile-tool-profile");
+    const mobileToolRag = document.getElementById("mobile-tool-rag");
+    const mobileToolComposer = document.getElementById("mobile-tool-composer");
+
+    const mobileToolNdviBadge = document.getElementById("mobile-tool-ndvi-badge");
+    const mobileToolProfileBadge = document.getElementById("mobile-tool-profile-badge");
 
     const mobileActCancel = document.getElementById("mobile-act-cancel");
     const mobileActCalc = document.getElementById("mobile-act-calc");
     const mobileActClear = document.getElementById("mobile-act-clear");
 
+    function openMobileToolsSheet() {
+      if (!mobileToolsSheet) return;
+      if (panelTools && panelTools.classList.contains("open")) {
+        closeMobileTools();
+      }
+      mobileToolsSheet.classList.add("open");
+      mobileToolsSheet.setAttribute("aria-hidden", "false");
+      if (mobileToolsBackdrop) mobileToolsBackdrop.classList.add("active");
+      if (mobileBtnTools) mobileBtnTools.classList.add("active");
+
+      // Synchronisation de l'état des badges
+      if (mobileToolNdviBadge && ndviManager) {
+        mobileToolNdviBadge.style.display = ndviManager.isActiveMode ? "inline-block" : "none";
+      }
+      if (mobileToolProfileBadge && profileManager) {
+        mobileToolProfileBadge.style.display = profileManager.isDrawing ? "inline-block" : "none";
+      }
+    }
+
+    function closeMobileToolsSheet() {
+      if (!mobileToolsSheet) return;
+      mobileToolsSheet.classList.remove("open");
+      mobileToolsSheet.setAttribute("aria-hidden", "true");
+      if (mobileToolsBackdrop) mobileToolsBackdrop.classList.remove("active");
+      if (mobileBtnTools) {
+        const isToolActive = (ndviManager && ndviManager.isActiveMode) || (profileManager && profileManager.isDrawing);
+        mobileBtnTools.classList.toggle("active", isToolActive);
+      }
+    }
+
     if (mobileBtnLayers) {
       mobileBtnLayers.addEventListener("click", () => {
+        closeMobileToolsSheet();
         if (panelTools && panelTools.classList.contains("open")) {
           closeMobileTools();
         } else {
@@ -2021,18 +2077,58 @@
       });
     }
 
-    if (mobileBtnNdvi) {
-      mobileBtnNdvi.addEventListener("click", () => {
+    if (mobileBtnTools) {
+      mobileBtnTools.addEventListener("click", () => {
+        if (mobileToolsSheet && mobileToolsSheet.classList.contains("open")) {
+          closeMobileToolsSheet();
+        } else {
+          openMobileToolsSheet();
+        }
+      });
+    }
+
+    if (mobileToolsClose) {
+      mobileToolsClose.addEventListener("click", closeMobileToolsSheet);
+    }
+    if (mobileToolsBackdrop) {
+      mobileToolsBackdrop.addEventListener("click", closeMobileToolsSheet);
+    }
+
+    // 1. NDVI (Sentinel-2)
+    if (mobileToolNdvi) {
+      mobileToolNdvi.addEventListener("click", () => {
+        closeMobileToolsSheet();
         if (ndviManager) ndviManager.toggleMode();
       });
     }
 
-    if (mobileBtnProfile) {
-      mobileBtnProfile.addEventListener("click", toggleDrawing);
+    // 2. Coupe Topographique (MNT)
+    if (mobileToolProfile) {
+      mobileToolProfile.addEventListener("click", () => {
+        closeMobileToolsSheet();
+        toggleDrawing();
+      });
+    }
+
+    // 3. Conseiller Agri-Réseau
+    if (mobileToolRag) {
+      mobileToolRag.addEventListener("click", () => {
+        closeMobileToolsSheet();
+        if (window.ragManager) window.ragManager.open();
+      });
+    }
+
+    // 4. Impression & Mise en page PDF
+    if (mobileToolComposer) {
+      mobileToolComposer.addEventListener("click", () => {
+        closeMobileToolsSheet();
+        if (window.composer) window.composer.open();
+      });
     }
 
     if (mobileBtnSearch) {
       mobileBtnSearch.addEventListener("click", () => {
+        closeMobileToolsSheet();
         toggleSearchPanel();
       });
     }

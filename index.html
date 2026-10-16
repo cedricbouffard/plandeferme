@@ -783,6 +783,67 @@
     </button>
   </div>
 
+  <!-- Backdrop pour la feuille d'outils mobile -->
+  <div id="mobile-tools-backdrop" class="mobile-tools-backdrop" aria-hidden="true"></div>
+
+  <!-- Feuille d'actions / Menu Outils sur mobile -->
+  <div id="mobile-tools-sheet" class="mobile-tools-sheet" role="dialog" aria-label="Boîte à outils" aria-hidden="true">
+    <div class="mobile-tools-header">
+      <div class="mobile-tools-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+        <span>Boîte à outils</span>
+      </div>
+      <button id="mobile-tools-close" class="mobile-tools-close-btn" type="button" aria-label="Fermer les outils">&times;</button>
+    </div>
+    <div class="mobile-tools-grid">
+      <!-- 1. NDVI (Sentinel-2) -->
+      <button type="button" id="mobile-tool-ndvi" class="mobile-tool-card">
+        <div class="mobile-tool-icon ndvi-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>
+        </div>
+        <div class="mobile-tool-info">
+          <div class="mobile-tool-name">NDVI Sentinel-2</div>
+          <div class="mobile-tool-desc">Santé &amp; vigueur de la végétation</div>
+        </div>
+        <span id="mobile-tool-ndvi-badge" class="mobile-tool-badge" style="display: none;">Actif</span>
+      </button>
+
+      <!-- 2. Coupe Topographique (MNT) -->
+      <button type="button" id="mobile-tool-profile" class="mobile-tool-card">
+        <div class="mobile-tool-icon profile-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+        </div>
+        <div class="mobile-tool-info">
+          <div class="mobile-tool-name">Coupe Topographique (MNT)</div>
+          <div class="mobile-tool-desc">Profil altimétrique LiDAR &amp; pentes</div>
+        </div>
+        <span id="mobile-tool-profile-badge" class="mobile-tool-badge" style="display: none;">En tracé</span>
+      </button>
+
+      <!-- 3. Conseiller Agri-Réseau -->
+      <button type="button" id="mobile-tool-rag" class="mobile-tool-card">
+        <div class="mobile-tool-icon rag-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+        </div>
+        <div class="mobile-tool-info">
+          <div class="mobile-tool-name">Conseiller Agri-Réseau</div>
+          <div class="mobile-tool-desc">Guides, fiches techniques &amp; régie des sols</div>
+        </div>
+      </button>
+
+      <!-- 4. Impression & Mise en page PDF -->
+      <button type="button" id="mobile-tool-composer" class="mobile-tool-card">
+        <div class="mobile-tool-icon composer-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+        </div>
+        <div class="mobile-tool-info">
+          <div class="mobile-tool-name">Mise en page &amp; PDF</div>
+          <div class="mobile-tool-desc">Export cartographique format Lettre</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
   <!-- Mobile Bottom Navigation Bar -->
   <nav id="mobile-bottom-bar" class="mobile-bottom-bar" aria-label="Navigation cartographique mobile">
     <button id="mobile-btn-layers" class="mobile-nav-item" type="button">
@@ -793,26 +854,11 @@
       </svg>
       <span>Couches</span>
     </button>
-    <button id="mobile-btn-ndvi" class="mobile-nav-item" type="button">
+    <button id="mobile-btn-tools" class="mobile-nav-item" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Menu des outils">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path>
-        <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path>
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
       </svg>
-      <span>NDVI</span>
-    </button>
-    <button id="mobile-btn-rag" class="mobile-nav-item" type="button">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-      </svg>
-      <span>Agri-Réseau</span>
-    </button>
-    <button id="mobile-btn-profile" class="mobile-nav-item" type="button">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 20h9"></path>
-        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-      </svg>
-      <span id="mobile-profile-label">Coupe MNT</span>
+      <span>Outils</span>
     </button>
     <button id="mobile-btn-search" class="mobile-nav-item" type="button">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

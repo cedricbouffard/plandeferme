@@ -133,6 +133,14 @@
         if (mobileNdviBtn) {
           mobileNdviBtn.classList.toggle("active", active);
         }
+        const mobileBtnTools = document.getElementById("mobile-btn-tools");
+        if (mobileBtnTools) {
+          mobileBtnTools.classList.toggle("active", active);
+        }
+        const mobileToolNdviBadge = document.getElementById("mobile-tool-ndvi-badge");
+        if (mobileToolNdviBadge) {
+          mobileToolNdviBadge.style.display = active ? "inline-block" : "none";
+        }
         if (active) {
           if (profileManager && profileManager.isDrawing) {
             profileManager.stopDrawing();
