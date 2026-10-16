@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Catalogue WMS / Géomatique Plan de Ferme",
+  "description": "Schéma de configuration des dossiers et couches WMS / ArcGIS / XYZ pour Plan de Ferme",
+  "type": "object",
+  "required": ["categories", "layers"],
+  "properties": {
+    "categories": {
+      "type": "array",
+      "description": "Liste des dossiers/groupes accordéons dans la barre latérale",
+      "items": {
+        "type": "object",
+        "required": ["id", "title"],
+        "properties": {
+          "id": { "type": "string", "description": "Identifiant unique du dossier (ex: foncier, eau, foret, imagerie)" },
+          "title": { "type": "string", "description": "Nom affiché du dossier" },
+          "icon": { "type": "string", "description": "Code SVG ou mot-clé d'icône" },
+          "defaultOpen": { "type": "boolean", "default": false, "description": "Ouvrir ce dossier par défaut au chargement" }
+        }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "description": "Liste des couches géomatiques disponibles",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "url"],
+        "properties": {
+          "id": { "type": "string", "description": "Identifiant unique de la couche" },
+          "category": { "type": "string", "description": "ID du dossier parent (foncier, eau, foret, imagerie, custom)" },
+          "name": { "type": "string", "description": "Titre principal de la couche" },
+          "subtitle": { "type": "string", "description": "Sous-titre explicatif ou précision de zoom" },
+          "type": {
+            "type": "string",
+            "enum": ["wms", "xyz", "arcgis_rest", "cadastre_geojson", "drainage_pmtiles"],
+            "default": "wms",
+            "description": "Protocole de flux cartographique"
+          },
+          "url": { "type": "string", "description": "URL du service" },
+          "layers": { "type": "string", "description": "Nom ou identifiants des sous-couches WMS/ArcGIS" },
+          "format": { "type": "string", "default": "image/png" },
+          "transparent": { "type": "boolean", "default": true },
+          "version": { "type": "string", "default": "1.3.0" },
+          "defaultOpacity": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.8 },
+          "minZoom": { "type": "number", "description": "Niveau de zoom minimum pour activer l'affichage" },
+          "insertPosition": {
+            "type": "string",
+            "enum": ["above_pedologie", "below_pedologie", "bottom"],
+            "default": "below_pedologie",
+            "description": "Positionnement vertical dans la pile de couches MapLibre"
+          },
+          "proxy": { "type": "boolean", "default": false, "description": "Activer le proxy CORS si le serveur d'origine ne supporte pas Access-Control-Allow-Origin" },
+          "attribution": { "type": "string", "description": "Mention de copyright ou source" },
+          "description": { "type": "string", "description": "Description détaillée affichée dans la bulle d'information" },
+          "icon": { "type": "string", "description": "Code SVG ou mot-clé d'icône" }
+        }
+      }
+    }
+  }
+}

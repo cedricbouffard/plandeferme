@@ -1,3 +1,22 @@
+    const WMS_ICON_PRESETS = {
+      folder: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+      layer: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>`,
+      foncier: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+      eau: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`,
+      foret: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L7 9h3l-4 7h6l-3 5h8l-3-5h6l-4-7h3L12 2z"/></svg>`,
+      imagerie: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
+      custom: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`,
+      cadastre: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`,
+      water: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 6c.6 0 1.2-.2 1.7-.6 1.1-.8 2.3-.8 3.4 0 1.1.8 2.3.8 3.4 0 1.1-.8 2.3-.8 3.4 0 1.1.8 2.3.8 3.4 0 1.1-.8 2.3-.8 3.4 0 .5.4 1.1.6 1.7.6"/><path d="M2 12c.6 0 1.2-.2 1.7-.6 1.1-.8 2.3-.8 3.4 0 1.1.8 2.3.8 3.4 0 1.1-.8 2.3-.8 3.4 0 1.1.8 2.3.8 3.4 0 1.1-.8 2.3-.8 3.4 0 .5.4 1.1.6 1.7.6"/><path d="M2 18c.6 0 1.2-.2 1.7-.6 1.1-.8 2.3-.8 3.4 0 1.1.8 2.3.8 3.4 0 1.1-.8 2.3-.8 3.4 0 1.1.8 2.3.8 3.4 0 1.1-.8 2.3-.8 3.4 0 .5.4 1.1.6 1.7.6"/></svg>`,
+      camera: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`,
+      flood: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+      wetland: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 0 0-7.54 16.56C5.54 17.65 7.18 17 9 17c1.47 0 2.82.43 3.96 1.16A7.95 7.95 0 0 1 17 17c1.82 0 3.46.65 4.54 1.56A10 10 0 0 0 12 2z"/><path d="M7 10v4"/><path d="M12 7v7"/><path d="M17 9v5"/><path d="M3 20c1.2-1 2.8-1.5 4.5-1.5s3.3.5 4.5 1.5c1.2-1 2.8-1.5 4.5-1.5s3.3.5 4.5 1.5"/></svg>`,
+      moisture: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/><path d="M7 16a5 5 0 0 0 10 0"/></svg>`,
+      drainage: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>`,
+      tree: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L7 9h3l-4 7h6l-3 5h8l-3-5h6l-4-7h3L12 2z"/></svg>`,
+      zone_agricole: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>`
+    };
+
     class WmsLayerManager {
       constructor(map) {
         this.map = map;
@@ -8,6 +27,9 @@
         this.cadastreAbortController = null;
         this._cadastreDebounceTimer = null;
         this._cadastreMoveListener = null;
+        this.catalogUrl = "data/wms-catalog.json";
+        this.catalogLoaded = false;
+        this._pendingRestoreIds = null;
 
         // Categories for grouping layers in collapsible dropdowns
         this.categories = [
@@ -328,14 +350,16 @@
             id: "eau_twi_mffp",
             category: "eau",
             name: "Indice d'humidité du sol (TWI)",
-            subtitle: "MFFP — Écologie forestière (LiDAR 1m)",
+            subtitle: "MFFP — Écologie forestière (LiDAR 1m, zoom 10+)",
             url: "https://geoegl.msp.gouv.qc.ca/ws/mffpecofor.fcgi",
             layers: "lidar_twi",
             format: "image/png",
             transparent: true,
             version: "1.3.0",
             defaultOpacity: 0.75,
-            insertPosition: "below_pedologie",
+            insertPosition: "above_pedologie",
+            proxy: true,
+            minZoom: 9.5,
             attribution: "© Gouvernement du Québec (MFFP - Écologie forestière)",
             description: "Indice d'humidité topographique (Topographic Wetness Index - TWI) dérivé du LiDAR 1 m par le MFFP. Permet de localiser les zones de saturation hydrique, d'accumulation des eaux et les bas-fonds propices au drainage ou aux cultures exigeantes.",
             icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/><path d="M7 16a5 5 0 0 0 10 0"/></svg>`
@@ -356,14 +380,16 @@
             id: "foret_canopee_mffp",
             category: "foret",
             name: "Hauteur de canopée (MFFP LiDAR)",
-            subtitle: "Écologie forestière (LiDAR 1m)",
+            subtitle: "Écologie forestière (LiDAR 1m, zoom 10+)",
             url: "https://geoegl.msp.gouv.qc.ca/ws/mffpecofor.fcgi",
             layers: "lidar_mhc",
             format: "image/png",
             transparent: true,
             version: "1.3.0",
             defaultOpacity: 0.75,
-            insertPosition: "below_pedologie",
+            insertPosition: "above_pedologie",
+            proxy: true,
+            minZoom: 9.5,
             attribution: "© Gouvernement du Québec (MFFP - Écologie forestière)",
             description: "Modèle de hauteur de canopée (MHC) issu du LiDAR 1 m du MFFP. Représente la hauteur relative de la végétation arborée et des peuplements forestiers.",
             icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L7 9h3l-4 7h6l-3 5h8l-3-5h6l-4-7h3L12 2z"/></svg>`
@@ -386,11 +412,55 @@
         ];
       }
 
+      resolveIcon(icon, fallbackType = "layer") {
+        if (typeof icon === "string") {
+          const trimmed = icon.trim();
+          if (trimmed.startsWith("<svg")) return trimmed;
+          if (WMS_ICON_PRESETS[trimmed]) return WMS_ICON_PRESETS[trimmed];
+        }
+        return WMS_ICON_PRESETS[fallbackType] || WMS_ICON_PRESETS.layer;
+      }
+
+      async loadCatalog() {
+        try {
+          const resp = await fetch(this.catalogUrl, { cache: "no-cache" });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (Array.isArray(data.categories) && data.categories.length > 0) {
+              this.categories = data.categories;
+            }
+            if (Array.isArray(data.layers) && data.layers.length > 0) {
+              const activeIds = new Set(this.activeLayerIds);
+              this.registry.clear();
+              data.layers.forEach(l => this.register(l));
+              this.loadCustomLayersFromStorage();
+              this.renderAllInSidebar();
+              activeIds.forEach(id => {
+                if (this.registry.has(id)) {
+                  this.toggle(id, true);
+                }
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("[WMS] Chargement de " + this.catalogUrl + ":", e);
+        } finally {
+          this.catalogLoaded = true;
+          if (this._pendingRestoreIds) {
+            this.restoreFromState(this._pendingRestoreIds);
+            this._pendingRestoreIds = null;
+          }
+        }
+      }
+
       init() {
-        this.defaultCatalog.forEach(c => this.register(c));
+        if (Array.isArray(this.defaultCatalog)) {
+          this.defaultCatalog.forEach(c => this.register(c));
+        }
         this.loadCustomLayersFromStorage();
         this.renderAllInSidebar();
         this.setupCustomAddEvents();
+        return this.loadCatalog();
       }
 
       register(config) {
@@ -422,7 +492,11 @@
         const transparent = config.transparent ? "TRUE" : "FALSE";
         const styles = config.styles || "";
         const fmt = config.format || "image/png";
-        return `${cleanUrl}?${queryPrefix}SERVICE=WMS&VERSION=${config.version || '1.3.0'}&REQUEST=GetMap&${crsParam}&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&LAYERS=${config.layers}&STYLES=${styles}&FORMAT=${fmt}&TRANSPARENT=${transparent}`;
+        let tileUrl = `${cleanUrl}?${queryPrefix}SERVICE=WMS&VERSION=${config.version || '1.3.0'}&REQUEST=GetMap&${crsParam}&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&LAYERS=${config.layers}&STYLES=${styles}&FORMAT=${fmt}&TRANSPARENT=${transparent}`;
+        if (config.proxy || cleanUrl.includes("geoegl.msp.gouv.qc.ca")) {
+          tileUrl = `https://wsrv.nl/?url=${encodeURIComponent(tileUrl).replace(/%7Bbbox-epsg-3857%7D/g, '{bbox-epsg-3857}')}`;
+        }
+        return tileUrl;
       }
 
       ensureCadastreLayers(cfg) {
@@ -858,7 +932,7 @@
           const layersInCat = Array.from(this.registry.values()).filter(c => (c.category || "custom") === cat.id);
           if (cat.id === "custom" && layersInCat.length === 0) return; // Hide custom group if empty
 
-          const isOpen = false;
+          const isOpen = Boolean(cat.defaultOpen);
 
           const groupEl = document.createElement("details");
           groupEl.className = "wms-group";
@@ -869,7 +943,7 @@
           groupEl.innerHTML = `
             <summary class="wms-group-header">
               <div class="wms-group-title">
-                <span class="wms-group-icon">${cat.icon}</span>
+                <span class="wms-group-icon">${this.resolveIcon(cat.icon, cat.id || 'folder')}</span>
                 <span>${cat.title}</span>
                 <span class="wms-group-badge" id="cat-badge-${cat.id}"></span>
               </div>
@@ -988,7 +1062,7 @@
           <div class="wms-item-header">
             <div class="wms-item-info">
               <div class="wms-item-icon">
-                ${cfg.icon || '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>'}
+                ${this.resolveIcon(cfg.icon, 'layer')}
               </div>
               <div class="wms-item-titles" title="${cfg.description || cfg.name}">
                 <div class="wms-item-title">
@@ -1125,6 +1199,9 @@
             this.toggle(id, true);
           }
         });
+        if (!this.catalogLoaded) {
+          this._pendingRestoreIds = wmsIds;
+        }
       }
     }
 

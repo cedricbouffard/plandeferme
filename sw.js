@@ -1,4 +1,4 @@
-const CACHE_NAME = "plandeferme-v4";
+const CACHE_NAME = "plandeferme-v5";
 
 const ASSETS = [
   "/",
@@ -13,6 +13,7 @@ const ASSETS = [
   "/favicon/favicon-192.png",
   "/favicon/favicon-512.png",
   "/logos/logo_plandeferme_v3_joyeux.png",
+  "/data/wms-catalog.json",
   "/js/config.js",
   "/js/topo.js",
   "/js/hydro.js",
