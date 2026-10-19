@@ -305,13 +305,13 @@
         });
       }
 
-        // 1. Remplissage polygone fixé (Superficie)
+      // 1. Remplissage polygone fixé (Superficie)
       if (!this.map.getLayer("measure-fill")) {
         this.map.addLayer({
           id: "measure-fill",
           type: "fill",
           source: "measure-source",
-          filter: ["==", ["geometry-type"], "Polygon"],
+          filter: ["==", "$type", "Polygon"],
           paint: {
             "fill-color": "#0d9488",
             "fill-opacity": 0.22
@@ -325,7 +325,7 @@
           id: "measure-preview-fill",
           type: "fill",
           source: "measure-preview-source",
-          filter: ["==", ["geometry-type"], "Polygon"],
+          filter: ["==", "$type", "Polygon"],
           paint: {
             "fill-color": "#0d9488",
             "fill-opacity": 0.12
@@ -381,7 +381,7 @@
           id: "measure-points",
           type: "circle",
           source: "measure-source",
-          filter: ["==", ["geometry-type"], "Point"],
+          filter: ["==", "$type", "Point"],
           paint: {
             "circle-radius": 5.5,
             "circle-color": "#ffffff",
@@ -393,70 +393,30 @@
     }
 
     /**
-     * Active ou désactive immédiatement la visibilité GPU des calques de mesure principaux
-     */
-    setLayersVisibility(visible) {
-      if (!this.map || !this.map.style) return;
-      const vis = visible ? "visible" : "none";
-      const layers = [
-        "measure-fill",
-        "measure-line-casing",
-        "measure-line",
-        "measure-points"
-      ];
-      layers.forEach(id => {
-        if (this.map.getLayer(id)) {
-          try {
-            this.map.setLayoutProperty(id, "visibility", vis);
-          } catch (e) {}
-        }
-      });
-      if (typeof this.map.triggerRepaint === "function") {
-        this.map.triggerRepaint();
-      }
-    }
-
-    /**
-     * Active ou désactive la visibilité GPU des calques élastiques de prévisualisation
-     */
-    setPreviewVisibility(visible) {
-      if (!this.map || !this.map.style) return;
-      const vis = visible ? "visible" : "none";
-      const previewLayers = ["measure-preview-fill", "measure-preview-line"];
-      previewLayers.forEach(id => {
-        if (this.map.getLayer(id)) {
-          try {
-            this.map.setLayoutProperty(id, "visibility", vis);
-          } catch (e) {}
-        }
-      });
-      if (typeof this.map.triggerRepaint === "function") {
-        this.map.triggerRepaint();
-      }
-    }
-
-    /**
-     * Maintient les calques de mesure par-dessus toutes les autres couches
+     * Maintient les calques de mesure par-dessus toutes les autres couches de façon sécurisée
      */
     bringToFront() {
       if (!this.map || !this.map.style) return;
-      const layers = [
-        "measure-fill",
-        "measure-preview-fill",
-        "measure-line-casing",
-        "measure-line",
-        "measure-preview-line",
-        "measure-points"
-      ];
-      layers.forEach(id => {
-        if (this.map.getLayer(id)) {
-          try {
-            this.map.moveLayer(id);
-          } catch (e) {}
-        }
-      });
-      if (typeof this.map.triggerRepaint === "function") {
-        this.map.triggerRepaint();
+      if (this._isMovingLayers) return; // Évite toute récursion
+      this._isMovingLayers = true;
+      try {
+        const layers = [
+          "measure-fill",
+          "measure-preview-fill",
+          "measure-line-casing",
+          "measure-line",
+          "measure-preview-line",
+          "measure-points"
+        ];
+        layers.forEach(id => {
+          if (this.map.getLayer(id)) {
+            try {
+              this.map.moveLayer(id);
+            } catch (e) {}
+          }
+        });
+      } finally {
+        this._isMovingLayers = false;
       }
     }
 
@@ -477,8 +437,11 @@
         this.map.once("load", ensure);
       }
 
+      // Ré-assurer uniquement si le fond de carte a changé et a supprimé les sources
       this.map.on("styledata", () => {
-        ensure();
+        if (!this.map.getSource("measure-source")) {
+          ensure();
+        }
       });
 
       // Clic sur la carte : ajout d'un sommet
@@ -732,8 +695,6 @@
       this.isFinished = true;
       this.mousePoint = null;
 
-      // Masquer immédiatement la prévisualisation élastique sur le GPU
-      this.setPreviewVisibility(false);
       const previewSrc = this.map ? this.map.getSource("measure-preview-source") : null;
       if (previewSrc) {
         previewSrc.setData({ type: "FeatureCollection", features: [] });
@@ -746,19 +707,14 @@
      * Efface immédiatement toutes les données visuelles sur la carte
      */
     clearMapData() {
-      // 1. Masquage GPU instantané (0 ms, contourne le délai asynchrone des web workers GeoJSON)
-      this.setLayersVisibility(false);
-      this.setPreviewVisibility(false);
-
-      // 2. Suppression immédiate des marqueurs HTML
       this.clearMarkers();
 
-      // 3. Vidage des sources GeoJSON
+      const emptyData = { type: "FeatureCollection", features: [] };
       const src = this.map ? this.map.getSource("measure-source") : null;
-      if (src) src.setData({ type: "FeatureCollection", features: [] });
+      if (src) src.setData(emptyData);
 
       const previewSrc = this.map ? this.map.getSource("measure-preview-source") : null;
-      if (previewSrc) previewSrc.setData({ type: "FeatureCollection", features: [] });
+      if (previewSrc) previewSrc.setData(emptyData);
     }
 
     /**
@@ -886,7 +842,6 @@
       const previewSrc = this.map.getSource("measure-preview-source");
       if (!previewSrc) return;
 
-      this.setPreviewVisibility(true);
       const currentPts = [...this.points, this.mousePoint];
       const features = [];
 
@@ -940,15 +895,12 @@
 
       const pts = this.points;
       if (pts.length === 0) {
-        this.setLayersVisibility(false);
-        this.setPreviewVisibility(false);
         src.setData({ type: "FeatureCollection", features: [] });
+        const previewSrc = this.map.getSource("measure-preview-source");
+        if (previewSrc) previewSrc.setData({ type: "FeatureCollection", features: [] });
         this.updateHud([]);
         return;
       }
-
-      // Rendre les calques de mesure visibles sur le GPU
-      this.setLayersVisibility(true);
 
       const features = [];
 
@@ -1021,6 +973,7 @@
           .addTo(this.map);
       }
 
+      this.bringToFront();
       this.updateHud(pts);
     }
 
