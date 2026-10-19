@@ -200,6 +200,11 @@
         </div>
       `;
 
+      // Empêcher les clics et interactions sur le panneau HUD de se propager à la carte
+      panel.addEventListener("click", (e) => e.stopPropagation());
+      panel.addEventListener("dblclick", (e) => e.stopPropagation());
+      panel.addEventListener("mousedown", (e) => e.stopPropagation());
+
       document.body.appendChild(panel);
 
       this.dom = {
@@ -300,13 +305,13 @@
         });
       }
 
-      // 1. Remplissage polygone fixé (Superficie)
+        // 1. Remplissage polygone fixé (Superficie)
       if (!this.map.getLayer("measure-fill")) {
         this.map.addLayer({
           id: "measure-fill",
           type: "fill",
           source: "measure-source",
-          filter: ["==", "$type", "Polygon"],
+          filter: ["==", ["geometry-type"], "Polygon"],
           paint: {
             "fill-color": "#0d9488",
             "fill-opacity": 0.22
@@ -320,7 +325,7 @@
           id: "measure-preview-fill",
           type: "fill",
           source: "measure-preview-source",
-          filter: ["==", "$type", "Polygon"],
+          filter: ["==", ["geometry-type"], "Polygon"],
           paint: {
             "fill-color": "#0d9488",
             "fill-opacity": 0.12
@@ -376,7 +381,7 @@
           id: "measure-points",
           type: "circle",
           source: "measure-source",
-          filter: ["==", "$type", "Point"],
+          filter: ["==", ["geometry-type"], "Point"],
           paint: {
             "circle-radius": 5.5,
             "circle-color": "#ffffff",
@@ -384,6 +389,49 @@
             "circle-stroke-width": 2.5
           }
         });
+      }
+    }
+
+    /**
+     * Active ou désactive immédiatement la visibilité GPU des calques de mesure principaux
+     */
+    setLayersVisibility(visible) {
+      if (!this.map || !this.map.style) return;
+      const vis = visible ? "visible" : "none";
+      const layers = [
+        "measure-fill",
+        "measure-line-casing",
+        "measure-line",
+        "measure-points"
+      ];
+      layers.forEach(id => {
+        if (this.map.getLayer(id)) {
+          try {
+            this.map.setLayoutProperty(id, "visibility", vis);
+          } catch (e) {}
+        }
+      });
+      if (typeof this.map.triggerRepaint === "function") {
+        this.map.triggerRepaint();
+      }
+    }
+
+    /**
+     * Active ou désactive la visibilité GPU des calques élastiques de prévisualisation
+     */
+    setPreviewVisibility(visible) {
+      if (!this.map || !this.map.style) return;
+      const vis = visible ? "visible" : "none";
+      const previewLayers = ["measure-preview-fill", "measure-preview-line"];
+      previewLayers.forEach(id => {
+        if (this.map.getLayer(id)) {
+          try {
+            this.map.setLayoutProperty(id, "visibility", vis);
+          } catch (e) {}
+        }
+      });
+      if (typeof this.map.triggerRepaint === "function") {
+        this.map.triggerRepaint();
       }
     }
 
@@ -656,19 +704,24 @@
       if (this.points.length > 0) {
         this.points.pop();
         this.isFinished = false;
-        this.render();
+        if (this.points.length === 0) {
+          this.clear();
+        } else {
+          this.render();
+          this.updatePreview();
+        }
       }
     }
 
     /**
-     * Réinitialise les mesures
+     * Réinitialise les mesures instantanément
      */
     clear() {
       this.points = [];
       this.mousePoint = null;
       this.isFinished = false;
       this.clearMapData();
-      this.render();
+      this.updateHud([]);
     }
 
     /**
@@ -679,7 +732,8 @@
       this.isFinished = true;
       this.mousePoint = null;
 
-      // Nettoyer la prévisualisation élastique
+      // Masquer immédiatement la prévisualisation élastique sur le GPU
+      this.setPreviewVisibility(false);
       const previewSrc = this.map ? this.map.getSource("measure-preview-source") : null;
       if (previewSrc) {
         previewSrc.setData({ type: "FeatureCollection", features: [] });
@@ -689,16 +743,22 @@
     }
 
     /**
-     * Efface les données visuelles sur la carte
+     * Efface immédiatement toutes les données visuelles sur la carte
      */
     clearMapData() {
+      // 1. Masquage GPU instantané (0 ms, contourne le délai asynchrone des web workers GeoJSON)
+      this.setLayersVisibility(false);
+      this.setPreviewVisibility(false);
+
+      // 2. Suppression immédiate des marqueurs HTML
+      this.clearMarkers();
+
+      // 3. Vidage des sources GeoJSON
       const src = this.map ? this.map.getSource("measure-source") : null;
       if (src) src.setData({ type: "FeatureCollection", features: [] });
 
       const previewSrc = this.map ? this.map.getSource("measure-preview-source") : null;
       if (previewSrc) previewSrc.setData({ type: "FeatureCollection", features: [] });
-
-      this.clearMarkers();
     }
 
     /**
@@ -826,6 +886,7 @@
       const previewSrc = this.map.getSource("measure-preview-source");
       if (!previewSrc) return;
 
+      this.setPreviewVisibility(true);
       const currentPts = [...this.points, this.mousePoint];
       const features = [];
 
@@ -878,82 +939,88 @@
       if (!src) return;
 
       const pts = this.points;
+      if (pts.length === 0) {
+        this.setLayersVisibility(false);
+        this.setPreviewVisibility(false);
+        src.setData({ type: "FeatureCollection", features: [] });
+        this.updateHud([]);
+        return;
+      }
+
+      // Rendre les calques de mesure visibles sur le GPU
+      this.setLayersVisibility(true);
+
       const features = [];
 
-      if (pts.length > 0) {
-        // 1. Sommets (Points)
-        pts.forEach((pt, idx) => {
-          features.push({
-            type: "Feature",
-            properties: { index: idx },
-            geometry: { type: "Point", coordinates: pt }
-          });
+      // 1. Sommets (Points)
+      pts.forEach((pt, idx) => {
+        features.push({
+          type: "Feature",
+          properties: { index: idx },
+          geometry: { type: "Point", coordinates: pt }
         });
+      });
 
-        // 2. Tracé (LineString)
-        if (pts.length >= 2) {
-          features.push({
-            type: "Feature",
-            properties: {},
-            geometry: {
-              type: "LineString",
-              coordinates: this.mode === "area" && this.isFinished ? [...pts, pts[0]] : pts
-            }
-          });
-        }
+      // 2. Tracé (LineString)
+      if (pts.length >= 2) {
+        features.push({
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: this.mode === "area" && this.isFinished ? [...pts, pts[0]] : pts
+          }
+        });
+      }
 
-        // 3. Polygone (Polygon en mode superficie avec >= 3 sommets)
-        if (this.mode === "area" && pts.length >= 3) {
-          features.push({
-            type: "Feature",
-            properties: {},
-            geometry: {
-              type: "Polygon",
-              coordinates: [[...pts, pts[0]]]
-            }
-          });
-        }
+      // 3. Polygone (Polygon en mode superficie avec >= 3 sommets)
+      if (this.mode === "area" && pts.length >= 3) {
+        features.push({
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "Polygon",
+            coordinates: [[...pts, pts[0]]]
+          }
+        });
       }
 
       src.setData({ type: "FeatureCollection", features });
 
       // Marqueurs d'étiquettes aux sommets sur la carte
-      if (pts.length > 0) {
-        let cumulativeDist = 0;
-        pts.forEach((pt, idx) => {
-          if (idx > 0) {
-            cumulativeDist += haversineDistance(pts[idx - 1], pt);
-          }
-
-          const el = document.createElement("div");
-          el.className = `measure-marker-label ${idx === pts.length - 1 && pts.length > 1 ? "total" : ""}`;
-          if (idx === 0) {
-            el.textContent = "Départ";
-          } else {
-            el.textContent = this.formatDistance(cumulativeDist);
-          }
-
-          const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
-            .setLngLat(pt)
-            .addTo(this.map);
-          this.markers.push(marker);
-        });
-
-        // Si superficie et >= 3 points, étiquette centrale avec la surface
-        if (this.mode === "area" && pts.length >= 3) {
-          const areaM2 = computeGeodesicPolygonArea(pts);
-          const centroid = computeCentroid(pts);
-          const areaEl = document.createElement("div");
-          areaEl.className = "measure-marker-label area";
-          areaEl.textContent = this.formatArea(areaM2);
-
-          this.areaMarker = new maplibregl.Marker({ element: areaEl, anchor: "center" })
-            .setLngLat(centroid)
-            .addTo(this.map);
+      let cumulativeDist = 0;
+      pts.forEach((pt, idx) => {
+        if (idx > 0) {
+          cumulativeDist += haversineDistance(pts[idx - 1], pt);
         }
+
+        const el = document.createElement("div");
+        el.className = `measure-marker-label ${idx === pts.length - 1 && pts.length > 1 ? "total" : ""}`;
+        if (idx === 0) {
+          el.textContent = "Départ";
+        } else {
+          el.textContent = this.formatDistance(cumulativeDist);
+        }
+
+        const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
+          .setLngLat(pt)
+          .addTo(this.map);
+        this.markers.push(marker);
+      });
+
+      // Si superficie et >= 3 points, étiquette centrale avec la surface
+      if (this.mode === "area" && pts.length >= 3) {
+        const areaM2 = computeGeodesicPolygonArea(pts);
+        const centroid = computeCentroid(pts);
+        const areaEl = document.createElement("div");
+        areaEl.className = "measure-marker-label area";
+        areaEl.textContent = this.formatArea(areaM2);
+
+        this.areaMarker = new maplibregl.Marker({ element: areaEl, anchor: "center" })
+          .setLngLat(centroid)
+          .addTo(this.map);
       }
 
-      this.bringToFront();
       this.updateHud(pts);
     }
 
