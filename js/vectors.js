@@ -1526,6 +1526,10 @@
       const layer = this.getLayer(layerId);
       if (!layer) return;
 
+      if (window.measureManager && window.measureManager.isActive) {
+        window.measureManager.deactivate();
+      }
+
       this.activeLayerId = layerId;
       this.isDrawing = true;
       this.drawingCoords = [];

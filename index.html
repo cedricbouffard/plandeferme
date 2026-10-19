@@ -69,6 +69,7 @@
   <link rel="stylesheet" href="geolibre-contour.css"/>
   <link rel="stylesheet" href="css/composer.css"/>
   <link rel="stylesheet" href="css/vectors.css"/>
+  <link rel="stylesheet" href="css/measure.css"/>
 
   <!-- MapLibre GL JS & PMTiles -->
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
@@ -794,6 +795,11 @@
       <span>Couche perso</span>
     </button>
     <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
+    <button id="btn-quick-measure" class="floating-profile-btn" type="button" title="Outil de mesure (Distance et Superficie métrique/impérial)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.2"><path d="M21.3 8.7 8.7 21.3c-1 1-2.6 1-3.5 0l-2.5-2.5c-1-1-1-2.6 0-3.5L15.3 2.7c1-1 2.6-1 3.5 0l2.5 2.5c1 1 1 2.6 0 3.5z"></path><path d="m14.5 3.5 2 2"></path><path d="m11.5 6.5 2 2"></path><path d="m8.5 9.5 2 2"></path><path d="m5.5 12.5 2 2"></path></svg>
+      <span>Mesurer</span>
+    </button>
+    <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
     <button id="btn-toggle-search" class="floating-profile-btn" type="button" title="Rechercher un lieu, une adresse ou une ville">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
       <span>Rechercher</span>
@@ -892,7 +898,18 @@
         </div>
       </button>
 
-      <!-- 5. Impression & Mise en page PDF -->
+      <!-- 5. Outil de Mesure -->
+      <button type="button" id="mobile-tool-measure" class="mobile-tool-card">
+        <div class="mobile-tool-icon" style="background: rgba(217, 119, 6, 0.1); color: #d97706;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.3 8.7 8.7 21.3c-1 1-2.6 1-3.5 0l-2.5-2.5c-1-1-1-2.6 0-3.5L15.3 2.7c1-1 2.6-1 3.5 0l2.5 2.5c1 1 1 2.6 0 3.5z"></path><path d="m14.5 3.5 2 2"></path><path d="m11.5 6.5 2 2"></path><path d="m8.5 9.5 2 2"></path><path d="m5.5 12.5 2 2"></path></svg>
+        </div>
+        <div class="mobile-tool-info">
+          <div class="mobile-tool-name">Mesurer</div>
+          <div class="mobile-tool-desc">Distances &amp; superficies (métrique / impérial)</div>
+        </div>
+      </button>
+
+      <!-- 6. Impression & Mise en page PDF -->
       <button type="button" id="mobile-tool-composer" class="mobile-tool-card">
         <div class="mobile-tool-icon composer-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
@@ -969,6 +986,7 @@
     <script src="js/soil-ai.js"></script>
     <script src="js/wms.js"></script>
     <script src="js/vectors.js"></script>
+    <script src="js/measure.js"></script>
     <script src="js/composer.js"></script>
     <script src="js/app.js"></script>
 </body>

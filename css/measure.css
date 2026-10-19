@@ -1,0 +1,347 @@
+/**
+ * Plan de Ferme — Styles pour l'Outil de Mesure Géodésique
+ * Mesures de distances et superficies (Systèmes Métrique et Impérial)
+ */
+
+/* ==========================================================================
+   1. Bouton d'outil flottant dans la barre supérieure
+   ========================================================================== */
+.floating-profile-btn.btn-measure-mode.active {
+  background: #0d9488;
+  color: #ffffff;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.35);
+}
+
+.floating-profile-btn.btn-measure-mode.active svg {
+  stroke: #ffffff;
+}
+
+/* ==========================================================================
+   2. Panneau flottant de mesure sur la carte (HUD)
+   ========================================================================== */
+.measure-panel {
+  position: absolute;
+  top: 60px;
+  right: 18px;
+  z-index: 130;
+  width: 320px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+  font-family: var(--font-sans, "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif);
+  color: #0f172a;
+  padding: 12px;
+  animation: measureSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+@keyframes measureSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* En-tête du panneau */
+.measure-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 10px;
+}
+
+.measure-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.measure-panel-title svg {
+  color: #0d9488;
+}
+
+.measure-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.measure-close-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+/* Sélecteur de mode (Distance vs Superficie) */
+.measure-mode-tabs {
+  display: flex;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.measure-mode-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.measure-mode-tab:hover {
+  color: #0f172a;
+}
+
+.measure-mode-tab.active {
+  background: #ffffff;
+  color: #0f766e;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  font-weight: 700;
+}
+
+/* Sélecteur de système d'unités (Métrique vs Impérial) */
+.measure-unit-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 6px 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.measure-unit-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.measure-unit-toggle {
+  display: flex;
+  background: #e2e8f0;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.measure-unit-btn {
+  border: none;
+  background: transparent;
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #64748b;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.measure-unit-btn.active {
+  background: #0d9488;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(13, 148, 136, 0.3);
+}
+
+.measure-unit-dropdown {
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: #ffffff;
+  font-size: 11px;
+  padding: 2px 6px;
+  color: #334155;
+  font-weight: 500;
+  cursor: pointer;
+  max-width: 110px;
+}
+
+.measure-unit-dropdown:focus {
+  outline: none;
+  border-color: #0d9488;
+}
+
+/* Résultat de mesure principal (Display) */
+.measure-display-card {
+  background: #f0fdfa;
+  border: 1.5px solid #99f6e4;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.measure-display-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: #0f766e;
+  margin-bottom: 2px;
+}
+
+.measure-display-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #115e59;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+
+.measure-display-secondary {
+  font-size: 11px;
+  color: #475569;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.measure-display-extra {
+  font-size: 10.5px;
+  color: #0f766e;
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px dashed rgba(15, 118, 110, 0.2);
+}
+
+/* Actions (Boutons Annuler, Effacer, Terminer) */
+.measure-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.measure-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.measure-btn:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.measure-btn.primary {
+  background: #0d9488;
+  color: #ffffff;
+  border-color: #0f766e;
+}
+
+.measure-btn.primary:hover {
+  background: #0f766e;
+}
+
+.measure-btn.danger {
+  color: #dc2626;
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.measure-btn.danger:hover {
+  background: #fee2e2;
+  border-color: #f87171;
+}
+
+.measure-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Texte d'aide / Conseils */
+.measure-hint {
+  font-size: 10px;
+  color: #64748b;
+  text-align: center;
+  line-height: 1.35;
+  font-style: italic;
+  margin-top: 6px;
+}
+
+/* ==========================================================================
+   3. Infobulles / Marqueurs sur la carte MapLibre
+   ========================================================================== */
+.measure-marker-label {
+  background: rgba(15, 23, 42, 0.92);
+  color: #ffffff;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-size: 10.5px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-8px);
+}
+
+.measure-marker-label.total {
+  background: #0d9488;
+  border-color: #99f6e4;
+  color: #ffffff;
+  font-size: 11px;
+}
+
+.measure-marker-label.area {
+  background: #0284c7;
+  border-color: #bae6fd;
+  font-size: 11.5px;
+}
+
+/* ==========================================================================
+   4. Adaptations mobiles & Petits écrans
+   ========================================================================== */
+@media (max-width: 640px) {
+  .measure-panel {
+    top: auto;
+    bottom: 74px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+  }
+}

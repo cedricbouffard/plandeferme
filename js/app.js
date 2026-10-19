@@ -431,6 +431,11 @@
         if (window.vectorManager && typeof window.vectorManager.bringToFront === "function") {
           window.vectorManager.bringToFront();
         }
+
+        // 4. Calques de mesure géodésique au sommet absolu
+        if (window.measureManager && typeof window.measureManager.bringToFront === "function") {
+          window.measureManager.bringToFront();
+        }
       }
       window.bringParcellesToFront = bringTopLayersToFront;
       window.bringTopLayersToFront = bringTopLayersToFront;
@@ -470,8 +475,16 @@
         window.vectorManager.init(map);
       }
 
+      // Instantiate Measure Tool (Distances & Superficies métriques / impériales)
+      if (window.measureManager) {
+        window.measureManager.init(map);
+      }
+
       // Map click handler for transect line drawing & NDVI mode
       map.on("click", (e) => {
+        if (window.measureManager && window.measureManager.isActive) {
+          return;
+        }
         if (window.vectorManager && window.vectorManager.isDrawing) {
           return;
         }
@@ -491,6 +504,9 @@
 
       // Double-click to complete drawing and calculate profile
       map.on("dblclick", (e) => {
+        if (window.measureManager && window.measureManager.isActive) {
+          return;
+        }
         if (window.vectorManager && window.vectorManager.isDrawing) {
           return;
         }
@@ -504,6 +520,9 @@
 
       // Right-click to complete drawing and calculate profile
       map.on("contextmenu", (e) => {
+        if (window.measureManager && window.measureManager.isActive) {
+          return;
+        }
         if (window.vectorManager && window.vectorManager.isDrawing) {
           e.preventDefault();
           window.vectorManager.finishDrawing();
@@ -1227,6 +1246,7 @@
 
       // Helper to check if click should be ignored by background analysis layers
       const isVectorInteraction = (e) => {
+        if (window.measureManager && window.measureManager.isActive) return true;
         if (window.vectorManager && window.vectorManager.isDrawing) return true;
         try {
           const vectorHits = map.queryRenderedFeatures(e.point).filter(f => f.layer && f.layer.id && f.layer.id.startsWith("vector-") && !f.layer.id.startsWith("vector-draw"));
@@ -1587,6 +1607,9 @@
 
     function startDrawing() {
       if (!profileManager) return;
+      if (window.measureManager && window.measureManager.isActive) {
+        window.measureManager.deactivate();
+      }
       if (ndviManager && ndviManager.isActiveMode) {
         ndviManager.setMode(false);
       }
@@ -2187,7 +2210,16 @@
       });
     }
 
-    // 5. Impression & Mise en page PDF
+    // 5. Outil de Mesure mobile
+    const mobileToolMeasure = document.getElementById("mobile-tool-measure");
+    if (mobileToolMeasure) {
+      mobileToolMeasure.addEventListener("click", () => {
+        closeMobileToolsSheet();
+        if (window.measureManager) window.measureManager.activate();
+      });
+    }
+
+    // 6. Impression & Mise en page PDF
     if (mobileToolComposer) {
       mobileToolComposer.addEventListener("click", () => {
         closeMobileToolsSheet();

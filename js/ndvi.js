@@ -142,6 +142,9 @@
           mobileToolNdviBadge.style.display = active ? "inline-block" : "none";
         }
         if (active) {
+          if (window.measureManager && window.measureManager.isActive) {
+            window.measureManager.deactivate();
+          }
           if (profileManager && profileManager.isDrawing) {
             profileManager.stopDrawing();
           }
