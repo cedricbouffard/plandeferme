@@ -225,6 +225,24 @@
                 </label>
               </summary>
               <div class="topo-sub-content">
+
+                <!-- Sélecteur de levé LiDAR / Mosaïque -->
+                <div style="margin-bottom: 8px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                  <div class="tool-label-row" style="margin-bottom: 4px;">
+                    <span class="tool-sublabel" style="font-weight: 600; color: #334155; display: flex; align-items: center; gap: 4px;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 2 22 22 22 12 2"></polygon></svg>
+                      Campagne LiDAR (Projet)
+                    </span>
+                    <span id="topo-project-count-badge" class="val-badge" style="font-size: 9.5px; font-weight: 600; background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd;">Mosaïque 1 m</span>
+                  </div>
+                  <select id="topo-lidar-project-select" class="measure-unit-dropdown" style="width: 100%; max-width: none; font-size: 11px; padding: 4px 6px; background: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; border-radius: 4px; outline: none; cursor: pointer;" title="Choisir une campagne / levé LiDAR aéroporté spécifique dans le champ de vision (zoom >= 11)">
+                    <option value="default">Mosaïque nationale 1 m (Par défaut)</option>
+                  </select>
+                  <div id="topo-project-hint" style="font-size: 9.5px; color: #64748b; margin-top: 3px; display: flex; justify-content: space-between; align-items: center;">
+                    <span id="topo-project-info">Zoomer (zoom 11+) pour explorer les levés</span>
+                    <button id="btn-refresh-lidar-projects" type="button" style="background: none; border: none; padding: 0; margin: 0; font-size: 9.5px; color: #2563eb; cursor: pointer; text-decoration: underline;" title="Rafraîchir les projets disponibles dans la vue">Actualiser</button>
+                  </div>
+                </div>
                 <div class="topo-gradient-bar" title="Dégradé d'altitude dynamique : mauve au plus bas, rouge au plus haut"></div>
                 <div class="topo-gradient-labels">
                   <span>Bas (mauve)</span>

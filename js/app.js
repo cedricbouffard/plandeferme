@@ -341,6 +341,9 @@
       topoManager = new TopoManager(map);
       pentesManager = new PentesManager(map);
       canopeeManager = new CanopeeManager(map);
+      window.topoManager = topoManager;
+      window.pentesManager = pentesManager;
+      window.canopeeManager = canopeeManager;
 
       // Instantiate ContourManager from geolibre-plugin
       const mockApp = {
@@ -349,6 +352,7 @@
         translate: (k, fallback) => fallback
       };
       contourManager = new ContourManager(mockApp);
+      window.contourManager = contourManager;
       
       const defaultTile = findTileForCoords(initialCenter[0], initialCenter[1]);
       contourManager.updateConfig({
@@ -653,7 +657,10 @@
 
       // Camera move listeners
       map.on('moveend', () => {
-        if (topoManager && topoManager.enabled) topoManager.scheduleUpdate();
+        if (topoManager) {
+          if (topoManager.enabled) topoManager.scheduleUpdate();
+          topoManager.scheduleProjectDiscovery();
+        }
         if (pentesManager && pentesManager.enabled) pentesManager.scheduleUpdate();
         if (canopeeManager && canopeeManager.enabled) canopeeManager.scheduleUpdate();
         

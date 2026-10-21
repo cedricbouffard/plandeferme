@@ -263,6 +263,20 @@ const { ContourManager, readCogRegion, fromUrl, proj4 } = window.GeoLibreContour
       };
     }
 
+    // Single Project LiDAR Region Reader: reads an individual airborne LiDAR survey Cloud-Optimized GeoTIFF (COG)
+    async function readSingleHrdemProjectRegion(cogUrl, bboxWgs84, targetSize = 256, signal = null, resampling = 'bilinear') {
+      if (!cogUrl) return null;
+      try {
+        const cog = await getHrdemCog(cogUrl);
+        if (signal && signal.aborted) return null;
+        return await readCogRegion(cog, bboxWgs84, targetSize, null, false, signal, resampling);
+      } catch (err) {
+        if (signal && signal.aborted) return null;
+        console.warn('readSingleHrdemProjectRegion error:', err);
+        return null;
+      }
+    }
+
     function isPointInRing(pt, ring) {
       let inside = false;
       for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {

@@ -20,6 +20,14 @@
         this.abortController = null;
         this.sourceAdded = false;
         this.hillshadeSourceAdded = false;
+        this.selectedProjectId = 'default';
+        this.selectedProjectUrl = null;
+        this.selectedProjectTitle = 'Mosaïque nationale 1 m';
+        this.availableProjects = [];
+        this.projectDebounceTimer = null;
+        this.stacAbortController = null;
+        this.lastStacBboxKey = '';
+        setTimeout(() => this.initProjectSelector(), 50);
       }
 
       setStretchMethod(method) {
@@ -94,6 +102,288 @@
         }, 150);
       }
 
+      initProjectSelector() {
+        const select = document.getElementById('topo-lidar-project-select');
+        if (select) {
+          select.addEventListener('change', (e) => {
+            this.setSelectedProject(e.target.value);
+          });
+        }
+        const btnRefresh = document.getElementById('btn-refresh-lidar-projects');
+        if (btnRefresh) {
+          btnRefresh.addEventListener('click', () => {
+            this.fetchLiDARProjectsForViewport(true);
+          });
+        }
+        const cardTopo = document.getElementById('card-topo');
+        if (cardTopo) {
+          cardTopo.addEventListener('toggle', () => {
+            if (cardTopo.open) {
+              this.fetchLiDARProjectsForViewport();
+            }
+          });
+        }
+      }
+
+      formatProjectLabel(item) {
+        const id = item.id || '';
+        let year = '';
+        if (item.properties && item.properties.datetime) {
+          try {
+            year = new Date(item.properties.datetime).getUTCFullYear();
+          } catch (e) {}
+        }
+        if (!year) {
+          const ym = id.match(/(20\d\d|19\d\d)/);
+          if (ym) year = ym[1];
+        }
+
+        const res = id.endsWith('-2m') ? '2 m' : '1 m';
+
+        let name = id;
+        name = name.replace(/-(1|2)m$/i, '');
+        name = name.replace(/^NRCAN[-_]FHIMP[-_]PICAI[-_](QC[-_])?/i, '');
+        name = name.replace(/^NRCAN[-_]/i, '');
+        name = name.replace(/^QC[-_]6000\d{2}[-_]\d{1,3}[-_]/i, '');
+        name = name.replace(/^QC[-_]6000\d{2}[-_]/i, '');
+        name = name.replace(/^QC[-_]10[-_]\d{2,4}[-_]/i, '');
+        name = name.replace(/^QC[-_]R\d+[-_]/i, '');
+        name = name.replace(/^QC[-_]/i, '');
+        name = name.replace(/^SNCA[-_]/i, '');
+        name = name.replace(/^VILLE[-_]/i, '');
+        name = name.replace(/[-_]?(MTM|UTM)\d+/gi, '');
+        name = name.replace(/[-_]?(20\d\d|19\d\d)([-_]\d{2})?/g, '');
+        name = name.replace(/([a-z])([A-Z])/g, '$1 $2');
+        name = name.replace(/\bLidarDIF\b/gi, '').replace(/\bLidar\b/gi, '').replace(/\bDIF\b/gi, '');
+        name = name.replace(/\bSegmentRiv\b/gi, '').replace(/\bRNCan\b/gi, '');
+        name = name.replace(/[_]+/g, ' ').replace(/[-]+/g, ' ');
+        name = name.replace(/\s+/g, ' ').trim();
+
+        const words = name.split(' ');
+        const unique = [];
+        for (const w of words) {
+          if (!w) continue;
+          if (!unique.some(u => u.toLowerCase() === w.toLowerCase())) {
+            unique.push(w);
+          }
+        }
+        name = unique.join(' ').trim();
+
+        name = name
+          .replace(/\bMonteregie\b/gi, 'Montérégie')
+          .replace(/\bMontreal\b/gi, 'Montréal')
+          .replace(/\bQuebec\b/gi, 'Québec')
+          .replace(/\bLevis\b/gi, 'Lévis')
+          .replace(/\bRiviere\b/gi, 'Rivière')
+          .replace(/\bBecancour\b/gi, 'Bécancour')
+          .replace(/\bErable\b/gi, 'Érable')
+          .replace(/\bGeomont\b/gi, 'GéoMont');
+
+        if (!name || name.length < 2) {
+          name = id.replace(/-(1|2)m$/i, '');
+        }
+
+        const meta = [];
+        if (year) meta.push(year);
+        meta.push(res);
+
+        return `${name} (${meta.join(', ')})`;
+      }
+
+      scheduleProjectDiscovery() {
+        if (this.projectDebounceTimer) clearTimeout(this.projectDebounceTimer);
+        this.projectDebounceTimer = setTimeout(() => {
+          this.fetchLiDARProjectsForViewport();
+        }, 350);
+      }
+
+      async fetchLiDARProjectsForViewport(force = false) {
+        if (!this.map) return;
+        const zoom = this.map.getZoom();
+        const countBadge = document.getElementById('topo-project-count-badge');
+        const infoEl = document.getElementById('topo-project-info');
+        const select = document.getElementById('topo-lidar-project-select');
+
+        if (zoom < 11) {
+          if (countBadge) {
+            countBadge.textContent = this.selectedProjectId === 'default' ? 'Mosaïque 1 m' : 'Projet actif';
+          }
+          if (infoEl) {
+            infoEl.textContent = 'Zoomer (zoom 11+) pour explorer les levés';
+          }
+          return;
+        }
+
+        const bounds = this.map.getBounds();
+        const w = bounds.getWest();
+        const s = bounds.getSouth();
+        const e = bounds.getEast();
+        const n = bounds.getNorth();
+        const bboxKey = `${w.toFixed(2)},${s.toFixed(2)},${e.toFixed(2)},${n.toFixed(2)}`;
+
+        if (!force && bboxKey === this.lastStacBboxKey) return;
+        this.lastStacBboxKey = bboxKey;
+
+        if (this.stacAbortController) this.stacAbortController.abort();
+        this.stacAbortController = new AbortController();
+
+        if (infoEl) infoEl.textContent = 'Recherche des levés LiDAR...';
+
+        try {
+          const stacUrl = `https://datacube.services.geo.ca/pgstac/api/collections/hrdem-lidar/items?bbox=${w.toFixed(4)},${s.toFixed(4)},${e.toFixed(4)},${n.toFixed(4)}&limit=50`;
+          const res = await fetch(stacUrl, { signal: this.stacAbortController.signal });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          const features = Array.isArray(json.features) ? json.features : [];
+
+          const projects = [];
+          for (const f of features) {
+            if (f.assets && f.assets.dtm && f.assets.dtm.href) {
+              let year = 0;
+              if (f.properties && f.properties.datetime) {
+                try { year = new Date(f.properties.datetime).getUTCFullYear(); } catch (err) {}
+              }
+              if (!year) {
+                const ym = f.id.match(/(20\d\d|19\d\d)/);
+                if (ym) year = parseInt(ym[1], 10);
+              }
+              projects.push({
+                id: f.id,
+                label: this.formatProjectLabel(f),
+                url: f.assets.dtm.href,
+                dsmUrl: f.assets.dsm ? f.assets.dsm.href : null,
+                year,
+                resolution: f.id.endsWith('-2m') ? '2 m' : '1 m',
+                bbox: f.bbox
+              });
+            }
+          }
+
+          // Tri chronologique décroissant (plus récents en premier)
+          projects.sort((a, b) => {
+            if (b.year !== a.year) return b.year - a.year;
+            return a.label.localeCompare(b.label);
+          });
+
+          this.availableProjects = projects;
+
+          // Reconstruire le sélecteur
+          if (select) {
+            const currentSelected = this.selectedProjectId;
+            select.innerHTML = '';
+
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = 'default';
+            defaultOpt.textContent = 'Mosaïque nationale 1 m (Par défaut)';
+            if (currentSelected === 'default') defaultOpt.selected = true;
+            select.appendChild(defaultOpt);
+
+            if (projects.length > 0) {
+              const grp = document.createElement('optgroup');
+              grp.label = `Campagnes LiDAR dans cette vue (${projects.length})`;
+              let currentFound = false;
+
+              for (const p of projects) {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.label;
+                if (p.id === currentSelected) {
+                  opt.selected = true;
+                  currentFound = true;
+                }
+                grp.appendChild(opt);
+              }
+              select.appendChild(grp);
+
+              if (currentSelected !== 'default' && !currentFound) {
+                const retainedOpt = document.createElement('option');
+                retainedOpt.value = currentSelected;
+                retainedOpt.textContent = `${this.selectedProjectTitle} (Hors vue)`;
+                retainedOpt.selected = true;
+                select.appendChild(retainedOpt);
+              }
+            }
+          }
+
+          if (countBadge) {
+            if (this.selectedProjectId === 'default') {
+              countBadge.textContent = `${projects.length} levé${projects.length > 1 ? 's' : ''}`;
+              countBadge.style.background = '#e0f2fe';
+              countBadge.style.color = '#0284c7';
+              countBadge.style.borderColor = '#bae6fd';
+            } else {
+              countBadge.textContent = 'Projet actif';
+              countBadge.style.background = '#ecfdf5';
+              countBadge.style.color = '#059669';
+              countBadge.style.borderColor = '#a7f3d0';
+            }
+          }
+
+          if (infoEl) {
+            infoEl.textContent = `${projects.length} levé(s) LiDAR découvert(s)`;
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.warn('STAC LiDAR projects discovery failed:', err);
+          if (infoEl) infoEl.textContent = 'Levés locaux indisponibles (Mosaïque active)';
+        }
+      }
+
+      setSelectedProject(id) {
+        if (id === 'default' || !id) {
+          this.selectedProjectId = 'default';
+          this.selectedProjectUrl = null;
+          this.selectedProjectTitle = 'Mosaïque nationale 1 m';
+        } else {
+          const proj = this.availableProjects.find(p => p.id === id);
+          if (proj) {
+            this.selectedProjectId = proj.id;
+            this.selectedProjectUrl = proj.url;
+            this.selectedProjectTitle = proj.label;
+          } else {
+            this.selectedProjectId = id;
+          }
+        }
+
+        const countBadge = document.getElementById('topo-project-count-badge');
+        if (countBadge) {
+          if (this.selectedProjectId === 'default') {
+            countBadge.textContent = `${this.availableProjects.length} levé${this.availableProjects.length > 1 ? 's' : ''}`;
+            countBadge.style.background = '#e0f2fe';
+            countBadge.style.color = '#0284c7';
+            countBadge.style.borderColor = '#bae6fd';
+          } else {
+            countBadge.textContent = 'Projet actif';
+            countBadge.style.background = '#ecfdf5';
+            countBadge.style.color = '#059669';
+            countBadge.style.borderColor = '#a7f3d0';
+          }
+        }
+
+        // Synchroniser ContourManager si chargé
+        if (window.contourManager) {
+          if (this.selectedProjectUrl) {
+            window.contourManager.updateConfig({
+              regionProvider: (bbox, gridSize, signal) => readSingleHrdemProjectRegion(this.selectedProjectUrl, bbox, gridSize, signal, 'bilinear')
+            });
+          } else {
+            window.contourManager.updateConfig({
+              regionProvider: (bbox, gridSize, signal) => readMultiHrdemRegion(bbox, gridSize, signal, 'bilinear')
+            });
+          }
+          const toggleContoursEl = document.getElementById("toggle-contours");
+          if (toggleContoursEl && toggleContoursEl.checked) {
+            window.contourManager.generateForView();
+          }
+        }
+
+        this.scheduleUpdate();
+
+        if (window.pentesManager && window.pentesManager.enabled) {
+          window.pentesManager.scheduleUpdate();
+        }
+      }
+
       async updateViewport() {
         if (!this.enabled || !this.map) return;
         const zoom = this.map.getZoom();
@@ -110,13 +400,6 @@
         const n = bounds.getNorth();
         const bbox = [w, s, e, n];
 
-        const intersecting = findTilesForBbox(w, s, e, n);
-        if (intersecting.length === 0) {
-          const badge = document.getElementById('topo-alt-badge');
-          if (badge) badge.textContent = 'Hors de la zone MNE HRDEM';
-          return;
-        }
-
         if (this.abortController) this.abortController.abort();
         this.abortController = new AbortController();
 
@@ -125,7 +408,28 @@
 
         try {
           const targetSize = 256;
-          const region = await readMultiHrdemRegion(bbox, targetSize, this.abortController.signal, 'bilinear');
+          let region = null;
+          let isProject = false;
+
+          if (this.selectedProjectId !== 'default' && this.selectedProjectUrl) {
+            region = await readSingleHrdemProjectRegion(this.selectedProjectUrl, bbox, targetSize, this.abortController.signal, 'bilinear');
+            if (region && region.data && region.data.length > 0) {
+              isProject = true;
+            }
+          }
+
+          if (!region) {
+            if (this.selectedProjectId !== 'default' && this.selectedProjectUrl) {
+              if (badge) badge.textContent = `Aucune donnée dans la vue pour ce levé (${this.selectedProjectTitle})`;
+              return;
+            }
+            const intersecting = findTilesForBbox(w, s, e, n);
+            if (intersecting.length === 0) {
+              if (badge) badge.textContent = 'Hors de la zone MNE HRDEM';
+              return;
+            }
+            region = await readMultiHrdemRegion(bbox, targetSize, this.abortController.signal, 'bilinear');
+          }
 
           if (!region || !region.data || region.data.length === 0) {
             if (badge) badge.textContent = 'Aucune donnée MNE dans la vue';
@@ -147,8 +451,8 @@
 
           if (badge) {
             const prefix = this.stretchMethod === 'manual' ? 'Alt fixé : ' : 'Alt : ';
-            const tileSuffix = region.tiles && region.tiles.length > 1 ? ` (${region.tiles.length} tuiles fusionnées)` : '';
-            badge.textContent = `${prefix}${minAlt.toFixed(2)} m (mauve) → ${maxAlt.toFixed(2)} m (rouge)${tileSuffix}`;
+            const sourceSuffix = isProject ? ` [${this.selectedProjectTitle}]` : (region.tiles && region.tiles.length > 1 ? ` (${region.tiles.length} tuiles fusionnées)` : '');
+            badge.textContent = `${prefix}${minAlt.toFixed(2)} m (mauve) → ${maxAlt.toFixed(2)} m (rouge)${sourceSuffix}`;
           }
 
           const span = Math.max(1, maxAlt - minAlt);
@@ -403,7 +707,15 @@
 
         try {
           const targetSize = 256;
-          const region = await readMultiHrdemRegion(bbox, targetSize, this.abortController.signal, 'bilinear');
+          let region = null;
+          let isProject = false;
+          if (window.topoManager && window.topoManager.selectedProjectId !== 'default' && window.topoManager.selectedProjectUrl) {
+            region = await readSingleHrdemProjectRegion(window.topoManager.selectedProjectUrl, bbox, targetSize, this.abortController.signal, 'bilinear');
+            if (region && region.data && region.data.length > 0) isProject = true;
+          }
+          if (!region) {
+            region = await readMultiHrdemRegion(bbox, targetSize, this.abortController.signal, 'bilinear');
+          }
 
           if (!region || !region.data || region.data.length === 0) {
             if (badge) badge.textContent = 'Aucune donnée MNE dans la vue';
@@ -972,12 +1284,26 @@
         if (this.abortController) this.abortController.abort();
         this.abortController = new AbortController();
 
-        const region = await readMultiHrdemRegion(
-          bbox,
-          512,
-          this.abortController.signal,
-          'bilinear'
-        );
+        let region = null;
+        if (window.topoManager && window.topoManager.selectedProjectId !== 'default' && window.topoManager.selectedProjectUrl) {
+          try {
+            region = await readSingleHrdemProjectRegion(
+              window.topoManager.selectedProjectUrl,
+              bbox,
+              512,
+              this.abortController.signal,
+              'bilinear'
+            );
+          } catch (e) {}
+        }
+        if (!region || !region.data || !region.sourceBBox) {
+          region = await readMultiHrdemRegion(
+            bbox,
+            512,
+            this.abortController.signal,
+            'bilinear'
+          );
+        }
 
         if (!region || !region.data || !region.sourceBBox) {
           throw new Error("Impossible de lire les données altimétriques MNE pour ce tracé.");
