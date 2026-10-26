@@ -162,6 +162,7 @@
     let soilAiAssistant = null;
     let wmsManager = null;
     let parcelHydrologyManager = null;
+    let terrain3DManager = null;
 
     map.on("load", () => {
       // 1. Google Hybrid Raster Source
@@ -344,6 +345,8 @@
       window.topoManager = topoManager;
       window.pentesManager = pentesManager;
       window.canopeeManager = canopeeManager;
+      terrain3DManager = new Terrain3DManager(map);
+      window.terrain3DManager = terrain3DManager;
 
       // Instantiate ContourManager from geolibre-plugin
       const mockApp = {
@@ -734,6 +737,14 @@
         });
         if (cadastreHits && cadastreHits.length > 0) {
           cadastreProps = cadastreHits[0].properties;
+        }
+
+        // Save active parcel/feature for 3D terrain focus
+        if (window.terrain3DManager && (parcelGeom || pedoGeom)) {
+          window.terrain3DManager.lastClickedParcel = {
+            geometry: parcelGeom || pedoGeom,
+            properties: parcelProps || pedoProps
+          };
         }
 
         // 4. Query drainage (plans de drainage agricole)
@@ -1178,6 +1189,10 @@
                 <span>Drainage${drainagePlans.length > 1 ? ` (${drainagePlans.length})` : ''}</span>
                 <span class="popup-tab-dot" title="${drainagePlans.length} plan(s) de drainage disponible(s)" style="background: #0284c7;"></span>
               </button>` : ''}
+              <button type="button" class="popup-tab-btn" id="btn-popup-trigger-3d" title="Visualiser cette parcelle en perspective 3D (30X)" style="margin-left: auto; color: #4f46e5; font-weight: 700; background: #eef2ff;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                <span>3D (30X)</span>
+              </button>
             </div>
             <div class="popup-tab-pane ${activeTab === 'sols' ? 'active' : ''}" data-tab="sols">
               ${solsTabHtml}
@@ -1202,6 +1217,20 @@
 
         const popupDom = popup.getElement();
         if (popupDom) {
+          const btn3D = popupDom.querySelector("#btn-popup-trigger-3d");
+          if (btn3D) {
+            btn3D.addEventListener("click", () => {
+              const targetP = {
+                geometry: parcelGeom || pedoGeom,
+                properties: parcelProps || pedoProps
+              };
+              popup.remove();
+              if (window.terrain3DManager) {
+                window.terrain3DManager.toggle3D(true, targetP);
+              }
+            });
+          }
+
           // Tab switching
           const tabBtns = popupDom.querySelectorAll(".popup-tab-btn");
           const tabPanes = popupDom.querySelectorAll(".popup-tab-pane");

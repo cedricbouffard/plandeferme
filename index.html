@@ -70,6 +70,7 @@
   <link rel="stylesheet" href="css/composer.css"/>
   <link rel="stylesheet" href="css/vectors.css"/>
   <link rel="stylesheet" href="css/measure.css"/>
+  <link rel="stylesheet" href="css/terrain3d.css"/>
 
   <!-- MapLibre GL JS & PMTiles -->
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
@@ -293,6 +294,14 @@
                   <span id="topo-hillshade-val" class="val-badge">60%</span>
                 </div>
                 <input type="range" id="topo-hillshade-opacity" min="0" max="100" value="60" class="slider" title="Opacité de l'ombrage du relief" />
+
+                <div class="tool-label-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #e2e8f0;">
+                  <label class="check-label" style="font-size: 11px; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;" title="Activer / désactiver la perspective 3D sur le terrain avec maillage haute résolution (30X par défaut)">
+                    <input type="checkbox" id="toggle-topo-3d" />
+                    <span>Perspective 3D</span>
+                  </label>
+                  <span id="topo-3d-badge-status" class="val-badge" style="background:#eef2ff; color:#4f46e5; border:1px solid #c7d2fe;">30x</span>
+                </div>
               </div>
             </details>
 
@@ -818,6 +827,15 @@
       <span>Mesurer</span>
     </button>
     <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
+    <button id="btn-quick-3d" class="floating-profile-btn btn-3d-mode" type="button" title="Activer / désactiver le Relief 3D du terrain (Vue en perspective 30X)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+        <polyline points="2 17 12 22 22 17"></polyline>
+        <polyline points="2 12 12 17 22 12"></polyline>
+      </svg>
+      <span id="btn-3d-text">Relief 3D</span>
+    </button>
+    <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
     <button id="btn-toggle-search" class="floating-profile-btn" type="button" title="Rechercher un lieu, une adresse ou une ville">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
       <span>Rechercher</span>
@@ -827,6 +845,69 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
       <span>Export PDF</span>
     </button>
+  </div>
+
+  <!-- Floating 3D Terrain Controls Panel -->
+  <div id="map-3d-controls" class="floating-3d-panel" style="display: none;">
+    <div class="floating-3d-header">
+      <div class="floating-3d-title">
+        <span class="pulse-dot-3d"></span>
+        <span>Relief 3D LiDAR</span>
+      </div>
+      <div class="floating-3d-badge" id="badge3DExaggeration">30.0x</div>
+      <button id="btnClose3DPanel" class="btn-3d-close" type="button" title="Fermer le panneau 3D">&times;</button>
+    </div>
+    
+    <div class="floating-3d-body">
+      <div class="floating-3d-row">
+        <span class="floating-3d-label">Exagération verticale :</span>
+        <span class="floating-3d-sublabel" id="label-3d-scope">Amplifie le micro-relief des pentes agricoles</span>
+      </div>
+      
+      <div class="floating-3d-slider-box">
+        <input type="range" id="slider3DExaggeration" min="1" max="100" step="1" value="30" class="slider slider-3d" />
+        <div class="slider-ticks-3d">
+          <span>1x</span>
+          <span>10x</span>
+          <span>20x</span>
+          <span>30x</span>
+          <span>50x</span>
+          <span>100x</span>
+        </div>
+      </div>
+
+      <div class="floating-3d-presets">
+        <button class="btn-preset-3d" data-exag="5" type="button">5x</button>
+        <button class="btn-preset-3d" data-exag="10" type="button">10x</button>
+        <button class="btn-preset-3d" data-exag="20" type="button">20x</button>
+        <button class="btn-preset-3d active" data-exag="30" type="button">30x</button>
+        <button class="btn-preset-3d" data-exag="50" type="button">50x</button>
+        <button class="btn-preset-3d" data-exag="75" type="button">75x</button>
+      </div>
+
+      <div class="floating-3d-actions">
+        <button id="btnResetView2D" class="btn-3d-action" type="button" title="Remettre la vue à plat (pitch 0°)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+          <span>Vue 2D (0°)</span>
+        </button>
+        <button id="btnTiltView3D" class="btn-3d-action" type="button" title="Incliner la vue en perspective (pitch 60°)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 12h20M12 2v20"/></svg>
+          <span>Perspective (60°)</span>
+        </button>
+      </div>
+
+      <div style="display: flex; gap: 6px; margin-top: 2px;">
+        <button id="btnRefresh3D" class="btn-3d-action" type="button" style="width: 100%; font-weight: 700; color: #4338ca; background: #eef2ff; border-color: #c7d2fe;" title="Recalculer le relief 3D sur la vue ou parcelle courante">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          <span>Recalculer sur cette vue</span>
+        </button>
+      </div>
+
+      <div class="floating-3d-tip">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span>Clic-droit ou Ctrl + glisser pour incliner et faire pivoter la 3D</span>
+      </div>
+    </div>
   </div>
 
   <!-- Floating Search Panel on Map -->
@@ -1006,6 +1087,7 @@
     <script src="js/vectors.js"></script>
     <script src="js/measure.js"></script>
     <script src="js/composer.js"></script>
+    <script src="js/terrain3d.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
