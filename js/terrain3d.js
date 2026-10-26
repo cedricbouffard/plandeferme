@@ -2,7 +2,9 @@
  * ==============================================================================
  * TERRAIN 3D MANAGER (PLAN DE FERME)
  * Visualisation 3D native du micro-relief LiDAR 1m côté client dans MapLibre GL
- * avec calage altimétrique à 0m et exagération verticale réglable (30X par défaut).
+ * avec calage altimétrique à 0m, exagération verticale réglable (30X par défaut),
+ * perspective libre jusqu'à 85° (rase-motte), ciel atmosphérique,
+ * orbite 360° et navigation libre intuitive.
  * ==============================================================================
  */
 
@@ -30,18 +32,39 @@ class Terrain3DManager {
     this.protocolRegistered = false;
     this.lastClickedParcel = null;
 
+    // Navigation libre & Orbite 360°
+    this.isOrbiting = false;
+    this.orbitAnimFrame = null;
+    this.isFreeCamActive = false;
+    this.freeCamDragging = false;
+    this.freeCamStartPos = null;
+    this.freeCamStartPitch = 0;
+    this.freeCamStartBearing = 0;
+
     this.init();
   }
 
   async init() {
+    // Débloquer la perspective maximale jusqu'à 85° (presque à l'horizontale / niveau du sol)
+    if (this.map) {
+      if (typeof this.map.setMaxPitch === 'function') {
+        this.map.setMaxPitch(85);
+      }
+      if (this.map.touchPitch && typeof this.map.touchPitch.enable === 'function') {
+        this.map.touchPitch.enable();
+      }
+    }
+
     // 1. Générer le buffer statique 256x256 plat à 0.0m (Terrarium: R=128, G=0, B=0)
     await this.initFlatTileBuffer();
 
     // 2. Enregistrer le protocole client-dem auprès de MapLibre
     this.registerDemProtocol();
 
-    // 3. Lier les événements UI
+    // 3. Lier les événements UI et carte
     this.bindEvents();
+    this.setupFreeCamHandlers();
+    this.bindMapEvents();
   }
 
   async initFlatTileBuffer() {
@@ -305,6 +328,33 @@ class Terrain3DManager {
     this.tileCache.clear();
   }
 
+  enableSky() {
+    if (!this.map) return;
+    try {
+      if (typeof this.map.setSky === 'function') {
+        this.map.setSky({
+          'sky-color': '#7dd3fc',
+          'sky-horizon-blend': 0.85,
+          'horizon-color': '#f8fafc',
+          'horizon-fog-blend': 0.6,
+          'fog-color': '#e2e8f0',
+          'fog-ground-blend': 0.5
+        });
+      }
+    } catch (e) {
+      console.warn('MapLibre setSky exception:', e);
+    }
+  }
+
+  disableSky() {
+    if (!this.map) return;
+    try {
+      if (typeof this.map.setSky === 'function') {
+        this.map.setSky(null);
+      }
+    } catch (e) {}
+  }
+
   async toggle3D(forceState = null, targetParcel = null) {
     if (!this.map) return;
     const newState = forceState !== null ? Boolean(forceState) : !this.is3DActive;
@@ -324,6 +374,11 @@ class Terrain3DManager {
 
       try {
         await this.prepareTerrainData(targetParcel);
+
+        // Assurer que le maxPitch est débloqué à 85°
+        if (typeof this.map.setMaxPitch === 'function') {
+          this.map.setMaxPitch(85);
+        }
 
         // Configurer la source raster-dem MapLibre si absente
         const tileUrl = `client-dem://{z}/{x}/{y}?v=${this.version}`;
@@ -372,7 +427,10 @@ class Terrain3DManager {
           exaggeration: this.exaggeration
         });
 
-        // Incliner la caméra en perspective
+        // Activer l'atmosphère / ciel pour les vues en plongée et rase-motte
+        this.enableSky();
+
+        // Incliner la caméra en perspective si actuellement à plat
         const currentPitch = this.map.getPitch();
         if (currentPitch < 20) {
           this.map.easeTo({
@@ -390,6 +448,10 @@ class Terrain3DManager {
       }
     } else {
       this.is3DActive = false;
+      this.stopOrbit();
+      this.disableFreeCam();
+      this.disableSky();
+
       this.map.setTerrain(null);
 
       if (this.map.getLayer(this.hillshadeLayerId)) {
@@ -420,16 +482,185 @@ class Terrain3DManager {
     this.syncUI();
   }
 
-  resetCamera2D() {
-    if (this.map) {
-      this.map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
+  setPitch(val, smooth = true) {
+    if (!this.map) return;
+    const p = Math.max(0, Math.min(85, parseFloat(val) || 0));
+    if (smooth) {
+      this.map.easeTo({ pitch: p, duration: 450 });
+    } else {
+      this.map.setPitch(p);
+    }
+    this.syncPitchUI(p);
+  }
+
+  setBearing(val, smooth = true) {
+    if (!this.map) return;
+    const b = (parseFloat(val) || 0) % 360;
+    if (smooth) {
+      this.map.easeTo({ bearing: b, duration: 450 });
+    } else {
+      this.map.setBearing(b);
     }
   }
 
-  tiltCamera3D() {
-    if (this.map) {
-      this.map.easeTo({ pitch: 60, bearing: -20, duration: 800 });
+  resetNorth() {
+    if (!this.map) return;
+    this.map.easeTo({ bearing: 0, duration: 400 });
+  }
+
+  startOrbit() {
+    if (!this.is3DActive || !this.map) return;
+    this.isOrbiting = true;
+    const btn = document.getElementById('btnToggleOrbit');
+    const icon = document.getElementById('iconOrbit');
+    if (btn) btn.classList.add('active');
+    if (icon) icon.classList.add('orbit-spinning');
+
+    // Si la vue est trop plate, incliner pour admirer le relief
+    if (this.map.getPitch() < 30) {
+      this.map.easeTo({ pitch: 60, duration: 600 });
     }
+
+    const step = () => {
+      if (!this.isOrbiting || !this.map) return;
+      const b = this.map.getBearing();
+      this.map.setBearing((b + 0.35) % 360);
+      this.orbitAnimFrame = requestAnimationFrame(step);
+    };
+    this.orbitAnimFrame = requestAnimationFrame(step);
+  }
+
+  stopOrbit() {
+    this.isOrbiting = false;
+    if (this.orbitAnimFrame) {
+      cancelAnimationFrame(this.orbitAnimFrame);
+      this.orbitAnimFrame = null;
+    }
+    const btn = document.getElementById('btnToggleOrbit');
+    const icon = document.getElementById('iconOrbit');
+    if (btn) btn.classList.remove('active');
+    if (icon) icon.classList.remove('orbit-spinning');
+  }
+
+  toggleOrbit() {
+    if (this.isOrbiting) {
+      this.stopOrbit();
+    } else {
+      this.startOrbit();
+    }
+  }
+
+  enableFreeCam() {
+    this.isFreeCamActive = true;
+    const btn = document.getElementById('btnToggleFreeCam');
+    if (btn) btn.classList.add('active');
+    const canvas = this.map ? this.map.getCanvas() : null;
+    if (canvas) canvas.style.cursor = 'grab';
+  }
+
+  disableFreeCam() {
+    this.isFreeCamActive = false;
+    const btn = document.getElementById('btnToggleFreeCam');
+    if (btn) btn.classList.remove('active');
+    const canvas = this.map ? this.map.getCanvas() : null;
+    if (canvas) canvas.style.cursor = '';
+  }
+
+  toggleFreeCam(force = null) {
+    const enable = force !== null ? Boolean(force) : !this.isFreeCamActive;
+    if (enable) {
+      this.enableFreeCam();
+    } else {
+      this.disableFreeCam();
+    }
+  }
+
+  setupFreeCamHandlers() {
+    if (!this.map) return;
+    const container = this.map.getCanvasContainer();
+    if (!container) return;
+
+    container.addEventListener('mousedown', (e) => {
+      if (!this.is3DActive) return;
+      if (this.isOrbiting) {
+        this.stopOrbit();
+      }
+      if (!this.isFreeCamActive || e.button !== 0 || e.shiftKey || e.altKey) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      this.freeCamDragging = true;
+      this.freeCamStartPos = { x: e.clientX, y: e.clientY };
+      this.freeCamStartPitch = this.map.getPitch();
+      this.freeCamStartBearing = this.map.getBearing();
+
+      if (this.map.dragPan) this.map.dragPan.disable();
+      const canvas = this.map.getCanvas();
+      if (canvas) canvas.style.cursor = 'grabbing';
+
+      const onMouseMove = (ev) => {
+        if (!this.freeCamDragging) return;
+        const dx = ev.clientX - this.freeCamStartPos.x;
+        const dy = ev.clientY - this.freeCamStartPos.y;
+
+        const newPitch = Math.max(0, Math.min(85, this.freeCamStartPitch - dy * 0.4));
+        const newBearing = (this.freeCamStartBearing + dx * 0.4) % 360;
+
+        this.map.jumpTo({
+          pitch: newPitch,
+          bearing: newBearing
+        });
+        this.syncPitchUI(newPitch);
+      };
+
+      const onMouseUp = () => {
+        this.freeCamDragging = false;
+        if (this.map.dragPan) this.map.dragPan.enable();
+        const c = this.map.getCanvas();
+        if (c) c.style.cursor = this.isFreeCamActive ? 'grab' : '';
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+      };
+
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    }, { capture: true });
+  }
+
+  bindMapEvents() {
+    if (!this.map) return;
+
+    this.map.on('pitch', () => this.syncPitchUI());
+    this.map.on('rotate', () => this.syncPitchUI());
+
+    const stopOrbitOnInteraction = () => {
+      if (this.isOrbiting) this.stopOrbit();
+    };
+
+    this.map.on('wheel', stopOrbitOnInteraction);
+    this.map.on('touchstart', stopOrbitOnInteraction);
+  }
+
+  syncPitchUI(pitchVal = null) {
+    if (!this.map) return;
+    const pitch = pitchVal !== null ? pitchVal : Math.round(this.map.getPitch());
+    const slider = document.getElementById('slider3DPitch');
+    const badge = document.getElementById('badge3DPitch');
+
+    if (slider && document.activeElement !== slider) {
+      slider.value = Math.round(pitch);
+    }
+    if (badge) {
+      badge.textContent = `${Math.round(pitch)}°`;
+    }
+
+    document.querySelectorAll('.btn-pitch-preset').forEach((b) => {
+      const p = parseFloat(b.getAttribute('data-pitch'));
+      b.classList.toggle('active', Math.abs(p - pitch) <= 4);
+    });
   }
 
   async refreshCurrentView() {
@@ -459,6 +690,7 @@ class Terrain3DManager {
     const btnText = document.getElementById('btn-3d-text');
     const panel = document.getElementById('map-3d-controls');
     const badge = document.getElementById('badge3DExaggeration');
+    const badgeInline = document.getElementById('badgeExagInline');
     const slider = document.getElementById('slider3DExaggeration');
     const toggleTopo3D = document.getElementById('toggle-topo-3d');
     const topo3DBadge = document.getElementById('topo-3d-badge-status');
@@ -481,6 +713,9 @@ class Terrain3DManager {
     if (badge) {
       badge.textContent = exagStr;
     }
+    if (badgeInline) {
+      badgeInline.textContent = exagStr;
+    }
     if (slider) {
       slider.value = this.exaggeration;
     }
@@ -495,6 +730,8 @@ class Terrain3DManager {
       const bVal = parseFloat(b.getAttribute('data-exag'));
       b.classList.toggle('active', Math.abs(bVal - this.exaggeration) < 0.5);
     });
+
+    this.syncPitchUI();
   }
 
   bindEvents() {
@@ -513,9 +750,10 @@ class Terrain3DManager {
       btnClose.addEventListener('click', () => this.toggle3D(false));
     }
 
-    const slider = document.getElementById('slider3DExaggeration');
-    if (slider) {
-      slider.addEventListener('input', (e) => this.setExaggeration(e.target.value));
+    // Exagération verticale slider & presets
+    const sliderExag = document.getElementById('slider3DExaggeration');
+    if (sliderExag) {
+      sliderExag.addEventListener('input', (e) => this.setExaggeration(e.target.value));
     }
 
     document.querySelectorAll('.btn-preset-3d').forEach((btn) => {
@@ -525,14 +763,33 @@ class Terrain3DManager {
       });
     });
 
-    const btnReset2D = document.getElementById('btnResetView2D');
-    if (btnReset2D) {
-      btnReset2D.addEventListener('click', () => this.resetCamera2D());
+    // Angle de perspective slider & presets
+    const sliderPitch = document.getElementById('slider3DPitch');
+    if (sliderPitch) {
+      sliderPitch.addEventListener('input', (e) => this.setPitch(e.target.value, false));
     }
 
-    const btnTilt3D = document.getElementById('btnTiltView3D');
-    if (btnTilt3D) {
-      btnTilt3D.addEventListener('click', () => this.tiltCamera3D());
+    document.querySelectorAll('.btn-pitch-preset').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const val = e.currentTarget.getAttribute('data-pitch');
+        if (val !== null) this.setPitch(val, true);
+      });
+    });
+
+    // Navigation libre & Orbite
+    const btnFreeCam = document.getElementById('btnToggleFreeCam');
+    if (btnFreeCam) {
+      btnFreeCam.addEventListener('click', () => this.toggleFreeCam());
+    }
+
+    const btnOrbit = document.getElementById('btnToggleOrbit');
+    if (btnOrbit) {
+      btnOrbit.addEventListener('click', () => this.toggleOrbit());
+    }
+
+    const btnNorth = document.getElementById('btnResetBearing');
+    if (btnNorth) {
+      btnNorth.addEventListener('click', () => this.resetNorth());
     }
 
     const btnRefresh = document.getElementById('btnRefresh3D');

@@ -133,11 +133,12 @@
       center: initialCenter,
       zoom: initialZoom,
       attributionControl: true,
-      preserveDrawingBuffer: true
+      preserveDrawingBuffer: true,
+      maxPitch: 85
     });
     window.map = map;
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
     map.addControl(
       new maplibregl.GeolocateControl({
         positionOptions: { enableHighAccuracy: true },

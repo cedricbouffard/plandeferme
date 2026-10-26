@@ -6,10 +6,10 @@
   position: absolute;
   top: 70px;
   right: 16px;
-  width: 310px;
+  width: 320px;
   max-width: calc(100vw - 32px);
   z-index: 105;
-  background: rgba(255, 255, 255, 0.97);
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid #e2e8f0;
@@ -107,6 +107,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
 }
 
 .floating-3d-row {
@@ -152,7 +154,7 @@
   gap: 4px;
 }
 
-.btn-preset-3d {
+.btn-preset-3d, .btn-pitch-preset {
   flex: 1;
   padding: 5px 0;
   border: 1px solid #e2e8f0;
@@ -167,12 +169,12 @@
   transition: all 0.15s ease;
 }
 
-.btn-preset-3d:hover {
+.btn-preset-3d:hover, .btn-pitch-preset:hover {
   border-color: #6366f1;
   color: #6366f1;
 }
 
-.btn-preset-3d.active {
+.btn-preset-3d.active, .btn-pitch-preset.active {
   background: #4f46e5;
   border-color: #4f46e5;
   color: #ffffff;
@@ -206,6 +208,17 @@
   background: #ffffff;
   border-color: #6366f1;
   color: #4f46e5;
+}
+
+.btn-3d-action.active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+}
+
+.btn-3d-action.active svg {
+  stroke: #ffffff;
 }
 
 .floating-3d-tip {
@@ -251,4 +264,13 @@
   background: #4338ca;
   color: #ffffff;
   border-color: #4338ca;
+}
+
+.orbit-spinning {
+  animation: spinOrbit 3s linear infinite;
+}
+
+@keyframes spinOrbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
