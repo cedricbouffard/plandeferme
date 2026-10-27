@@ -847,6 +847,12 @@
     </button>
   </div>
 
+  <!-- Floating Selection Prompt Banner for 3D Parcel Mode -->
+  <div id="banner-3d-select" class="banner-3d-prompt" style="display: none;">
+    <span>👆 Cliquez sur une parcelle sur la carte pour voir son relief 3D découpé</span>
+    <button id="btnCancel3DSelect" type="button" title="Annuler">&times;</button>
+  </div>
+
   <!-- Floating 3D Terrain Controls Panel -->
   <div id="map-3d-controls" class="floating-3d-panel" style="display: none;">
     <div class="floating-3d-header">
@@ -859,6 +865,19 @@
     </div>
     
     <div class="floating-3d-body">
+      <!-- Informations sur la parcelle découpée en 3D -->
+      <div id="card3DParcelInfo" class="floating-3d-parcel-card" style="display: none;">
+        <div class="floating-3d-parcel-title">
+          <span id="label3DParcelName">Parcelle agricole</span>
+          <button id="btnSwitchParcel" type="button" style="background: transparent; border: none; color: #6366f1; font-size: 0.68rem; font-weight: 600; cursor: pointer; text-decoration: underline;" title="Cliquer pour choisir une autre parcelle">Changer</button>
+        </div>
+        <div class="floating-3d-parcel-meta">
+          <span id="meta3DParcelArea" class="floating-3d-parcel-stat">-- ha</span>
+          <span>•</span>
+          <span id="meta3DParcelSpan" class="floating-3d-parcel-stat">Dénivelé : -- m</span>
+        </div>
+      </div>
+
       <div class="floating-3d-row">
         <div style="display: flex; justify-content: space-between; align-items: baseline;">
           <span class="floating-3d-label">Exagération verticale :</span>
@@ -930,11 +949,15 @@
       </div>
 
       <div style="display: flex; gap: 6px; margin-top: 2px;">
+        <button id="btnExport3DTif" class="btn-3d-action" type="button" style="font-weight: 700; color: #0284c7; background: #f0f9ff; border-color: #bae6fd;" title="Exporter le Modèle Numérique de Terrain (MNT) LiDAR découpé à la parcelle au format GeoTIFF (.tif)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Exporter TIF</span>
+        </button>
         <button id="btnResetBearing" class="btn-3d-action" type="button" title="Réaligner vers le Nord">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>
           <span>Cap Nord</span>
         </button>
-        <button id="btnRefresh3D" class="btn-3d-action" type="button" style="font-weight: 700; color: #4338ca; background: #eef2ff; border-color: #c7d2fe;" title="Recalculer le relief 3D sur la vue ou parcelle courante">
+        <button id="btnRefresh3D" class="btn-3d-action" type="button" style="font-weight: 700; color: #4338ca; background: #eef2ff; border-color: #c7d2fe;" title="Recalculer le relief 3D sur cette parcelle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
           <span>Recalculer</span>
         </button>

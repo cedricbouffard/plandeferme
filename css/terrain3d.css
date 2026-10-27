@@ -274,3 +274,89 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ==========================================================================
+   DECOUPAGE 3D PARCELLE & EXPORT GEOTIFF
+   ========================================================================== */
+
+.floating-3d-parcel-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 3.5px solid #4f46e5;
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.floating-3d-parcel-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.floating-3d-parcel-meta {
+  font-size: 0.68rem;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.floating-3d-parcel-stat {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.banner-3d-prompt {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 120;
+  background: #1e1b4b;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 30px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(30, 27, 75, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: bannerFadeIn 0.25s ease;
+  pointer-events: auto;
+}
+
+@keyframes bannerFadeIn {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.banner-3d-prompt button {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.banner-3d-prompt button:hover {
+  color: #ffffff;
+}
+
+.btn-popup-parcel-action {
+  transition: all 0.15s ease;
+}
+
+.btn-popup-parcel-action:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}

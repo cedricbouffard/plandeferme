@@ -742,10 +742,18 @@
 
         // Save active parcel/feature for 3D terrain focus
         if (window.terrain3DManager && (parcelGeom || pedoGeom)) {
-          window.terrain3DManager.lastClickedParcel = {
+          const currentTargetP = {
             geometry: parcelGeom || pedoGeom,
             properties: parcelProps || pedoProps
           };
+          window.terrain3DManager.lastClickedParcel = currentTargetP;
+
+          // Si l'utilisateur était en mode sélection de parcelle pour la 3D
+          if (window.terrain3DManager.isSelectingParcel && parcelGeom) {
+            window.terrain3DManager.stopParcelSelection();
+            window.terrain3DManager.viewParcel3D(currentTargetP);
+            return;
+          }
         }
 
         // 4. Query drainage (plans de drainage agricole)
@@ -1027,6 +1035,17 @@
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
                 <span>Consulter Agri-Réseau pour cette culture</span>
               </button>
+
+              <div style="display: flex; gap: 6px; margin-top: 8px;">
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-3d" style="flex: 1; padding: 7px 8px; background: #4f46e5; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                  <span>Voir en 3D (30X)</span>
+                </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-tif" style="flex: 1; padding: 7px 8px; background: #0284c7; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>Exporter MNT (TIF)</span>
+                </button>
+              </div>
             </div>
 
             <div class="popup-crop-history" style="margin-top: 8px;">
@@ -1218,16 +1237,36 @@
 
         const popupDom = popup.getElement();
         if (popupDom) {
+          const targetP = {
+            geometry: parcelGeom || pedoGeom,
+            properties: parcelProps || pedoProps
+          };
+
           const btn3D = popupDom.querySelector("#btn-popup-trigger-3d");
           if (btn3D) {
             btn3D.addEventListener("click", () => {
-              const targetP = {
-                geometry: parcelGeom || pedoGeom,
-                properties: parcelProps || pedoProps
-              };
               popup.remove();
               if (window.terrain3DManager) {
-                window.terrain3DManager.toggle3D(true, targetP);
+                window.terrain3DManager.viewParcel3D(targetP);
+              }
+            });
+          }
+
+          const btnAction3D = popupDom.querySelector(".btn-popup-action-3d");
+          if (btnAction3D) {
+            btnAction3D.addEventListener("click", () => {
+              popup.remove();
+              if (window.terrain3DManager) {
+                window.terrain3DManager.viewParcel3D(targetP);
+              }
+            });
+          }
+
+          const btnActionTif = popupDom.querySelector(".btn-popup-action-tif");
+          if (btnActionTif) {
+            btnActionTif.addEventListener("click", () => {
+              if (window.terrain3DManager) {
+                window.terrain3DManager.exportParcelGeoTiff(targetP);
               }
             });
           }

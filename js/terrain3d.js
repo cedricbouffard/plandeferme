@@ -2,9 +2,12 @@
  * ==============================================================================
  * TERRAIN 3D MANAGER (PLAN DE FERME)
  * Visualisation 3D native du micro-relief LiDAR 1m côté client dans MapLibre GL
- * avec calage altimétrique à 0m, exagération verticale réglable (30X par défaut),
- * perspective libre jusqu'à 85° (rase-motte), ciel atmosphérique,
- * orbite 360° et navigation libre intuitive.
+ * DÉCOUPÉ AUX PARCELLES AGRICOLES :
+ * - Découpage strict au polygone de la parcelle (relief 30X à l'intérieur, 0m à l'extérieur)
+ * - Calage altimétrique à 0m au point le plus bas de la parcelle
+ * - Mise en valeur du périmètre de la parcelle en 3D
+ * - Exportation directe du Modèle Numérique de Terrain (MNT) découpé en GeoTIFF (.tif)
+ * - Navigation libre jusqu'à 85° (rase-motte), ciel atmosphérique et orbite 360°
  * ==============================================================================
  */
 
@@ -12,9 +15,14 @@ class Terrain3DManager {
   constructor(mapInstance) {
     this.map = mapInstance;
     this.is3DActive = false;
-    this.exaggeration = 30.0; // 30X par défaut comme demandé
+    this.exaggeration = 30.0; // 30X par défaut
     this.activeTerrain = null;
-    this.activeTargetName = 'Vue courante';
+    this.activeParcel = null;
+    this.activeParcelGeom = null;
+    this.activeTargetName = 'Parcelle agricole';
+    this.lastClickedParcel = null;
+    this.isSelectingParcel = false;
+
     this.tileCache = new Map();
     this.maxCacheSize = 256;
     this.version = 1;
@@ -29,8 +37,9 @@ class Terrain3DManager {
     this.sourceId = 'client-terrain-source';
     this.hillshadeSourceId = 'client-3d-hillshade-source';
     this.hillshadeLayerId = 'client-3d-hillshade-layer';
+    this.highlightSourceId = 'parcel-3d-highlight-source';
+    this.highlightLayerId = 'parcel-3d-highlight-line';
     this.protocolRegistered = false;
-    this.lastClickedParcel = null;
 
     // Navigation libre & Orbite 360°
     this.isOrbiting = false;
@@ -45,7 +54,7 @@ class Terrain3DManager {
   }
 
   async init() {
-    // Débloquer la perspective maximale jusqu'à 85° (presque à l'horizontale / niveau du sol)
+    // Débloquer l'inclinaison maximale jusqu'à 85°
     if (this.map) {
       if (typeof this.map.setMaxPitch === 'function') {
         this.map.setMaxPitch(85);
@@ -55,13 +64,13 @@ class Terrain3DManager {
       }
     }
 
-    // 1. Générer le buffer statique 256x256 plat à 0.0m (Terrarium: R=128, G=0, B=0)
+    // 1. Buffer statique 256x256 plat à 0.0m (Terrarium: R=128, G=0, B=0)
     await this.initFlatTileBuffer();
 
-    // 2. Enregistrer le protocole client-dem auprès de MapLibre
+    // 2. Protocole client-dem MapLibre
     this.registerDemProtocol();
 
-    // 3. Lier les événements UI et carte
+    // 3. UI, gestes et événements
     this.bindEvents();
     this.setupFreeCamHandlers();
     this.bindMapEvents();
@@ -118,6 +127,64 @@ class Terrain3DManager {
     ];
   }
 
+  // Fonctions de géométrie pour le découpage strict aux parcelles
+  isPointInRing(pt, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      const intersect = ((yi > pt[1]) !== (yj > pt[1]))
+        && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  isPointInGeom(pt, geom) {
+    if (!geom || !geom.coordinates) return true;
+    if (geom.type === 'Polygon') {
+      if (!geom.coordinates.length || !this.isPointInRing(pt, geom.coordinates[0])) return false;
+      for (let k = 1; k < geom.coordinates.length; k++) {
+        if (this.isPointInRing(pt, geom.coordinates[k])) return false;
+      }
+      return true;
+    } else if (geom.type === 'MultiPolygon') {
+      for (const poly of geom.coordinates) {
+        if (poly.length && this.isPointInRing(pt, poly[0])) {
+          let inHole = false;
+          for (let k = 1; k < poly.length; k++) {
+            if (this.isPointInRing(pt, poly[k])) { inHole = true; break; }
+          }
+          if (!inHole) return true;
+        }
+      }
+      return false;
+    }
+    return true;
+  }
+
+  computeBboxFromGeometry(geom) {
+    if (!geom || !geom.coordinates) return null;
+    let minLng = Infinity, maxLng = -Infinity;
+    let minLat = Infinity, maxLat = -Infinity;
+
+    function walk(coords) {
+      if (typeof coords[0] === 'number') {
+        const [lng, lat] = coords;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        return;
+      }
+      for (const item of coords) walk(item);
+    }
+
+    walk(geom.coordinates);
+    if (!Number.isFinite(minLng) || !Number.isFinite(minLat)) return null;
+    return [minLng, minLat, maxLng, maxLat];
+  }
+
   async handleTileRequest(params) {
     const url = params.url || '';
     const match = url.match(/client-dem:\/\/(\d+)\/(\d+)\/(\d+)/);
@@ -141,7 +208,7 @@ class Terrain3DManager {
     const [tMinLng, tMinLat, tMaxLng, tMaxLat] = this.getTileBbox(z, x, y);
     const ab = this.activeTerrain.bounds;
 
-    // Vérifier si la tuile intersecte le relief actif
+    // Vérifier l'intersection avec la bounding box de la parcelle
     const intersects = !(tMaxLng < ab[0] || tMinLng > ab[2] || tMaxLat < ab[1] || tMinLat > ab[3]);
     if (!intersects) {
       if (this.tileCache.size < this.maxCacheSize) {
@@ -150,8 +217,8 @@ class Terrain3DManager {
       return { data: this.flatTileBuffer ? this.flatTileBuffer.slice(0) : new ArrayBuffer(0) };
     }
 
-    // Échantillonner la tuile 256x256 depuis la grille LiDAR
     const grid = this.activeTerrain.data;
+    const mask = this.activeTerrain.mask;
     const gridW = this.activeTerrain.width;
     const gridH = this.activeTerrain.height;
     const minElev = this.activeTerrain.minElev;
@@ -185,22 +252,28 @@ class Terrain3DManager {
           const fc = col - c0;
           const fr = row - r0;
 
-          const val00 = grid[r0 * gridW + c0];
-          const val10 = grid[r0 * gridW + c1];
-          const val01 = grid[r1 * gridW + c0];
-          const val11 = grid[r1 * gridW + c1];
+          // Échantillonnage du masque de découpage parcelle
+          let maskVal = 1.0;
+          if (mask) {
+            const m00 = mask[r0 * gridW + c0];
+            const m10 = mask[r0 * gridW + c1];
+            const m01 = mask[r1 * gridW + c0];
+            const m11 = mask[r1 * gridW + c1];
+            maskVal = (m00 * (1 - fc) + m10 * fc) * (1 - fr) + (m01 * (1 - fc) + m11 * fc) * fr;
+          }
 
-          // Interpolation bilinéaire
-          const elev = (val00 * (1 - fc) + val10 * fc) * (1 - fr) + (val01 * (1 - fc) + val11 * fc) * fr;
+          // Si on est à l'intérieur du polygone de la parcelle
+          if (maskVal > 0.01) {
+            const val00 = grid[r0 * gridW + c0];
+            const val10 = grid[r0 * gridW + c1];
+            const val01 = grid[r1 * gridW + c0];
+            const val11 = grid[r1 * gridW + c1];
 
-          if (Number.isFinite(elev) && elev > -900 && elev < 9000) {
-            z_rel = Math.max(0.0, elev - minElev);
+            const elev = (val00 * (1 - fc) + val10 * fc) * (1 - fr) + (val01 * (1 - fc) + val11 * fc) * fr;
 
-            // Adoucissement des bordures (decay linéaire sur les 4% périphériques)
-            const edgeFrac = Math.min(u, 1.0 - u, v, 1.0 - v);
-            if (edgeFrac < 0.04) {
-              const decay = Math.max(0.0, edgeFrac / 0.04);
-              z_rel *= decay;
+            if (Number.isFinite(elev) && elev > -900 && elev < 9000) {
+              // Altitude relative au plancher de la parcelle, modulée par le masque
+              z_rel = Math.max(0.0, elev - minElev) * maskVal;
             }
           }
         }
@@ -229,99 +302,203 @@ class Terrain3DManager {
     return { data: tileBuffer };
   }
 
-  computeBboxFromGeometry(geom) {
-    if (!geom || !geom.coordinates) return null;
-    let minLng = Infinity, maxLng = -Infinity;
-    let minLat = Infinity, maxLat = -Infinity;
+  startParcelSelection() {
+    this.isSelectingParcel = true;
+    const banner = document.getElementById('banner-3d-select');
+    if (banner) banner.style.display = 'flex';
+    if (this.map) {
+      const canvas = this.map.getCanvas();
+      if (canvas) canvas.style.cursor = 'crosshair';
+    }
+  }
 
-    function walk(coords) {
-      if (typeof coords[0] === 'number') {
-        const [lng, lat] = coords;
-        if (lng < minLng) minLng = lng;
-        if (lng > maxLng) maxLng = lng;
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-        return;
-      }
-      for (const item of coords) walk(item);
+  stopParcelSelection() {
+    this.isSelectingParcel = false;
+    const banner = document.getElementById('banner-3d-select');
+    if (banner) banner.style.display = 'none';
+    if (this.map) {
+      const canvas = this.map.getCanvas();
+      if (canvas) canvas.style.cursor = '';
+    }
+  }
+
+  highlightParcel(geometry) {
+    if (!this.map || !geometry) return;
+    const geojson = {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: geometry,
+        properties: {}
+      }]
+    };
+
+    if (!this.map.getSource(this.highlightSourceId)) {
+      this.map.addSource(this.highlightSourceId, {
+        type: 'geojson',
+        data: geojson
+      });
+    } else {
+      this.map.getSource(this.highlightSourceId).setData(geojson);
     }
 
-    walk(geom.coordinates);
-    if (!Number.isFinite(minLng) || !Number.isFinite(minLat)) return null;
-    return [minLng, minLat, maxLng, maxLat];
+    if (!this.map.getLayer(this.highlightLayerId)) {
+      this.map.addLayer({
+        id: this.highlightLayerId,
+        type: 'line',
+        source: this.highlightSourceId,
+        paint: {
+          'line-color': '#4f46e5',
+          'line-width': 3.5,
+          'line-opacity': 0.95
+        }
+      });
+    } else {
+      this.map.setLayoutProperty(this.highlightLayerId, 'visibility', 'visible');
+    }
+  }
+
+  clearHighlight() {
+    if (this.map && this.map.getLayer(this.highlightLayerId)) {
+      this.map.setLayoutProperty(this.highlightLayerId, 'visibility', 'none');
+    }
+  }
+
+  async viewParcel3D(targetParcel) {
+    if (!targetParcel || !targetParcel.geometry) {
+      this.startParcelSelection();
+      return;
+    }
+
+    this.stopParcelSelection();
+    this.activeParcel = targetParcel;
+    this.activeParcelGeom = targetParcel.geometry;
+
+    const geomBbox = this.computeBboxFromGeometry(targetParcel.geometry);
+    if (geomBbox && this.map) {
+      this.map.fitBounds(
+        [[geomBbox[0], geomBbox[1]], [geomBbox[2], geomBbox[3]]],
+        {
+          padding: { top: 70, bottom: 70, left: 70, right: 330 },
+          pitch: Math.max(55, this.map.getPitch() || 60),
+          bearing: this.map.getBearing() || -20,
+          duration: 1000
+        }
+      );
+    }
+
+    this.highlightParcel(targetParcel.geometry);
+    await this.toggle3D(true, targetParcel);
   }
 
   async prepareTerrainData(targetParcel = null) {
-    let bbox = null;
-    let targetName = 'Champ de vision';
+    const parcel = targetParcel || this.activeParcel || this.lastClickedParcel;
 
-    if (targetParcel) {
-      const geomBbox = targetParcel.geometry ? this.computeBboxFromGeometry(targetParcel.geometry) : (targetParcel.bbox || null);
-      if (geomBbox) {
-        // Ajouter 15% de marge autour de la parcelle
-        const padLng = Math.max(0.0008, (geomBbox[2] - geomBbox[0]) * 0.15);
-        const padLat = Math.max(0.0008, (geomBbox[3] - geomBbox[1]) * 0.15);
-        bbox = [geomBbox[0] - padLng, geomBbox[1] - padLat, geomBbox[2] + padLng, geomBbox[3] + padLat];
-        const props = targetParcel.properties || {};
-        targetName = props.NO_LOT ? `Lot ${props.NO_LOT}` : (props.id ? `Parcelle ${props.id}` : 'Parcelle ciblée');
-      }
+    if (!parcel || !parcel.geometry) {
+      this.startParcelSelection();
+      throw new Error("Veuillez cliquer sur une parcelle pour afficher son relief 3D.");
     }
 
-    if (!bbox) {
-      const bounds = this.map.getBounds();
-      bbox = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
-      targetName = 'Vue courante';
+    this.activeParcel = parcel;
+    this.activeParcelGeom = parcel.geometry;
+
+    const geomBbox = this.computeBboxFromGeometry(parcel.geometry);
+    if (!geomBbox) {
+      throw new Error("Contour géométrique de parcelle invalide.");
     }
 
-    this.activeTargetName = targetName;
+    // Marge de 12% autour du contour pour le collier de raccord
+    const padLng = Math.max(0.0006, (geomBbox[2] - geomBbox[0]) * 0.12);
+    const padLat = Math.max(0.0006, (geomBbox[3] - geomBbox[1]) * 0.12);
+    const bbox = [geomBbox[0] - padLng, geomBbox[1] - padLat, geomBbox[2] + padLng, geomBbox[3] + padLat];
 
-    // Lire les données altimétriques LiDAR 1m (priorité au projet actif si sélectionné)
+    const props = parcel.properties || {};
+    const pid = props.IDPAR || props.idpar || '';
+    const lotNum = props.NO_LOT || '';
+    const sup = props.SUPHEC || props.suphec || '';
+
+    this.activeTargetName = pid ? `Parcelle nº ${pid}` : (lotNum ? `Lot nº ${lotNum}` : 'Parcelle agricole');
+
+    // Résolution d'échantillonnage de la grille
+    const targetSize = 256;
+
     let region = null;
     const projectUrl = window.topoManager && window.topoManager.selectedProjectUrl;
 
     if (projectUrl && typeof readSingleHrdemProjectRegion === 'function') {
       try {
-        region = await readSingleHrdemProjectRegion(projectUrl, bbox, 256, null, 'bilinear');
+        region = await readSingleHrdemProjectRegion(projectUrl, bbox, targetSize, null, 'bilinear');
       } catch (e) {
         console.warn('readSingleHrdemProjectRegion fallback to multi:', e);
       }
     }
 
     if (!region && typeof readMultiHrdemRegion === 'function') {
-      region = await readMultiHrdemRegion(bbox, 256, null, 'bilinear');
+      region = await readMultiHrdemRegion(bbox, targetSize, null, 'bilinear');
     }
 
     if (!region || !region.data || region.data.length === 0) {
-      throw new Error("Impossible de lire les données altimétriques LiDAR dans cette zone.");
+      throw new Error("Données altimétriques LiDAR indisponibles pour cette zone.");
     }
 
-    // Calculer le plancher au 2e percentile pour éliminer les artéfacts
-    const vals = [];
-    for (let i = 0; i < region.data.length; i++) {
-      const v = region.data[i];
-      if (Number.isFinite(v) && v > -900 && v < 9000) {
-        vals.push(v);
+    const gridW = region.width;
+    const gridH = region.height;
+    const ab = region.bboxWgs84 || bbox;
+
+    // 1. Calcul du masque booléen/matriciel strict de découpage à la parcelle
+    const mask = new Float32Array(gridW * gridH);
+    for (let r = 0; r < gridH; r++) {
+      const pLat = ab[3] - (r / (gridH - 1)) * (ab[3] - ab[1]);
+      for (let c = 0; c < gridW; c++) {
+        const pLng = ab[0] + (c / (gridW - 1)) * (ab[2] - ab[0]);
+        mask[r * gridW + c] = this.isPointInGeom([pLng, pLat], parcel.geometry) ? 1.0 : 0.0;
       }
     }
 
-    if (vals.length === 0) {
-      throw new Error("Aucune altitude LiDAR valide dans cette zone.");
+    // 2. Calcul du plancher altimétrique (2e percentile) STRICTEMENT dans la parcelle
+    const parcelVals = [];
+    for (let i = 0; i < region.data.length; i++) {
+      if (mask[i] > 0.5) {
+        const v = region.data[i];
+        if (Number.isFinite(v) && v > -900 && v < 9000) {
+          parcelVals.push(v);
+        }
+      }
     }
 
-    vals.sort((a, b) => a - b);
-    const p2Idx = Math.max(0, Math.floor(vals.length * 0.02));
-    const p98Idx = Math.min(vals.length - 1, Math.floor(vals.length * 0.98));
-    const minElev = vals[p2Idx];
-    const maxElev = vals[p98Idx];
+    // Si aucun point intérieur n'a été trouvé, fallback sur la grille globale
+    if (parcelVals.length === 0) {
+      for (let i = 0; i < region.data.length; i++) {
+        const v = region.data[i];
+        if (Number.isFinite(v) && v > -900 && v < 9000) parcelVals.push(v);
+      }
+    }
+
+    if (parcelVals.length === 0) {
+      throw new Error("Aucune altitude LiDAR valide dans cette parcelle.");
+    }
+
+    parcelVals.sort((a, b) => a - b);
+    const p2Idx = Math.max(0, Math.floor(parcelVals.length * 0.02));
+    const p98Idx = Math.min(parcelVals.length - 1, Math.floor(parcelVals.length * 0.98));
+    const minElev = parcelVals[p2Idx];
+    const maxElev = parcelVals[p98Idx];
+    const elevSpan = Math.max(0.2, maxElev - minElev);
 
     this.activeTerrain = {
       data: region.data,
-      width: region.width,
-      height: region.height,
-      bounds: region.bboxWgs84 || bbox,
+      mask,
+      width: gridW,
+      height: gridH,
+      bounds: ab,
       minElev,
       maxElev,
-      span: Math.max(0.5, maxElev - minElev)
+      span: elevSpan,
+      parcelInfo: {
+        name: this.activeTargetName,
+        supStr: sup ? `${parseFloat(sup).toFixed(1)} ha` : null,
+        spanStr: `${elevSpan.toFixed(1)} m (${minElev.toFixed(1)}m – ${maxElev.toFixed(1)}m)`
+      }
     };
 
     this.version++;
@@ -364,23 +541,21 @@ class Terrain3DManager {
     const toggleTopo3D = document.getElementById('toggle-topo-3d');
 
     if (newState) {
-      const zoom = this.map.getZoom();
-      if (zoom < 11 && !targetParcel) {
-        alert("Veuillez zoomer davantage (zoom 12+) ou sélectionner une parcelle pour activer le relief 3D.");
+      const parcelToUse = targetParcel || this.activeParcel || this.lastClickedParcel;
+      if (!parcelToUse) {
+        this.startParcelSelection();
         return;
       }
 
       if (btnText) btnText.textContent = 'Calcul 3D...';
 
       try {
-        await this.prepareTerrainData(targetParcel);
+        await this.prepareTerrainData(parcelToUse);
 
-        // Assurer que le maxPitch est débloqué à 85°
         if (typeof this.map.setMaxPitch === 'function') {
           this.map.setMaxPitch(85);
         }
 
-        // Configurer la source raster-dem MapLibre si absente
         const tileUrl = `client-dem://{z}/{x}/{y}?v=${this.version}`;
 
         if (!this.map.getSource(this.sourceId)) {
@@ -403,7 +578,6 @@ class Terrain3DManager {
           });
         }
 
-        // Ajouter la couche hillshade 3D
         if (!this.map.getLayer(this.hillshadeLayerId)) {
           const beforeLayer = this.map.getLayer('pedologie-fill') ? 'pedologie-fill' : undefined;
           this.map.addLayer({
@@ -421,16 +595,14 @@ class Terrain3DManager {
           this.map.setLayoutProperty(this.hillshadeLayerId, 'visibility', 'visible');
         }
 
-        // Activer le relief 3D avec l'exagération demandée (30X par défaut)
+        // Relief 3D actif (30X par défaut)
         this.map.setTerrain({
           source: this.sourceId,
           exaggeration: this.exaggeration
         });
 
-        // Activer l'atmosphère / ciel pour les vues en plongée et rase-motte
         this.enableSky();
 
-        // Incliner la caméra en perspective si actuellement à plat
         const currentPitch = this.map.getPitch();
         if (currentPitch < 20) {
           this.map.easeTo({
@@ -451,6 +623,7 @@ class Terrain3DManager {
       this.stopOrbit();
       this.disableFreeCam();
       this.disableSky();
+      this.clearHighlight();
 
       this.map.setTerrain(null);
 
@@ -516,7 +689,6 @@ class Terrain3DManager {
     if (btn) btn.classList.add('active');
     if (icon) icon.classList.add('orbit-spinning');
 
-    // Si la vue est trop plate, incliner pour admirer le relief
     if (this.map.getPitch() < 30) {
       this.map.easeTo({ pitch: 60, duration: 600 });
     }
@@ -669,9 +841,8 @@ class Terrain3DManager {
     if (btn) btn.disabled = true;
 
     try {
-      await this.prepareTerrainData(this.lastClickedParcel);
+      await this.prepareTerrainData(this.activeParcel);
       
-      // Forcer le rechargement du terrain en rafraîchissant setTerrain
       this.map.setTerrain(null);
       this.map.setTerrain({
         source: this.sourceId,
@@ -685,6 +856,253 @@ class Terrain3DManager {
     }
   }
 
+  // ============================================================================
+  // EXPORT GEOTIFF (.TIF) DU MNT DÉCOUPÉ À LA PARCELLE
+  // ============================================================================
+
+  buildGeoTiffBuffer(dataFloat32, width, height, bboxWgs84, noDataValue = -9999.0) {
+    const [minLng, minLat, maxLng, maxLat] = bboxWgs84;
+    const pixelScaleX = (maxLng - minLng) / width;
+    const pixelScaleY = (maxLat - minLat) / height;
+
+    const noDataStr = `${noDataValue}\0`;
+    const noDataLength = noDataStr.length;
+
+    // GeoKeyDirectory: WGS 84 (EPSG:4326)
+    const geoKeys = [
+      1, 1, 0, 3,
+      1024, 0, 1, 2,   // GTModelTypeGeoKey: 2 = ModelTypeGeographic
+      1025, 0, 1, 1,   // GTRasterTypeGeoKey: 1 = RasterPixelIsArea
+      2048, 0, 1, 4326 // GeographicTypeGeoKey: 4326 = EPSG:4326
+    ];
+    const geoKeyBytesLength = geoKeys.length * 2; // 32 bytes
+
+    const modelPixelScale = [pixelScaleX, pixelScaleY, 0.0]; // 24 bytes
+    const modelTiepoint = [0.0, 0.0, 0.0, minLng, maxLat, 0.0]; // 48 bytes
+
+    const numEntries = 15;
+    const ifdSize = 2 + numEntries * 12 + 4; // 186 bytes
+
+    const ifdOffset = 8;
+    let currentOffset = ifdOffset + ifdSize;
+
+    const modelPixelScaleOffset = currentOffset;
+    currentOffset += 24;
+
+    const modelTiepointOffset = currentOffset;
+    currentOffset += 48;
+
+    const geoKeyDirectoryOffset = currentOffset;
+    currentOffset += geoKeyBytesLength;
+
+    const noDataOffset = currentOffset;
+    currentOffset += noDataLength;
+
+    if (currentOffset % 4 !== 0) {
+      currentOffset += (4 - (currentOffset % 4));
+    }
+
+    const stripOffset = currentOffset;
+    const stripByteCounts = width * height * 4;
+    const totalFileSize = stripOffset + stripByteCounts;
+
+    const buffer = new ArrayBuffer(totalFileSize);
+    const view = new DataView(buffer);
+
+    // Header: II (0x4949), 42, offset 8
+    view.setUint16(0, 0x4949, true);
+    view.setUint16(2, 42, true);
+    view.setUint32(4, ifdOffset, true);
+
+    let ifdPos = ifdOffset;
+    view.setUint16(ifdPos, numEntries, true);
+    ifdPos += 2;
+
+    const writeTag = (tag, type, count, valOrOffset) => {
+      view.setUint16(ifdPos, tag, true);
+      view.setUint16(ifdPos + 2, type, true);
+      view.setUint32(ifdPos + 4, count, true);
+      view.setUint32(ifdPos + 8, valOrOffset, true);
+      ifdPos += 12;
+    };
+
+    writeTag(256, 4, 1, width); // ImageWidth (LONG)
+    writeTag(257, 4, 1, height); // ImageLength (LONG)
+    writeTag(258, 3, 1, 32); // BitsPerSample (SHORT)
+    writeTag(259, 3, 1, 1); // Compression: None (SHORT)
+    writeTag(262, 3, 1, 1); // PhotometricInterpretation: BlackIsZero (SHORT)
+    writeTag(273, 4, 1, stripOffset); // StripOffsets (LONG)
+    writeTag(277, 3, 1, 1); // SamplesPerPixel (SHORT)
+    writeTag(278, 4, 1, height); // RowsPerStrip (LONG)
+    writeTag(279, 4, 1, stripByteCounts); // StripByteCounts (LONG)
+    writeTag(284, 3, 1, 1); // PlanarConfiguration: Chunky (SHORT)
+    writeTag(339, 3, 1, 3); // SampleFormat: IEEE Float (SHORT)
+    writeTag(33550, 12, 3, modelPixelScaleOffset); // ModelPixelScale (DOUBLE)
+    writeTag(33922, 12, 6, modelTiepointOffset); // ModelTiepoint (DOUBLE)
+    writeTag(34735, 3, geoKeys.length, geoKeyDirectoryOffset); // GeoKeyDirectory (SHORT)
+    writeTag(42113, 2, noDataLength, noDataOffset); // GDAL_NODATA (ASCII)
+
+    view.setUint32(ifdPos, 0, true); // Next IFD = 0
+
+    // ModelPixelScale
+    for (let i = 0; i < 3; i++) {
+      view.setFloat64(modelPixelScaleOffset + i * 8, modelPixelScale[i], true);
+    }
+
+    // ModelTiepoint
+    for (let i = 0; i < 6; i++) {
+      view.setFloat64(modelTiepointOffset + i * 8, modelTiepoint[i], true);
+    }
+
+    // GeoKeyDirectory
+    for (let i = 0; i < geoKeys.length; i++) {
+      view.setUint16(geoKeyDirectoryOffset + i * 2, geoKeys[i], true);
+    }
+
+    // GDAL_NODATA
+    const uint8View = new Uint8Array(buffer);
+    for (let i = 0; i < noDataLength; i++) {
+      uint8View[noDataOffset + i] = noDataStr.charCodeAt(i);
+    }
+
+    // Données altimétriques Float32
+    for (let i = 0; i < dataFloat32.length; i++) {
+      view.setFloat32(stripOffset + i * 4, dataFloat32[i], true);
+    }
+
+    return buffer;
+  }
+
+  async exportParcelGeoTiff(targetParcel = null) {
+    const parcel = targetParcel || this.activeParcel || this.lastClickedParcel;
+    if (!parcel || !parcel.geometry) {
+      alert("Veuillez d'abord cliquer sur une parcelle sur la carte pour exporter son MNT.");
+      return;
+    }
+
+    const props = parcel.properties || {};
+    const parcelId = props.IDPAR || props.idpar || props.NO_LOT || 'agricole';
+    const cleanId = String(parcelId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `parcelle_${cleanId}_mnt_lidar_1m.tif`;
+
+    const btnExport = document.getElementById('btnExport3DTif');
+    const origHtml = btnExport ? btnExport.innerHTML : '';
+    if (btnExport) {
+      btnExport.disabled = true;
+      btnExport.innerHTML = `<span>Génération TIF...</span>`;
+    }
+
+    try {
+      const geom = parcel.geometry;
+      const geomBbox = this.computeBboxFromGeometry(geom);
+      if (!geomBbox) throw new Error("Contour de parcelle invalide.");
+
+      const [minLng, minLat, maxLng, maxLat] = geomBbox;
+      const midLat = (minLat + maxLat) / 2;
+      const widthM = (maxLng - minLng) * 111320 * Math.cos(midLat * Math.PI / 180);
+      const heightM = (maxLat - minLat) * 111320;
+
+      // Résolution 1m LiDAR native (taille adaptée entre 64 et 2048 pixels)
+      const gridW = Math.max(48, Math.min(2048, Math.round(widthM)));
+      const gridH = Math.max(48, Math.min(2048, Math.round(heightM)));
+      const targetSize = Math.max(gridW, gridH);
+
+      let region = null;
+      const projectUrl = window.topoManager && window.topoManager.selectedProjectUrl;
+      if (projectUrl && typeof readSingleHrdemProjectRegion === 'function') {
+        try {
+          region = await readSingleHrdemProjectRegion(projectUrl, geomBbox, targetSize, null, 'bilinear');
+        } catch (e) {
+          console.warn('readSingle fallback:', e);
+        }
+      }
+      if (!region && typeof readMultiHrdemRegion === 'function') {
+        region = await readMultiHrdemRegion(geomBbox, targetSize, null, 'bilinear');
+      }
+
+      if (!region || !region.data) {
+        throw new Error("Impossible de récupérer les données LiDAR pour cette parcelle.");
+      }
+
+      const srcGrid = region.data;
+      const srcW = region.width;
+      const srcH = region.height;
+      const srcBbox = region.bboxWgs84 || geomBbox;
+      const srcSpanLng = srcBbox[2] - srcBbox[0];
+      const srcSpanLat = srcBbox[3] - srcBbox[1];
+
+      const outData = new Float32Array(gridW * gridH);
+
+      for (let r = 0; r < gridH; r++) {
+        const pLat = maxLat - ((r + 0.5) / gridH) * (maxLat - minLat);
+        for (let c = 0; c < gridW; c++) {
+          const pLng = minLng + ((c + 0.5) / gridW) * (maxLng - minLng);
+          const outIdx = r * gridW + c;
+
+          // Découpage strict au polygone de la parcelle
+          if (!this.isPointInGeom([pLng, pLat], geom)) {
+            outData[outIdx] = -9999.0; // Valeur NoData standard
+            continue;
+          }
+
+          // Échantillonnage bilinéaire
+          const u = (pLng - srcBbox[0]) / srcSpanLng;
+          const v = (srcBbox[3] - pLat) / srcSpanLat;
+
+          if (u < 0 || u > 1 || v < 0 || v > 1) {
+            outData[outIdx] = -9999.0;
+            continue;
+          }
+
+          const col = Math.max(0, Math.min(srcW - 1, u * (srcW - 1)));
+          const row = Math.max(0, Math.min(srcH - 1, v * (srcH - 1)));
+          const c0 = Math.floor(col);
+          const c1 = Math.min(srcW - 1, c0 + 1);
+          const r0 = Math.floor(row);
+          const r1 = Math.min(srcH - 1, r0 + 1);
+          const fc = col - c0;
+          const fr = row - r0;
+
+          const v00 = srcGrid[r0 * srcW + c0];
+          const v10 = srcGrid[r0 * srcW + c1];
+          const v01 = srcGrid[r1 * srcW + c0];
+          const v11 = srcGrid[r1 * srcW + c1];
+
+          const elev = (v00 * (1 - fc) + v10 * fc) * (1 - fr) + (v01 * (1 - fc) + v11 * fc) * fr;
+          if (Number.isFinite(elev) && elev > -900 && elev < 9000) {
+            outData[outIdx] = elev;
+          } else {
+            outData[outIdx] = -9999.0;
+          }
+        }
+      }
+
+      const tiffBuffer = this.buildGeoTiffBuffer(outData, gridW, gridH, geomBbox, -9999.0);
+      const blob = new Blob([tiffBuffer], { type: 'image/tiff' });
+      const downloadUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+
+    } catch (err) {
+      console.error('Erreur export GeoTIFF:', err);
+      alert(err.message || "Erreur lors de l'exportation du MNT en GeoTIFF.");
+    } finally {
+      if (btnExport) {
+        btnExport.disabled = false;
+        btnExport.innerHTML = origHtml || `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Exporter TIF</span>
+        `;
+      }
+    }
+  }
+
   syncUI() {
     const btn = document.getElementById('btn-quick-3d');
     const btnText = document.getElementById('btn-3d-text');
@@ -695,6 +1113,11 @@ class Terrain3DManager {
     const toggleTopo3D = document.getElementById('toggle-topo-3d');
     const topo3DBadge = document.getElementById('topo-3d-badge-status');
     const scopeLabel = document.getElementById('label-3d-scope');
+
+    const cardParcel = document.getElementById('card3DParcelInfo');
+    const labelParcelName = document.getElementById('label3DParcelName');
+    const metaParcelArea = document.getElementById('meta3DParcelArea');
+    const metaParcelSpan = document.getElementById('meta3DParcelSpan');
 
     const exagStr = `${this.exaggeration.toFixed(0)}x`;
 
@@ -722,8 +1145,17 @@ class Terrain3DManager {
     if (panel) {
       panel.style.display = this.is3DActive ? 'block' : 'none';
     }
-    if (scopeLabel) {
-      scopeLabel.textContent = this.is3DActive && this.activeTargetName ? `Cible : ${this.activeTargetName}` : 'Amplifie le micro-relief des pentes agricoles';
+
+    if (this.is3DActive && this.activeTerrain && this.activeTerrain.parcelInfo) {
+      const info = this.activeTerrain.parcelInfo;
+      if (cardParcel) cardParcel.style.display = 'flex';
+      if (labelParcelName) labelParcelName.textContent = info.name || 'Parcelle sélectionnée';
+      if (metaParcelArea) metaParcelArea.textContent = info.supStr || 'Superficie parcelle';
+      if (metaParcelSpan) metaParcelSpan.textContent = `Dénivelé : ${info.spanStr}`;
+      if (scopeLabel) scopeLabel.textContent = 'Micro-relief découpé et amplifié 30X';
+    } else {
+      if (cardParcel) cardParcel.style.display = 'none';
+      if (scopeLabel) scopeLabel.textContent = 'Amplifie le micro-relief des pentes agricoles';
     }
 
     document.querySelectorAll('.btn-preset-3d').forEach((b) => {
@@ -737,17 +1169,49 @@ class Terrain3DManager {
   bindEvents() {
     const btnQuick3D = document.getElementById('btn-quick-3d');
     if (btnQuick3D) {
-      btnQuick3D.addEventListener('click', () => this.toggle3D());
+      btnQuick3D.addEventListener('click', () => {
+        if (this.is3DActive) {
+          this.toggle3D(false);
+        } else {
+          const p = this.activeParcel || this.lastClickedParcel;
+          if (p) {
+            this.viewParcel3D(p);
+          } else {
+            this.startParcelSelection();
+          }
+        }
+      });
     }
 
     const toggleTopo3D = document.getElementById('toggle-topo-3d');
     if (toggleTopo3D) {
-      toggleTopo3D.addEventListener('change', (e) => this.toggle3D(e.target.checked));
+      toggleTopo3D.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          const p = this.activeParcel || this.lastClickedParcel;
+          if (p) {
+            this.viewParcel3D(p);
+          } else {
+            this.startParcelSelection();
+          }
+        } else {
+          this.toggle3D(false);
+        }
+      });
     }
 
     const btnClose = document.getElementById('btnClose3DPanel');
     if (btnClose) {
       btnClose.addEventListener('click', () => this.toggle3D(false));
+    }
+
+    const btnCancelSelect = document.getElementById('btnCancel3DSelect');
+    if (btnCancelSelect) {
+      btnCancelSelect.addEventListener('click', () => this.stopParcelSelection());
+    }
+
+    const btnSwitch = document.getElementById('btnSwitchParcel');
+    if (btnSwitch) {
+      btnSwitch.addEventListener('click', () => this.startParcelSelection());
     }
 
     // Exagération verticale slider & presets
@@ -795,6 +1259,12 @@ class Terrain3DManager {
     const btnRefresh = document.getElementById('btnRefresh3D');
     if (btnRefresh) {
       btnRefresh.addEventListener('click', () => this.refreshCurrentView());
+    }
+
+    // Export GeoTIFF (.tif)
+    const btnExportTif = document.getElementById('btnExport3DTif');
+    if (btnExportTif) {
+      btnExportTif.addEventListener('click', () => this.exportParcelGeoTiff());
     }
   }
 }
