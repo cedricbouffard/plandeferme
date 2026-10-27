@@ -2,11 +2,11 @@
  * ==============================================================================
  * TERRAIN 3D MANAGER (PLAN DE FERME)
  * Visualisation 3D native du micro-relief LiDAR 1m côté client dans MapLibre GL
- * DÉCOUPÉ AUX PARCELLES AGRICOLES :
- * - Découpage strict au polygone de la parcelle (relief 30X à l'intérieur, 0m à l'extérieur)
- * - Calage altimétrique à 0m au point le plus bas de la parcelle
- * - Mise en valeur du périmètre de la parcelle en 3D
- * - Exportation directe du Modèle Numérique de Terrain (MNT) découpé en GeoTIFF (.tif)
+ * DÉCOUPÉ AUX PARCELLES AGRICOLES AVEC PROJECTION EXACTE :
+ * - Projection rigoureuse via proj4 (EPSG:3979 / MTM / UTM) éliminant toute distorsion/rotation
+ * - Découpage strict au polygone de la parcelle (micro-relief amplifié à l'intérieur, 0m à l'extérieur)
+ * - Calage altimétrique précis au plancher de la parcelle
+ * - Exportation conforme du MNT LiDAR en GeoTIFF métrique UTM (.tif) pour QGIS, ArcGIS, Trimble, AgOpenGPS
  * - Navigation libre jusqu'à 85° (rase-motte), ciel atmosphérique et orbite 360°
  * ==============================================================================
  */
@@ -51,6 +51,10 @@ class Terrain3DManager {
     this.freeCamStartBearing = 0;
 
     this.init();
+  }
+
+  getProj4() {
+    return window.proj4 || (window.GeoLibreContour && window.GeoLibreContour.proj4) || (typeof proj4 !== 'undefined' ? proj4 : null);
   }
 
   async init() {
@@ -127,7 +131,7 @@ class Terrain3DManager {
     ];
   }
 
-  // Fonctions de géométrie pour le découpage strict aux parcelles
+  // Fonctions de géométrie
   isPointInRing(pt, ring) {
     let inside = false;
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -185,6 +189,10 @@ class Terrain3DManager {
     return [minLng, minLat, maxLng, maxLat];
   }
 
+  // ============================================================================
+  // ÉCHANTILLONNAGE 3D PAR TUILE (AVEC PROJECTION PROJ4 EXACTE)
+  // ============================================================================
+
   async handleTileRequest(params) {
     const url = params.url || '';
     const match = url.match(/client-dem:\/\/(\d+)\/(\d+)\/(\d+)/);
@@ -201,14 +209,14 @@ class Terrain3DManager {
       return { data: this.tileCache.get(cacheKey) };
     }
 
-    if (!this.activeTerrain || !this.activeTerrain.data) {
+    if (!this.activeTerrain || !this.activeTerrain.data || !this.activeTerrain.sourceBBox) {
       return { data: this.flatTileBuffer ? this.flatTileBuffer.slice(0) : new ArrayBuffer(0) };
     }
 
     const [tMinLng, tMinLat, tMaxLng, tMaxLat] = this.getTileBbox(z, x, y);
     const ab = this.activeTerrain.bounds;
 
-    // Vérifier l'intersection avec la bounding box de la parcelle
+    // Vérifier l'intersection avec la bounding box de la zone active
     const intersects = !(tMaxLng < ab[0] || tMinLng > ab[2] || tMaxLat < ab[1] || tMinLat > ab[3]);
     if (!intersects) {
       if (this.tileCache.size < this.maxCacheSize) {
@@ -217,63 +225,81 @@ class Terrain3DManager {
       return { data: this.flatTileBuffer ? this.flatTileBuffer.slice(0) : new ArrayBuffer(0) };
     }
 
+    const p4 = this.getProj4();
+    if (!p4) {
+      console.warn('proj4 introuvable dans Terrain3DManager');
+      return { data: this.flatTileBuffer ? this.flatTileBuffer.slice(0) : new ArrayBuffer(0) };
+    }
+
     const grid = this.activeTerrain.data;
-    const mask = this.activeTerrain.mask;
     const gridW = this.activeTerrain.width;
     const gridH = this.activeTerrain.height;
     const minElev = this.activeTerrain.minElev;
-    const abW = ab[2] - ab[0];
-    const abH = ab[3] - ab[1];
+    const sB = this.activeTerrain.sourceBBox;
+    const projDef = this.activeTerrain.projection;
+    const geom = this.activeParcelGeom;
+
+    const spanX = sB[2] - sB[0];
+    const spanY = sB[3] - sB[1];
+
+    // Projection rigoureuse des 4 coins de la tuile en coordonnées du raster LiDAR
+    const pNW = p4('EPSG:4326', projDef, [tMinLng, tMaxLat]);
+    const pNE = p4('EPSG:4326', projDef, [tMaxLng, tMaxLat]);
+    const pSW = p4('EPSG:4326', projDef, [tMinLng, tMinLat]);
+    const pSE = p4('EPSG:4326', projDef, [tMaxLng, tMinLat]);
 
     const imgData = this.ctx.createImageData(256, 256);
     const pixels = imgData.data;
 
     for (let py = 0; py < 256; py++) {
-      const pLat = tMaxLat - (py / 255.0) * (tMaxLat - tMinLat);
+      const v_tile = py / 255.0;
       const rowOffset = py * 256 * 4;
 
+      // Interpolation linéaire des coordonnées projetées sur les bords gauche et droit
+      const leftX = (1 - v_tile) * pNW[0] + v_tile * pSW[0];
+      const leftY = (1 - v_tile) * pNW[1] + v_tile * pSW[1];
+      const rightX = (1 - v_tile) * pNE[0] + v_tile * pSE[0];
+      const rightY = (1 - v_tile) * pNE[1] + v_tile * pSE[1];
+
+      // Coordonnée géographique pour le test de polygone
+      const pLat = tMaxLat - v_tile * (tMaxLat - tMinLat);
+
       for (let px = 0; px < 256; px++) {
-        const pLng = tMinLng + (px / 255.0) * (tMaxLng - tMinLng);
+        const u_tile = px / 255.0;
+        const pLng = tMinLng + u_tile * (tMaxLng - tMinLng);
 
         let z_rel = 0.0;
 
-        if (pLng >= ab[0] && pLng <= ab[2] && pLat >= ab[1] && pLat <= ab[3]) {
-          const u = (pLng - ab[0]) / abW;
-          const v = (ab[3] - pLat) / abH;
+        // Vérifier si le point est à l'intérieur du polygone de la parcelle
+        if (!geom || this.isPointInGeom([pLng, pLat], geom)) {
+          // Coordonnées projetées exactes (mX, mY) dans le système de référence du LiDAR
+          const mX = leftX + u_tile * (rightX - leftX);
+          const mY = leftY + u_tile * (rightY - leftY);
 
-          const col = Math.max(0, Math.min(gridW - 1, u * (gridW - 1)));
-          const row = Math.max(0, Math.min(gridH - 1, v * (gridH - 1)));
+          const u = (mX - sB[0]) / spanX;
+          const v = (sB[3] - mY) / spanY;
 
-          const c0 = Math.floor(col);
-          const c1 = Math.min(gridW - 1, c0 + 1);
-          const r0 = Math.floor(row);
-          const r1 = Math.min(gridH - 1, r0 + 1);
+          if (u >= 0 && u <= 1 && v >= 0 && v <= 1) {
+            const col = u * (gridW - 1);
+            const row = v * (gridH - 1);
 
-          const fc = col - c0;
-          const fr = row - r0;
+            const c0 = Math.floor(col);
+            const c1 = Math.min(gridW - 1, c0 + 1);
+            const r0 = Math.floor(row);
+            const r1 = Math.min(gridH - 1, r0 + 1);
 
-          // Échantillonnage du masque de découpage parcelle
-          let maskVal = 1.0;
-          if (mask) {
-            const m00 = mask[r0 * gridW + c0];
-            const m10 = mask[r0 * gridW + c1];
-            const m01 = mask[r1 * gridW + c0];
-            const m11 = mask[r1 * gridW + c1];
-            maskVal = (m00 * (1 - fc) + m10 * fc) * (1 - fr) + (m01 * (1 - fc) + m11 * fc) * fr;
-          }
+            const fc = col - c0;
+            const fr = row - r0;
 
-          // Si on est à l'intérieur du polygone de la parcelle
-          if (maskVal > 0.01) {
-            const val00 = grid[r0 * gridW + c0];
-            const val10 = grid[r0 * gridW + c1];
-            const val01 = grid[r1 * gridW + c0];
-            const val11 = grid[r1 * gridW + c1];
+            const v00 = grid[r0 * gridW + c0];
+            const v10 = grid[r0 * gridW + c1];
+            const v01 = grid[r1 * gridW + c0];
+            const v11 = grid[r1 * gridW + c1];
 
-            const elev = (val00 * (1 - fc) + val10 * fc) * (1 - fr) + (val01 * (1 - fc) + val11 * fc) * fr;
+            const elev = (v00 * (1 - fc) + v10 * fc) * (1 - fr) + (v01 * (1 - fc) + v11 * fc) * fr;
 
             if (Number.isFinite(elev) && elev > -900 && elev < 9000) {
-              // Altitude relative au plancher de la parcelle, modulée par le masque
-              z_rel = Math.max(0.0, elev - minElev) * maskVal;
+              z_rel = Math.max(0.0, elev - minElev);
             }
           }
         }
@@ -407,7 +433,7 @@ class Terrain3DManager {
       throw new Error("Contour géométrique de parcelle invalide.");
     }
 
-    // Marge de 12% autour du contour pour le collier de raccord
+    // Marge de 12% autour du contour
     const padLng = Math.max(0.0006, (geomBbox[2] - geomBbox[0]) * 0.12);
     const padLat = Math.max(0.0006, (geomBbox[3] - geomBbox[1]) * 0.12);
     const bbox = [geomBbox[0] - padLng, geomBbox[1] - padLat, geomBbox[2] + padLng, geomBbox[3] + padLat];
@@ -419,9 +445,7 @@ class Terrain3DManager {
 
     this.activeTargetName = pid ? `Parcelle nº ${pid}` : (lotNum ? `Lot nº ${lotNum}` : 'Parcelle agricole');
 
-    // Résolution d'échantillonnage de la grille
     const targetSize = 256;
-
     let region = null;
     const projectUrl = window.topoManager && window.topoManager.selectedProjectUrl;
 
@@ -437,36 +461,36 @@ class Terrain3DManager {
       region = await readMultiHrdemRegion(bbox, targetSize, null, 'bilinear');
     }
 
-    if (!region || !region.data || region.data.length === 0) {
+    if (!region || !region.data || region.data.length === 0 || !region.sourceBBox) {
       throw new Error("Données altimétriques LiDAR indisponibles pour cette zone.");
     }
 
+    const p4 = this.getProj4();
+    const projDef = region.projection || (typeof EPSG_3979_DEF !== 'undefined' ? EPSG_3979_DEF : '+proj=lcc +lat_1=49 +lat_2=77 +lat_0=49 +lon_0=-95 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+
     const gridW = region.width;
     const gridH = region.height;
-    const ab = region.bboxWgs84 || bbox;
+    const sB = region.sourceBBox;
+    const spanX = sB[2] - sB[0];
+    const spanY = sB[3] - sB[1];
 
-    // 1. Calcul du masque booléen/matriciel strict de découpage à la parcelle
-    const mask = new Float32Array(gridW * gridH);
-    for (let r = 0; r < gridH; r++) {
-      const pLat = ab[3] - (r / (gridH - 1)) * (ab[3] - ab[1]);
-      for (let c = 0; c < gridW; c++) {
-        const pLng = ab[0] + (c / (gridW - 1)) * (ab[2] - ab[0]);
-        mask[r * gridW + c] = this.isPointInGeom([pLng, pLat], parcel.geometry) ? 1.0 : 0.0;
-      }
-    }
-
-    // 2. Calcul du plancher altimétrique (2e percentile) STRICTEMENT dans la parcelle
+    // Calcul du plancher altimétrique (2e percentile) STRICTEMENT à l'intérieur du polygone de la parcelle
     const parcelVals = [];
-    for (let i = 0; i < region.data.length; i++) {
-      if (mask[i] > 0.5) {
-        const v = region.data[i];
-        if (Number.isFinite(v) && v > -900 && v < 9000) {
-          parcelVals.push(v);
+    for (let r = 0; r < gridH; r++) {
+      const mY = sB[3] - (r / (gridH - 1)) * spanY;
+      for (let c = 0; c < gridW; c++) {
+        const mX = sB[0] + (c / (gridW - 1)) * spanX;
+        const [lng, lat] = p4(projDef, 'EPSG:4326', [mX, mY]);
+
+        if (this.isPointInGeom([lng, lat], parcel.geometry)) {
+          const v = region.data[r * gridW + c];
+          if (Number.isFinite(v) && v > -900 && v < 9000) {
+            parcelVals.push(v);
+          }
         }
       }
     }
 
-    // Si aucun point intérieur n'a été trouvé, fallback sur la grille globale
     if (parcelVals.length === 0) {
       for (let i = 0; i < region.data.length; i++) {
         const v = region.data[i];
@@ -487,10 +511,11 @@ class Terrain3DManager {
 
     this.activeTerrain = {
       data: region.data,
-      mask,
       width: gridW,
       height: gridH,
-      bounds: ab,
+      sourceBBox: region.sourceBBox,
+      projection: projDef,
+      bounds: region.bboxWgs84 || bbox,
       minElev,
       maxElev,
       span: elevSpan,
@@ -857,46 +882,34 @@ class Terrain3DManager {
   }
 
   // ============================================================================
-  // EXPORT GEOTIFF (.TIF) DU MNT DÉCOUPÉ À LA PARCELLE
+  // EXPORT GEOTIFF (.TIF) MÉTRIQUE EN COORDONNÉES UTM STANDARD
   // ============================================================================
 
-  buildGeoTiffBuffer(dataFloat32, width, height, bboxWgs84, noDataValue = -9999.0) {
-    const [minLng, minLat, maxLng, maxLat] = bboxWgs84;
-    const pixelScaleX = (maxLng - minLng) / width;
-    const pixelScaleY = (maxLat - minLat) / height;
-
+  buildUtmGeoTiffBuffer(dataFloat32, width, height, utmMinX, utmMaxY, resMeters, utmEpsg, noDataValue = -9999.0) {
     const noDataStr = `${noDataValue}\0`;
     const noDataLength = noDataStr.length;
 
-    // GeoKeyDirectory: WGS 84 (EPSG:4326)
+    // GeoKeyDirectory: Système projeté UTM (EPSG:32618 ou EPSG:32619)
     const geoKeys = [
       1, 1, 0, 3,
-      1024, 0, 1, 2,   // GTModelTypeGeoKey: 2 = ModelTypeGeographic
-      1025, 0, 1, 1,   // GTRasterTypeGeoKey: 1 = RasterPixelIsArea
-      2048, 0, 1, 4326 // GeographicTypeGeoKey: 4326 = EPSG:4326
+      1024, 0, 1, 1,        // GTModelTypeGeoKey: 1 = ModelTypeProjected
+      1025, 0, 1, 1,        // GTRasterTypeGeoKey: 1 = RasterPixelIsArea
+      3072, 0, 1, utmEpsg   // ProjectedCSTypeGeoKey: 32618 (UTM 18N) ou 32619 (UTM 19N)
     ];
     const geoKeyBytesLength = geoKeys.length * 2; // 32 bytes
 
-    const modelPixelScale = [pixelScaleX, pixelScaleY, 0.0]; // 24 bytes
-    const modelTiepoint = [0.0, 0.0, 0.0, minLng, maxLat, 0.0]; // 48 bytes
+    const modelPixelScale = [resMeters, resMeters, 0.0]; // 24 bytes
+    const modelTiepoint = [0.0, 0.0, 0.0, utmMinX, utmMaxY, 0.0]; // 48 bytes
 
     const numEntries = 15;
     const ifdSize = 2 + numEntries * 12 + 4; // 186 bytes
-
     const ifdOffset = 8;
     let currentOffset = ifdOffset + ifdSize;
 
-    const modelPixelScaleOffset = currentOffset;
-    currentOffset += 24;
-
-    const modelTiepointOffset = currentOffset;
-    currentOffset += 48;
-
-    const geoKeyDirectoryOffset = currentOffset;
-    currentOffset += geoKeyBytesLength;
-
-    const noDataOffset = currentOffset;
-    currentOffset += noDataLength;
+    const modelPixelScaleOffset = currentOffset; currentOffset += 24;
+    const modelTiepointOffset = currentOffset; currentOffset += 48;
+    const geoKeyDirectoryOffset = currentOffset; currentOffset += geoKeyBytesLength;
+    const noDataOffset = currentOffset; currentOffset += noDataLength;
 
     if (currentOffset % 4 !== 0) {
       currentOffset += (4 - (currentOffset % 4));
@@ -909,7 +922,7 @@ class Terrain3DManager {
     const buffer = new ArrayBuffer(totalFileSize);
     const view = new DataView(buffer);
 
-    // Header: II (0x4949), 42, offset 8
+    // Header TIFF: Little Endian II, 42, offset IFD 8
     view.setUint16(0, 0x4949, true);
     view.setUint16(2, 42, true);
     view.setUint32(4, ifdOffset, true);
@@ -942,30 +955,23 @@ class Terrain3DManager {
     writeTag(34735, 3, geoKeys.length, geoKeyDirectoryOffset); // GeoKeyDirectory (SHORT)
     writeTag(42113, 2, noDataLength, noDataOffset); // GDAL_NODATA (ASCII)
 
-    view.setUint32(ifdPos, 0, true); // Next IFD = 0
+    view.setUint32(ifdPos, 0, true);
 
-    // ModelPixelScale
     for (let i = 0; i < 3; i++) {
       view.setFloat64(modelPixelScaleOffset + i * 8, modelPixelScale[i], true);
     }
-
-    // ModelTiepoint
     for (let i = 0; i < 6; i++) {
       view.setFloat64(modelTiepointOffset + i * 8, modelTiepoint[i], true);
     }
-
-    // GeoKeyDirectory
     for (let i = 0; i < geoKeys.length; i++) {
       view.setUint16(geoKeyDirectoryOffset + i * 2, geoKeys[i], true);
     }
 
-    // GDAL_NODATA
     const uint8View = new Uint8Array(buffer);
     for (let i = 0; i < noDataLength; i++) {
       uint8View[noDataOffset + i] = noDataStr.charCodeAt(i);
     }
 
-    // Données altimétriques Float32
     for (let i = 0; i < dataFloat32.length; i++) {
       view.setFloat32(stripOffset + i * 4, dataFloat32[i], true);
     }
@@ -977,6 +983,12 @@ class Terrain3DManager {
     const parcel = targetParcel || this.activeParcel || this.lastClickedParcel;
     if (!parcel || !parcel.geometry) {
       alert("Veuillez d'abord cliquer sur une parcelle sur la carte pour exporter son MNT.");
+      return;
+    }
+
+    const p4 = this.getProj4();
+    if (!p4) {
+      alert("Bibliothèque de projection proj4 indisponible.");
       return;
     }
 
@@ -997,15 +1009,33 @@ class Terrain3DManager {
       const geomBbox = this.computeBboxFromGeometry(geom);
       if (!geomBbox) throw new Error("Contour de parcelle invalide.");
 
-      const [minLng, minLat, maxLng, maxLat] = geomBbox;
-      const midLat = (minLat + maxLat) / 2;
-      const widthM = (maxLng - minLng) * 111320 * Math.cos(midLat * Math.PI / 180);
-      const heightM = (maxLat - minLat) * 111320;
+      const midLng = (geomBbox[0] + geomBbox[2]) / 2;
+      const utmZone = midLng < -72.0 ? 18 : 19;
+      const utmEpsg = midLng < -72.0 ? 32618 : 32619;
+      const utmDef = `+proj=utm +zone=${utmZone} +datum=WGS84 +units=m +no_defs`;
 
-      // Résolution 1m LiDAR native (taille adaptée entre 64 et 2048 pixels)
-      const gridW = Math.max(48, Math.min(2048, Math.round(widthM)));
-      const gridH = Math.max(48, Math.min(2048, Math.round(heightM)));
-      const targetSize = Math.max(gridW, gridH);
+      // Déterminer les bornes précises du polygone en mètres UTM
+      let utmMinX = Infinity, utmMaxX = -Infinity;
+      let utmMinY = Infinity, utmMaxY = -Infinity;
+
+      const walkCoords = (coords) => {
+        if (typeof coords[0] === 'number') {
+          const pt = p4('EPSG:4326', utmDef, coords);
+          if (pt[0] < utmMinX) utmMinX = pt[0];
+          if (pt[0] > utmMaxX) utmMaxX = pt[0];
+          if (pt[1] < utmMinY) utmMinY = pt[1];
+          if (pt[1] > utmMaxY) utmMaxY = pt[1];
+          return;
+        }
+        for (const item of coords) walkCoords(item);
+      };
+      walkCoords(geom.coordinates);
+
+      // Résolution 1m LiDAR native
+      const res = 1.0;
+      const gridW = Math.max(16, Math.round((utmMaxX - utmMinX) / res));
+      const gridH = Math.max(16, Math.round((utmMaxY - utmMinY) / res));
+      const targetSize = Math.max(256, Math.min(2048, Math.max(gridW, gridH)));
 
       let region = null;
       const projectUrl = window.topoManager && window.topoManager.selectedProjectUrl;
@@ -1020,34 +1050,39 @@ class Terrain3DManager {
         region = await readMultiHrdemRegion(geomBbox, targetSize, null, 'bilinear');
       }
 
-      if (!region || !region.data) {
+      if (!region || !region.data || !region.sourceBBox) {
         throw new Error("Impossible de récupérer les données LiDAR pour cette parcelle.");
       }
 
       const srcGrid = region.data;
       const srcW = region.width;
       const srcH = region.height;
-      const srcBbox = region.bboxWgs84 || geomBbox;
-      const srcSpanLng = srcBbox[2] - srcBbox[0];
-      const srcSpanLat = srcBbox[3] - srcBbox[1];
+      const sB = region.sourceBBox;
+      const projDef = region.projection || (typeof EPSG_3979_DEF !== 'undefined' ? EPSG_3979_DEF : '+proj=lcc +lat_1=49 +lat_2=77 +lat_0=49 +lon_0=-95 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+
+      const spanX = sB[2] - sB[0];
+      const spanY = sB[3] - sB[1];
 
       const outData = new Float32Array(gridW * gridH);
 
       for (let r = 0; r < gridH; r++) {
-        const pLat = maxLat - ((r + 0.5) / gridH) * (maxLat - minLat);
+        const y_utm = utmMaxY - (r + 0.5) * res;
         for (let c = 0; c < gridW; c++) {
-          const pLng = minLng + ((c + 0.5) / gridW) * (maxLng - minLng);
+          const x_utm = utmMinX + (c + 0.5) * res;
           const outIdx = r * gridW + c;
 
+          const [lng, lat] = p4(utmDef, 'EPSG:4326', [x_utm, y_utm]);
+
           // Découpage strict au polygone de la parcelle
-          if (!this.isPointInGeom([pLng, pLat], geom)) {
-            outData[outIdx] = -9999.0; // Valeur NoData standard
+          if (!this.isPointInGeom([lng, lat], geom)) {
+            outData[outIdx] = -9999.0;
             continue;
           }
 
-          // Échantillonnage bilinéaire
-          const u = (pLng - srcBbox[0]) / srcSpanLng;
-          const v = (srcBbox[3] - pLat) / srcSpanLat;
+          // Projection du point dans le système source du LiDAR
+          const [mX, mY] = p4('EPSG:4326', projDef, [lng, lat]);
+          const u = (mX - sB[0]) / spanX;
+          const v = (sB[3] - mY) / spanY;
 
           if (u < 0 || u > 1 || v < 0 || v > 1) {
             outData[outIdx] = -9999.0;
@@ -1077,7 +1112,7 @@ class Terrain3DManager {
         }
       }
 
-      const tiffBuffer = this.buildGeoTiffBuffer(outData, gridW, gridH, geomBbox, -9999.0);
+      const tiffBuffer = this.buildUtmGeoTiffBuffer(outData, gridW, gridH, utmMinX, utmMaxY, res, utmEpsg, -9999.0);
       const blob = new Blob([tiffBuffer], { type: 'image/tiff' });
       const downloadUrl = URL.createObjectURL(blob);
 
