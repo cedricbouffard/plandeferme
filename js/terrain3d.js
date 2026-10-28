@@ -188,6 +188,134 @@ class Terrain3DManager {
     if (!Number.isFinite(minLng) || !Number.isFinite(minLat)) return null;
     return [minLng, minLat, maxLng, maxLat];
   }
+  assembleParcelFeature(feature) {
+    if (!feature || !feature.geometry) return feature;
+    const map = this.map;
+    if (!map) return feature;
+
+    const props = feature.properties || {};
+    const pid = props.IDPAR || props.idpar || props.IDANPAR || props.idanpar;
+    const polyId = props.POLY_ID || props.poly_id;
+    const fid = feature.id;
+
+    if (!pid && !polyId && fid === undefined) {
+      return feature;
+    }
+
+    const candidateSlices = [];
+
+    // 1. Récupération depuis le cache des tuiles de la source (toutes les tuiles chargées)
+    if (typeof map.querySourceFeatures === 'function') {
+      try {
+        if (pid) {
+          const srcHits = map.querySourceFeatures('parcelles-source', { sourceLayer: 'BDPPAD_2026' });
+          if (srcHits && srcHits.length > 0) {
+            for (const f of srcHits) candidateSlices.push(f);
+          }
+        }
+        if (polyId) {
+          const pedoHits = map.querySourceFeatures('pedologie', { sourceLayer: 'pedologie_quebec' });
+          if (pedoHits && pedoHits.length > 0) {
+            for (const f of pedoHits) candidateSlices.push(f);
+          }
+        }
+      } catch (e) {
+        console.warn('querySourceFeatures error:', e);
+      }
+    }
+
+    // 2. Récupération depuis les couches affichées dans la vue
+    if (typeof map.queryRenderedFeatures === 'function') {
+      try {
+        const queryLayers = ['parcelles-fill', 'parcelles-hit-layer', 'pedologie-fill', 'pedologie-hit-layer'].filter(l => map.getLayer(l));
+        if (queryLayers.length > 0) {
+          const renHits = map.queryRenderedFeatures(undefined, { layers: queryLayers });
+          if (renHits && renHits.length > 0) {
+            for (const f of renHits) candidateSlices.push(f);
+          }
+        }
+      } catch (e) {
+        console.warn('queryRenderedFeatures error:', e);
+      }
+    }
+
+    candidateSlices.push(feature);
+
+    // 3. Filtrage strict des tranches appartenant à la même entité
+    const matching = [];
+    for (const f of candidateSlices) {
+      if (!f || !f.geometry) continue;
+      const fp = f.properties || {};
+      const fPid = fp.IDPAR || fp.idpar || fp.IDANPAR || fp.idanpar;
+      const fPolyId = fp.POLY_ID || fp.poly_id;
+
+      let isMatch = false;
+      if (pid && fPid && (String(fPid) === String(pid) || Number(fPid) === Number(pid))) {
+        isMatch = true;
+      } else if (polyId && fPolyId && (String(fPolyId) === String(polyId) || Number(fPolyId) === Number(polyId))) {
+        isMatch = true;
+      } else if (fid !== undefined && f.id === fid) {
+        isMatch = true;
+      }
+
+      if (isMatch) {
+        matching.push(f);
+      }
+    }
+
+    if (matching.length <= 1) {
+      return feature;
+    }
+
+    // 4. Déduplication par signature géométrique de l'anneau extérieur
+    const getRingSignature = (ring) => {
+      if (!ring || ring.length === 0) return '';
+      const len = ring.length;
+      const p0 = ring[0];
+      const pMid = ring[Math.floor(len / 2)];
+      const pLast = ring[len - 1];
+      return `${len}:${p0[0].toFixed(5)},${p0[1].toFixed(5)}|${pMid[0].toFixed(5)},${pMid[1].toFixed(5)}|${pLast[0].toFixed(5)},${pLast[1].toFixed(5)}`;
+    };
+
+    const uniquePolygons = [];
+    const seenSignatures = new Set();
+
+    for (const f of matching) {
+      const g = f.geometry;
+      if (g.type === 'Polygon') {
+        const sig = getRingSignature(g.coordinates[0]);
+        if (!seenSignatures.has(sig)) {
+          seenSignatures.add(sig);
+          uniquePolygons.push(g.coordinates);
+        }
+      } else if (g.type === 'MultiPolygon') {
+        for (const poly of g.coordinates) {
+          const sig = getRingSignature(poly[0]);
+          if (!seenSignatures.has(sig)) {
+            seenSignatures.add(sig);
+            uniquePolygons.push(poly);
+          }
+        }
+      }
+    }
+
+    if (uniquePolygons.length <= 1) {
+      return feature;
+    }
+
+    return {
+      type: 'Feature',
+      id: feature.id,
+      properties: Object.assign({}, feature.properties, {
+        _multiTileSlices: uniquePolygons.length
+      }),
+      geometry: {
+        type: 'MultiPolygon',
+        coordinates: uniquePolygons
+      }
+    };
+  }
+
 
   // ============================================================================
   // ÉCHANTILLONNAGE 3D PAR TUILE (AVEC PROJECTION PROJ4 EXACTE)
@@ -396,11 +524,12 @@ class Terrain3DManager {
       return;
     }
 
+    const unifiedParcel = this.assembleParcelFeature(targetParcel);
     this.stopParcelSelection();
-    this.activeParcel = targetParcel;
-    this.activeParcelGeom = targetParcel.geometry;
+    this.activeParcel = unifiedParcel;
+    this.activeParcelGeom = unifiedParcel.geometry;
 
-    const geomBbox = this.computeBboxFromGeometry(targetParcel.geometry);
+    const geomBbox = this.computeBboxFromGeometry(unifiedParcel.geometry);
     if (geomBbox && this.map) {
       this.map.fitBounds(
         [[geomBbox[0], geomBbox[1]], [geomBbox[2], geomBbox[3]]],
@@ -413,18 +542,19 @@ class Terrain3DManager {
       );
     }
 
-    this.highlightParcel(targetParcel.geometry);
-    await this.toggle3D(true, targetParcel);
+    this.highlightParcel(unifiedParcel.geometry);
+    await this.toggle3D(true, unifiedParcel);
   }
 
   async prepareTerrainData(targetParcel = null) {
-    const parcel = targetParcel || this.activeParcel || this.lastClickedParcel;
+    let parcel = targetParcel || this.activeParcel || this.lastClickedParcel;
 
     if (!parcel || !parcel.geometry) {
       this.startParcelSelection();
       throw new Error("Veuillez cliquer sur une parcelle pour afficher son relief 3D.");
     }
 
+    parcel = this.assembleParcelFeature(parcel);
     this.activeParcel = parcel;
     this.activeParcelGeom = parcel.geometry;
 
@@ -447,7 +577,8 @@ class Terrain3DManager {
 
     const targetSize = 256;
     let region = null;
-    const projectUrl = window.topoManager && window.topoManager.selectedProjectUrl;
+    const isCustomProject = window.topoManager && window.topoManager.selectedProjectId !== "default" && window.topoManager.selectedProjectUrl;
+    const projectUrl = isCustomProject ? window.topoManager.selectedProjectUrl : null;
 
     if (projectUrl && typeof readSingleHrdemProjectRegion === 'function') {
       try {
@@ -980,11 +1111,15 @@ class Terrain3DManager {
   }
 
   async exportParcelGeoTiff(targetParcel = null) {
-    const parcel = targetParcel || this.activeParcel || this.lastClickedParcel;
-    if (!parcel || !parcel.geometry) {
+    const rawParcel = targetParcel || this.activeParcel || this.lastClickedParcel;
+    if (!rawParcel || !rawParcel.geometry) {
       alert("Veuillez d'abord cliquer sur une parcelle sur la carte pour exporter son MNT.");
       return;
     }
+
+    const parcel = this.assembleParcelFeature(rawParcel);
+    this.activeParcel = parcel;
+    this.activeParcelGeom = parcel.geometry;
 
     const p4 = this.getProj4();
     if (!p4) {
@@ -1035,10 +1170,11 @@ class Terrain3DManager {
       const res = 1.0;
       const gridW = Math.max(16, Math.round((utmMaxX - utmMinX) / res));
       const gridH = Math.max(16, Math.round((utmMaxY - utmMinY) / res));
-      const targetSize = Math.max(256, Math.min(2048, Math.max(gridW, gridH)));
+      const targetSize = Math.max(256, Math.min(4096, Math.max(gridW, gridH)));
 
       let region = null;
-      const projectUrl = window.topoManager && window.topoManager.selectedProjectUrl;
+      const isCustomProject = window.topoManager && window.topoManager.selectedProjectId !== "default" && window.topoManager.selectedProjectUrl;
+      const projectUrl = isCustomProject ? window.topoManager.selectedProjectUrl : null;
       if (projectUrl && typeof readSingleHrdemProjectRegion === 'function') {
         try {
           region = await readSingleHrdemProjectRegion(projectUrl, geomBbox, targetSize, null, 'bilinear');

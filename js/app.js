@@ -727,8 +727,12 @@
           layers: ["parcelles-fill", "parcelles-hit-layer"].filter(l => map.getLayer(l))
         });
         if (parcelHits && parcelHits.length > 0) {
-          parcelProps = parcelHits[0].properties;
-          parcelGeom = parcelHits[0].geometry;
+          const unifiedParcel = window.terrain3DManager
+            ? window.terrain3DManager.assembleParcelFeature(parcelHits[0])
+            : parcelHits[0];
+          parcelProps = unifiedParcel.properties;
+          parcelGeom = unifiedParcel.geometry;
+          parcelHits[0] = unifiedParcel;
         }
 
         // 3. Query cadastre (lots rénovés)
