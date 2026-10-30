@@ -537,12 +537,62 @@
           const rawData = region.data;
 
           const totalPixels = width * height;
+
+          // 1. Lissage Gaussien 3x3 séparable du MNE pour éliminer le micro-bruit LiDAR avant l'ombrage
+          const tempSmooth = new Float32Array(totalPixels);
+          for (let r = 0; r < height; r++) {
+            const rowOff = r * width;
+            for (let c = 0; c < width; c++) {
+              const center = rawData[rowOff + c];
+              if (isNaN(center) || center <= -1000 || center >= 9000) {
+                tempSmooth[rowOff + c] = NaN;
+                continue;
+              }
+              const cPrev = c > 0 ? c - 1 : 0;
+              const cNext = c < width - 1 ? c + 1 : width - 1;
+              const v0 = rawData[rowOff + cPrev];
+              const v1 = center;
+              const v2 = rawData[rowOff + cNext];
+              const valid0 = !isNaN(v0) && v0 > -1000 && v0 < 9000;
+              const valid2 = !isNaN(v2) && v2 > -1000 && v2 < 9000;
+              const w0 = valid0 ? 1 : 0;
+              const w1 = 2;
+              const w2 = valid2 ? 1 : 0;
+              const sumW = w0 + w1 + w2;
+              tempSmooth[rowOff + c] = ((valid0 ? v0 : 0) * w0 + v1 * w1 + (valid2 ? v2 : 0) * w2) / sumW;
+            }
+          }
+
+          const smoothed = new Float32Array(totalPixels);
+          for (let c = 0; c < width; c++) {
+            for (let r = 0; r < height; r++) {
+              const center = tempSmooth[r * width + c];
+              if (isNaN(center)) {
+                smoothed[r * width + c] = NaN;
+                continue;
+              }
+              const rPrev = (r > 0 ? r - 1 : 0) * width;
+              const rCurr = r * width;
+              const rNext = (r < height - 1 ? r + 1 : height - 1) * width;
+              const v0 = tempSmooth[rPrev + c];
+              const v1 = center;
+              const v2 = tempSmooth[rNext + c];
+              const valid0 = !isNaN(v0);
+              const valid2 = !isNaN(v2);
+              const w0 = valid0 ? 1 : 0;
+              const w1 = 2;
+              const w2 = valid2 ? 1 : 0;
+              const sumW = w0 + w1 + w2;
+              smoothed[rCurr + c] = ((valid0 ? v0 : 0) * w0 + v1 * w1 + (valid2 ? v2 : 0) * w2) / sumW;
+            }
+          }
+
           const illumBuffer = new Float32Array(totalPixels);
           const shadowDevs = [];
           const lightDevs = [];
           const sampleStride = (width > 256 || height > 256) ? 2 : 1;
 
-          // Passe 1 : Calcul de l'illumination par le filtre de Horn 3x3 et échantillonnage
+          // Passe 1 : Calcul de l'illumination par le filtre de Horn 3x3 sur le MNE lissé et échantillonnage
           for (let r = 0; r < height; r++) {
             const rPrev = (r > 0 ? r - 1 : 0) * width;
             const rCurr = r * width;
@@ -551,7 +601,7 @@
 
             for (let c = 0; c < width; c++) {
               const idx = rCurr + c;
-              const z_c = rawData[idx];
+              const z_c = smoothed[idx];
 
               if (isNaN(z_c) || z_c <= -1000 || z_c >= 9000) {
                 illumBuffer[idx] = -1;
@@ -562,7 +612,7 @@
               const cNext = c < width - 1 ? c + 1 : width - 1;
 
               const getVal = (i) => {
-                const v = rawData[i];
+                const v = smoothed[i];
                 return (isNaN(v) || v <= -1000 || v >= 9000) ? z_c : v;
               };
 
