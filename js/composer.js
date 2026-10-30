@@ -2071,12 +2071,11 @@ ${logoItemXml}
 
         const toggleHillshade = document.getElementById("toggle-topo-hillshade");
         if (toggleHillshade && toggleHillshade.checked) {
-          const isMulti = window.topoManager ? (window.topoManager.hillshadeMode === 'multidirectional') : true;
           items.push({
             id: "topo_hillshade",
             groupId: "topo",
             type: "swatch",
-            label: isMulti ? "Ombrage multidirectionnel (QGIS / GDAL)" : "Ombrage 3D du relief (azimut 315°)",
+            label: "Ombrage multidirectionnel du relief (QGIS)",
             color: "#64748b"
           });
         }

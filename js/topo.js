@@ -14,7 +14,6 @@
         this.ctx = this.canvas.getContext('2d');
         this.hillshadeEnabled = true;
         this.hillshadeOpacity = 0.60;
-        this.hillshadeMode = 'multidirectional'; // 'multidirectional' (QGIS / GDAL) or 'single' (315°)
         this.hillshadeCanvas = document.createElement('canvas');
         this.hillshadeCtx = this.hillshadeCanvas.getContext('2d');
         this.debounceTimer = null;
@@ -58,13 +57,6 @@
         this.hillshadeOpacity = val;
         if (this.map.getLayer('hrdem-hillshade-layer')) {
           this.map.setPaintProperty('hrdem-hillshade-layer', 'raster-opacity', this.hillshadeOpacity);
-        }
-      }
-
-      setHillshadeMode(mode) {
-        if (this.hillshadeMode !== mode) {
-          this.hillshadeMode = mode;
-          this.scheduleUpdate();
         }
       }
 
@@ -599,9 +591,8 @@
           const shadowDevs = [];
           const lightDevs = [];
           const sampleStride = (width > 256 || height > 256) ? 2 : 1;
-          const isMulti = (this.hillshadeMode === 'multidirectional');
 
-          // Passe 1 : Calcul de l'illumination (multidirectionnelle QGIS / GDAL ou classique 315°) sur le MNE lissé
+          // Passe 1 : Calcul de l'illumination multidirectionnelle (QGIS / GDAL - USGS Mark 1992) sur le MNE lissé
           for (let r = 0; r < height; r++) {
             const rPrev = (r > 0 ? r - 1 : 0) * width;
             const rCurr = r * width;
@@ -642,39 +633,34 @@
               const ny = -dzdy * zFactor;
               const invLen = 1 / Math.sqrt(nx * nx + ny * ny + 1.0);
 
+              // Algorithme multidirectionnel QGIS / GDAL (USGS Mark 1992) :
+              // 4 sources lumineuses obliques (225° SW, 270° W, 315° NW, 360° N)
+              // pondérées selon le carré du sinus de l'écart avec l'aspect de la pente
+              const dot1 = nx * -0.5 + ny * -0.5 + Sz;
+              const dot2 = nx * -0.7071068 + Sz;
+              const dot3 = nx * -0.5 + ny * 0.5 + Sz;
+              const dot4 = ny * 0.7071068 + Sz;
+
+              const I1 = dot1 > 1 ? 1 : (dot1 < 0 ? 0 : dot1 * invLen);
+              const I2 = dot2 > 1 ? 1 : (dot2 < 0 ? 0 : dot2 * invLen);
+              const I3 = dot3 > 1 ? 1 : (dot3 < 0 ? 0 : dot3 * invLen);
+              const I4 = dot4 > 1 ? 1 : (dot4 < 0 ? 0 : dot4 * invLen);
+
+              const nSq = nx * nx + ny * ny;
               let I;
-              if (isMulti) {
-                // Algorithme multidirectionnel QGIS / GDAL (USGS Mark 1992) :
-                // 4 sources lumineuses obliques (225° SW, 270° W, 315° NW, 360° N)
-                // pondérées selon le carré du sinus de l'écart avec l'aspect de la pente
-                const dot1 = nx * -0.5 + ny * -0.5 + Sz;
-                const dot2 = nx * -0.7071068 + Sz;
-                const dot3 = nx * -0.5 + ny * 0.5 + Sz;
-                const dot4 = ny * 0.7071068 + Sz;
-
-                const I1 = dot1 > 1 ? 1 : (dot1 < 0 ? 0 : dot1 * invLen);
-                const I2 = dot2 > 1 ? 1 : (dot2 < 0 ? 0 : dot2 * invLen);
-                const I3 = dot3 > 1 ? 1 : (dot3 < 0 ? 0 : dot3 * invLen);
-                const I4 = dot4 > 1 ? 1 : (dot4 < 0 ? 0 : dot4 * invLen);
-
-                const nSq = nx * nx + ny * ny;
-                if (nSq > 1e-7) {
-                  const invHypot = 1 / Math.sqrt(nSq);
-                  const p = nx * invHypot;
-                  const q = ny * invHypot;
-                  const pmq = p - q;
-                  const ppq = p + q;
-                  const w1 = 0.5 * pmq * pmq;
-                  const w2 = q * q;
-                  const w3 = 0.5 * ppq * ppq;
-                  const w4 = p * p;
-                  I = 0.5 * (w1 * I1 + w2 * I2 + w3 * I3 + w4 * I4);
-                } else {
-                  I = I0;
-                }
+              if (nSq > 1e-7) {
+                const invHypot = 1 / Math.sqrt(nSq);
+                const p = nx * invHypot;
+                const q = ny * invHypot;
+                const pmq = p - q;
+                const ppq = p + q;
+                const w1 = 0.5 * pmq * pmq;
+                const w2 = q * q;
+                const w3 = 0.5 * ppq * ppq;
+                const w4 = p * p;
+                I = 0.5 * (w1 * I1 + w2 * I2 + w3 * I3 + w4 * I4);
               } else {
-                const dot = (nx * Sx + ny * Sy + Sz) * invLen;
-                I = dot > 1 ? 1 : (dot < 0 ? 0 : dot);
+                I = I0;
               }
               illumBuffer[idx] = I;
 
