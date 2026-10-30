@@ -407,7 +407,7 @@
         if (badge) badge.textContent = 'Calcul du relief...';
 
         try {
-          const targetSize = 256;
+          const targetSize = 512;
           let region = null;
           let isProject = false;
 
@@ -516,7 +516,7 @@
             this.sourceAdded = true;
           }
 
-          // --- Calcul de l'ombrage du relief (Hillshade 3D) semi-transparent à la volée ---
+          // --- Calcul de l'ombrage du relief (Hillshade 3D) avec étirement de contraste dynamique ---
           const dx = Math.max(0.5, (region.sourceBBox[2] - region.sourceBBox[0]) / width);
           const dy = Math.max(0.5, (region.sourceBBox[3] - region.sourceBBox[1]) / height);
           const inv8dx = 1 / (8 * dx);
@@ -524,8 +524,6 @@
           // Vecteur d'éclairage : Azimut 315° (Nord-Ouest), Altitude solaire 45°
           const Sx = -0.5, Sy = 0.5, Sz = 0.7071068;
           const I0 = 0.7071068;
-          const invI0 = 1 / I0;
-          const inv1MinusI0 = 1 / (1 - I0);
 
           // Exagération verticale adaptative selon le zoom pour révéler le micro-relief
           let zFactor = 2.4;
@@ -538,25 +536,33 @@
           const hsPixels = hsImgData.data;
           const rawData = region.data;
 
+          const totalPixels = width * height;
+          const illumBuffer = new Float32Array(totalPixels);
+          const shadowDevs = [];
+          const lightDevs = [];
+          const sampleStride = (width > 256 || height > 256) ? 2 : 1;
+
+          // Passe 1 : Calcul de l'illumination par le filtre de Horn 3x3 et échantillonnage
           for (let r = 0; r < height; r++) {
             const rPrev = (r > 0 ? r - 1 : 0) * width;
             const rCurr = r * width;
             const rNext = (r < height - 1 ? r + 1 : height - 1) * width;
+            const isSampleRow = (r % sampleStride === 0);
 
             for (let c = 0; c < width; c++) {
-              const pIdx = (rCurr + c) * 4;
-              const z_c = rawData[rCurr + c];
+              const idx = rCurr + c;
+              const z_c = rawData[idx];
 
               if (isNaN(z_c) || z_c <= -1000 || z_c >= 9000) {
-                hsPixels[pIdx + 3] = 0;
+                illumBuffer[idx] = -1;
                 continue;
               }
 
               const cPrev = c > 0 ? c - 1 : 0;
               const cNext = c < width - 1 ? c + 1 : width - 1;
 
-              const getVal = (idx) => {
-                const v = rawData[idx];
+              const getVal = (i) => {
+                const v = rawData[i];
                 return (isNaN(v) || v <= -1000 || v >= 9000) ? z_c : v;
               };
 
@@ -579,22 +585,86 @@
 
               const dot = (nx * Sx + ny * Sy + Sz) * invLen;
               const I = dot > 1 ? 1 : (dot < 0 ? 0 : dot);
+              illumBuffer[idx] = I;
 
-              if (I < I0) {
-                // Versant à l'ombre (obscurcissement progressif semi-transparent)
-                const shade = Math.pow((I0 - I) * invI0, 0.85);
-                hsPixels[pIdx] = 15;
-                hsPixels[pIdx + 1] = 23;
-                hsPixels[pIdx + 2] = 42;
-                hsPixels[pIdx + 3] = Math.min(255, (shade * 255 * 1.35) | 0);
-              } else {
-                // Versant exposé au soleil (lumière diffuse / rehaut blanc semi-transparent)
-                const light = Math.pow((I - I0) * inv1MinusI0, 0.9);
-                hsPixels[pIdx] = 255;
-                hsPixels[pIdx + 1] = 255;
-                hsPixels[pIdx + 2] = 255;
-                hsPixels[pIdx + 3] = Math.min(255, (light * 255 * 1.2) | 0);
+              if (isSampleRow && (c % sampleStride === 0)) {
+                if (I < I0) {
+                  shadowDevs.push(I0 - I);
+                } else if (I > I0) {
+                  lightDevs.push(I - I0);
+                }
               }
+            }
+          }
+
+          // Détermination des facteurs d'étirement de contraste (stretching) en miroir de la topo
+          if (shadowDevs.length > 0) shadowDevs.sort((a, b) => a - b);
+          if (lightDevs.length > 0) lightDevs.sort((a, b) => a - b);
+
+          const calcPct = typeof stretchPercentile === 'function' ? stretchPercentile : (sorted, fraction) => {
+            if (sorted.length === 1) return sorted[0];
+            const pos = fraction * (sorted.length - 1);
+            const low = Math.floor(pos);
+            const up = Math.ceil(pos);
+            return sorted[low] + (sorted[up] - sorted[low]) * (pos - low);
+          };
+
+          let shadowScale = 0.05;
+          let lightScale = 0.05;
+
+          if (this.stretchMethod === 'minmax') {
+            const maxShadow = shadowDevs.length > 0 ? shadowDevs[shadowDevs.length - 1] : 0.05;
+            const maxLight = lightDevs.length > 0 ? lightDevs[lightDevs.length - 1] : 0.05;
+            shadowScale = Math.max(0.003, Math.min(I0, maxShadow));
+            lightScale = Math.max(0.003, Math.min(1 - I0, maxLight));
+          } else {
+            // Mode percentile 95% (par défaut, harmonisé avec le stretch 5-95% de la topo)
+            const p95Shadow = shadowDevs.length > 0 ? calcPct(shadowDevs, 0.95) : 0.04;
+            const p95Light = lightDevs.length > 0 ? calcPct(lightDevs, 0.95) : 0.04;
+
+            if (this.stretchMethod === 'manual' && Number.isFinite(this.manualMin) && Number.isFinite(this.manualMax) && this.manualMax > this.manualMin) {
+              const currentSpan = this.manualMax - this.manualMin;
+              const baseSpan = (this.lastAutoMax && this.lastAutoMin) ? Math.max(0.5, this.lastAutoMax - this.lastAutoMin) : currentSpan;
+              const mult = Math.max(0.25, Math.min(5.0, baseSpan / currentSpan));
+              shadowScale = Math.max(0.003, Math.min(I0, p95Shadow / mult));
+              lightScale = Math.max(0.003, Math.min(1 - I0, p95Light / mult));
+            } else {
+              shadowScale = Math.max(0.003, Math.min(I0, p95Shadow));
+              lightScale = Math.max(0.003, Math.min(1 - I0, p95Light));
+            }
+          }
+
+          const invShadowScale = 1 / shadowScale;
+          const invLightScale = 1 / lightScale;
+
+          // Passe 2 : Peinture des ombres et rehauts avec étirement de contraste
+          for (let i = 0; i < totalPixels; i++) {
+            const pIdx = i * 4;
+            const I = illumBuffer[i];
+
+            if (I < 0) {
+              hsPixels[pIdx + 3] = 0;
+              continue;
+            }
+
+            if (I < I0) {
+              // Versant à l'ombre (obscurcissement progressif étiré)
+              const norm = Math.min(1.0, (I0 - I) * invShadowScale);
+              const shade = Math.pow(norm, 0.85);
+              hsPixels[pIdx] = 15;
+              hsPixels[pIdx + 1] = 23;
+              hsPixels[pIdx + 2] = 42;
+              hsPixels[pIdx + 3] = Math.min(255, (shade * 255 * 1.35) | 0);
+            } else if (I > I0) {
+              // Versant exposé au soleil (lumière diffuse / rehaut blanc étiré)
+              const norm = Math.min(1.0, (I - I0) * invLightScale);
+              const light = Math.pow(norm, 0.90);
+              hsPixels[pIdx] = 255;
+              hsPixels[pIdx + 1] = 255;
+              hsPixels[pIdx + 2] = 255;
+              hsPixels[pIdx + 3] = Math.min(255, (light * 255 * 1.20) | 0);
+            } else {
+              hsPixels[pIdx + 3] = 0;
             }
           }
 
@@ -607,6 +677,9 @@
               url: hsDataUrl,
               coordinates: coords
             });
+            if (this.map.getLayer('hrdem-hillshade-layer')) {
+              this.map.setLayoutProperty('hrdem-hillshade-layer', 'visibility', (this.enabled && this.hillshadeEnabled) ? 'visible' : 'none');
+            }
           } else {
             this.map.addSource('hrdem-hillshade-source', {
               type: 'image',
@@ -706,7 +779,7 @@
         if (badge) badge.textContent = 'Calcul des pentes...';
 
         try {
-          const targetSize = 256;
+          const targetSize = 512;
           let region = null;
           let isProject = false;
           if (window.topoManager && window.topoManager.selectedProjectId !== 'default' && window.topoManager.selectedProjectUrl) {
@@ -989,7 +1062,7 @@
         if (badge) badge.textContent = 'Calcul de la canopée (DSM - DTM)...';
 
         try {
-          const targetSize = 256;
+          const targetSize = 512;
           // Concurrent fetch of bare-earth DTM and surface DSM from AWS Canada
           const [dtmRegion, dsmRegion] = await Promise.all([
             readMultiHrdemRegion(bbox, targetSize, this.abortController.signal, 'bilinear', 'dtm'),

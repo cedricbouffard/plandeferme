@@ -575,7 +575,7 @@ class Terrain3DManager {
 
     this.activeTargetName = pid ? `Parcelle nº ${pid}` : (lotNum ? `Lot nº ${lotNum}` : 'Parcelle agricole');
 
-    const targetSize = 256;
+    const targetSize = 512;
     let region = null;
     const isCustomProject = window.topoManager && window.topoManager.selectedProjectId !== "default" && window.topoManager.selectedProjectUrl;
     const projectUrl = isCustomProject ? window.topoManager.selectedProjectUrl : null;
