@@ -295,6 +295,14 @@
                 </div>
                 <input type="range" id="topo-hillshade-opacity" min="0" max="100" value="60" class="slider" title="Opacité de l'ombrage du relief" />
 
+                <div class="tool-label-row" style="margin-top: 5px; margin-bottom: 2px;">
+                  <span class="tool-sublabel" style="font-size: 10px;">Type d'ombrage</span>
+                  <div class="segmented-control" style="width: 200px;">
+                    <button id="btn-hillshade-multi" class="seg-btn active" type="button" title="Ombrage multidirectionnel (QGIS / GDAL - 4 directions combinées)">Multidirectionnel (QGIS)</button>
+                    <button id="btn-hillshade-single" class="seg-btn" type="button" title="Ombrage classique unidirectionnel (Azimut 315°)">315° (Classique)</button>
+                  </div>
+                </div>
+
                 <div class="tool-label-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #e2e8f0;">
                   <label class="check-label" style="font-size: 11px; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 6px; cursor: pointer;" title="Activer / désactiver la perspective 3D sur le terrain avec maillage haute résolution (30X par défaut)">
                     <input type="checkbox" id="toggle-topo-3d" />

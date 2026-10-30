@@ -1604,6 +1604,21 @@
       });
     }
 
+    const btnHillshadeMulti = document.getElementById("btn-hillshade-multi");
+    const btnHillshadeSingle = document.getElementById("btn-hillshade-single");
+    if (btnHillshadeMulti && btnHillshadeSingle) {
+      btnHillshadeMulti.addEventListener("click", () => {
+        btnHillshadeMulti.classList.add("active");
+        btnHillshadeSingle.classList.remove("active");
+        if (topoManager) topoManager.setHillshadeMode("multidirectional");
+      });
+      btnHillshadeSingle.addEventListener("click", () => {
+        btnHillshadeSingle.classList.add("active");
+        btnHillshadeMulti.classList.remove("active");
+        if (topoManager) topoManager.setHillshadeMode("single");
+      });
+    }
+
     // Carte des Pentes (%) Controls
     const togglePentes = document.getElementById("toggle-pentes");
     const pentesOpacitySlider = document.getElementById("pentes-opacity");
