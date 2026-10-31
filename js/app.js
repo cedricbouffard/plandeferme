@@ -99,6 +99,7 @@
       const pentesOp = searchParams.get("pentes_op");
       const canopeeOp = searchParams.get("canopee_op");
       const interval = searchParams.get("interval");
+      const contourLabels = searchParams.get("contour_labels");
 
       const hasLocation = (lat !== null && !isNaN(lat) && lng !== null && !isNaN(lng) && zoom !== null && !isNaN(zoom));
 
@@ -117,7 +118,8 @@
         topoHsOp: topoHsOp ? parseInt(topoHsOp, 10) : null,
         pentesOp: pentesOp ? parseInt(pentesOp, 10) : null,
         canopeeOp: canopeeOp ? parseInt(canopeeOp, 10) : null,
-        interval: interval ? parseFloat(interval) : null
+        interval: interval ? parseFloat(interval) : null,
+        contourLabels: contourLabels !== null ? (contourLabels === "1" || contourLabels === "true") : null
       };
     }
 
@@ -1644,20 +1646,42 @@
 
     // Dynamic Contours Controls
     const toggleContours = document.getElementById("toggle-contours");
+    const toggleContourLabels = document.getElementById("toggle-contour-labels");
     const pillButtons = document.querySelectorAll(".pill-btn");
     const colorCircles = document.querySelectorAll(".color-circle");
 
-    toggleContours.addEventListener("change", (e) => {
-      const on = e.target.checked;
-      for (const layerId of ["gc-contour-minor", "gc-contour-major", "gc-contour-labels"]) {
+    function updateContourLayersVisibility() {
+      const on = toggleContours ? toggleContours.checked : false;
+      const showLabels = toggleContourLabels ? toggleContourLabels.checked : true;
+
+      for (const layerId of ["gc-contour-minor", "gc-contour-major"]) {
         if (map.getLayer(layerId)) {
           map.setLayoutProperty(layerId, "visibility", on ? "visible" : "none");
         }
       }
-      if (on && contourManager) {
-        contourManager.generateForView();
+      if (map.getLayer("gc-contour-labels")) {
+        map.setLayoutProperty("gc-contour-labels", "visibility", (on && showLabels) ? "visible" : "none");
       }
-    });
+    }
+    window.updateContourLayersVisibility = updateContourLayersVisibility;
+
+    if (toggleContours) {
+      toggleContours.addEventListener("change", (e) => {
+        const on = e.target.checked;
+        updateContourLayersVisibility();
+        if (on && contourManager) {
+          contourManager.generateForView();
+        }
+        if (typeof updateUrlState === "function") updateUrlState();
+      });
+    }
+
+    if (toggleContourLabels) {
+      toggleContourLabels.addEventListener("change", () => {
+        updateContourLayersVisibility();
+        if (typeof updateUrlState === "function") updateUrlState();
+      });
+    }
 
     pillButtons.forEach(btn => {
       btn.addEventListener("click", () => {
@@ -2398,7 +2422,12 @@
         if (toggleTopo && toggleTopo.checked) activeLayers.push("topo");
         if (togglePentes && togglePentes.checked) activeLayers.push("pentes");
         if (toggleCanopee && toggleCanopee.checked) activeLayers.push("canopee");
-        if (toggleContours && toggleContours.checked) activeLayers.push("contours");
+        if (toggleContours && toggleContours.checked) {
+          activeLayers.push("contours");
+          if (toggleContourLabels && !toggleContourLabels.checked) {
+            params.set("contour_labels", "0");
+          }
+        }
         if (toggleHydroParcelle && toggleHydroParcelle.checked) activeLayers.push("hydro");
         if (ndviManager && ndviManager.isActiveMode) activeLayers.push("ndvi");
 
@@ -2545,9 +2574,19 @@
         }
         if (toggleContours) {
           toggleContours.checked = true;
-          for (const layerId of ["gc-contour-minor", "gc-contour-major", "gc-contour-labels"]) {
-            if (map.getLayer(layerId)) {
-              map.setLayoutProperty(layerId, "visibility", "visible");
+          if (state.contourLabels === false && toggleContourLabels) {
+            toggleContourLabels.checked = false;
+          }
+          if (typeof updateContourLayersVisibility === "function") {
+            updateContourLayersVisibility();
+          } else {
+            for (const layerId of ["gc-contour-minor", "gc-contour-major"]) {
+              if (map.getLayer(layerId)) {
+                map.setLayoutProperty(layerId, "visibility", "visible");
+              }
+            }
+            if (map.getLayer("gc-contour-labels")) {
+              map.setLayoutProperty("gc-contour-labels", "visibility", (toggleContourLabels && !toggleContourLabels.checked) ? "none" : "visible");
             }
           }
           if (contourManager) {
