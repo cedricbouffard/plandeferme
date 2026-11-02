@@ -451,6 +451,8 @@
 
       // Double lissage 3x3 pour supprimer le micro-bruit LiDAR et les artefacts de scan
       this.currentGrid = this.smooth3(this.smooth3(gridObj));
+      // Modèle hydrologique de remplissage des cuvettes (Priority Flood) pour le routage de l'eau
+      this.currentGrid.zf = this.fillDepressions(this.currentGrid.z, this.currentGrid.W, this.currentGrid.H, 1e-4);
       this.updateParcelHeader();
       this.resetRain();
     }
@@ -631,26 +633,41 @@
     }
 
     surf(s, x, y) {
-      const { W, H, z } = s.G;
+      const { W, H, z, zf } = s.G;
       if (x < 0 || y < 0 || x >= W || y >= H) return NaN;
       const i = y * W + x;
+      if (Number.isNaN(z[i])) return NaN;
+
+      const cap = zf ? Math.max(0, zf[i] - z[i]) : 0;
+      if (cap > 1e-4) {
+        const w = Math.min(cap, s.water[i]);
+        const fillRatio = w / cap;
+        // La surface de l'eau transite en continu du fond de cuvette (z)
+        // vers la surface de déversement (zf) au fur et à mesure du remplissage
+        return z[i] * (1 - fillRatio) + zf[i] * fillRatio;
+      }
       return z[i] + s.water[i];
     }
 
     gradient(s, x, y) {
       const c = this.surf(s, x, y);
-      let l = this.surf(s, x - 1, y), r = this.surf(s, x + 1, y);
-      let u = this.surf(s, x, y - 1), d = this.surf(s, x, y + 1);
-      const drop = 0.05;
-      if (Number.isNaN(l)) l = c - drop;
-      if (Number.isNaN(r)) r = c - drop;
-      if (Number.isNaN(u)) u = c - drop;
-      if (Number.isNaN(d)) d = c - drop;
-      return [(r - l) / (2 * s.G.dx), (d - u) / (2 * s.G.dy)];
+      if (Number.isNaN(c)) return [0, 0];
+      const l = this.surf(s, x - 1, y), r = this.surf(s, x + 1, y);
+      const u = this.surf(s, x, y - 1), d = this.surf(s, x, y + 1);
+
+      const gx = !Number.isNaN(r) && !Number.isNaN(l) ? (r - l) / (2 * s.G.dx)
+               : !Number.isNaN(r) ? (r - c) / s.G.dx
+               : !Number.isNaN(l) ? (c - l) / s.G.dx : 0;
+
+      const gy = !Number.isNaN(d) && !Number.isNaN(u) ? (d - u) / (2 * s.G.dy)
+               : !Number.isNaN(d) ? (d - c) / s.G.dy
+               : !Number.isNaN(u) ? (c - u) / s.G.dy : 0;
+
+      return [gx, gy];
     }
 
     rainStep(s, dt) {
-      const { W, H, dx, dy, z } = s.G;
+      const { W, H, dx, dy, z, zf } = s.G;
       const cell = dx * dy;
       const I = this.intensity;
       const soil = SOIL_TYPES[this.soilKey] || SOIL_TYPES.loam;
@@ -698,11 +715,35 @@
         s.flow[i] += p.v / cell;
         p.age++;
 
-        // Ralentissement ou cuvette : dépôt
+        // Ralentissement ou cuvette : dépôt si la cuvette n'est pas encore pleine
+        const cap = zf ? Math.max(0, zf[i] - z[i]) : 0;
+        const isDepression = cap > 1e-4;
+        const isFull = isDepression && s.water[i] >= cap * 0.95;
+
         if ((sp < 0.03 || slope < 2e-5) && p.age > 3) {
-          s.water[i] += p.v / cell;
-          s.wetList.add(i);
-          continue;
+          if (isDepression && !isFull) {
+            // La cuvette n'est pas pleine : piéger l'eau et remplir la cuvette
+            const room = cap - s.water[i];
+            const take = Math.min(p.v / cell, room);
+            s.water[i] += take;
+            s.wetList.add(i);
+            p.v -= take * cell;
+            if (p.v <= 1e-7) continue; // Absorbée
+          } else if (!isDepression) {
+            // Replat temporaire
+            s.water[i] += p.v / cell;
+            s.wetList.add(i);
+            continue;
+          }
+
+          // Si la cuvette est pleine : la goutte continue vers l'exutoire naturel selon zf
+          if (isFull) {
+            const slf = Math.hypot(gx, gy);
+            if (slf > 1e-7) {
+              p.vx = - (gx / slf) * 0.25;
+              p.vy = - (gy / slf) * 0.25;
+            }
+          }
         }
 
         p.x += p.vx;
@@ -713,15 +754,17 @@
           continue;
         }
         if (p.age > 3500) {
-          s.water[i] += p.v / cell;
-          s.wetList.add(i);
+          if (isDepression && !isFull) {
+            s.water[i] += p.v / cell;
+            s.wetList.add(i);
+          }
           continue;
         }
         keep.push(p);
       }
       s.drops = keep;
 
-      // Étalement et débordement des cuvettes
+      // Étalement et débordement hydrologique des cuvettes
       const infil = (f / 1000 / 3600) * dt;
       const nextWet = new Set();
       for (const i of s.wetList) {
@@ -732,24 +775,59 @@
         s.inf += take * cell;
 
         const x = i % W, y = (i / W) | 0;
-        const h = z[i] + w;
+        const capI = zf ? Math.max(0, zf[i] - z[i]) : 0;
 
-        for (const [xx, yy] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
-          const j = yy * W + xx;
-          const outside = (xx < 0 || yy < 0 || xx >= W || yy >= H || Number.isNaN(z[j]));
-          const hn = outside ? -Infinity : z[j] + s.water[j];
-          if (hn >= h) continue;
+        // Si la cellule n'est pas dans une cuvette : relâcher l'eau excédentaire en écoulement actif
+        if (capI <= 1e-4) {
+          if (w > 1e-4 && s.drops.length < 22000) {
+            s.drops.push({ x: x + 0.5, y: y + 0.5, vx: 0, vy: 0, v: w * cell, age: 1 });
+          }
+          s.water[i] = 0;
+          continue;
+        }
 
-          const mv = outside ? w * 0.25 : Math.min(w, (h - hn) * 0.25);
-          if (mv <= 0) continue;
-          w -= mv;
-          if (outside) {
-            s.out += mv * cell;
+        // Si l'eau dépasse la capacité de la cuvette, le surplus déborde par l'exutoire naturel sous forme de ruissellement !
+        if (w > capI) {
+          const overflow = w - capI;
+          w = capI;
+          if (s.drops.length < 22000) {
+            // Créer une goutte qui part immédiatement vers le point de déversement
+            s.drops.push({ x: x + 0.5, y: y + 0.5, vx: 0, vy: 0, v: overflow * cell, age: 1 });
           } else {
-            s.water[j] += mv;
-            if (s.water[j] > 1e-5) nextWet.add(j);
+            s.out += overflow * cell;
           }
         }
+
+        if (w <= 0) {
+          s.water[i] = 0;
+          continue;
+        }
+
+        const h = z[i] + w;
+        for (const [xx, yy] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const j = yy * W + xx;
+          if (Number.isNaN(z[j])) continue;
+
+          // Règle physique stricte : l'eau stagnante ne peut jamais franchir une crête au-dessus du déversement (zf)
+          const spillZ = zf ? zf[i] : z[i];
+          if (z[j] >= spillZ - 1e-4) continue;
+
+          const capJ = zf ? Math.max(0, zf[j] - z[j]) : 0;
+          if (capJ <= 1e-4) continue;
+
+          const wj = s.water[j];
+          const hj = z[j] + wj;
+          if (hj >= h) continue;
+
+          const mv = Math.min(w * 0.25, Math.min((h - hj) * 0.25, capJ - wj));
+          if (mv <= 0) continue;
+
+          w -= mv;
+          s.water[j] += mv;
+          if (s.water[j] > 1e-5) nextWet.add(j);
+        }
+
         s.water[i] = w;
         if (w > 1e-5) nextWet.add(i); else s.water[i] = 0;
       }
@@ -969,7 +1047,7 @@
       const { W, H, dx, dy, z } = G;
       const N = W * H;
 
-      const zf = this.fillDepressions(z, W, H, 1e-4);
+      const zf = G.zf || this.fillDepressions(z, W, H, 1e-4);
       const cell = dx * dy;
       const width = (dx + dy) / 2;
 
