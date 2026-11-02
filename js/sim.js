@@ -1,11 +1,12 @@
 /**
- * Plan de Ferme — Module de simulation de pluie et d'érosion des sols (RUSLE)
+ * Plan de Ferme — Modules de Simulation de Pluie & d'Érosion des Sols (RUSLE)
  * 
- * Intègre les modèles hydrodynamiques et agronomiques d'Ektare :
- * - Simulation de pluie : pluie animée, infiltration (Horton), écoulement gravitationnel
- *   sur MNT LiDAR 1m, traçage des thalwegs et remplissage/débordement des cuvettes.
- * - Érosion des sols (RUSLE) : calcul des pertes de sol annuelles A = R · K · LS · C · P (t/ha/an),
- *   facteur LS topographique selon Moore & Burch (1986) avec accumulation multidirectionnelle (Freeman 1.1).
+ * Architecture découplée et indépendante :
+ * 1. ParcelRainManager : Modèle hydrodynamique de pluie et ruissellement (Priority Flood,
+ *    infiltration Horton, cheminement gravitationnel thalwegs & remplissage/débordement de cuvettes).
+ * 2. ParcelErosionManager : Modèle d'érosion des sols RUSLE affiché dans le menu de gauche,
+ *    indépendant de la pluie, avec détection automatique de la texture du sol (Pédologie QC / Soil World)
+ *    et sélection par défaut de la dernière culture déclarée (Facteur C).
  */
 (function (root) {
   "use strict";
@@ -17,39 +18,39 @@
     [6, [250, 204, 21], "Modéré (3 à 6 t/ha/an, seuil toléré)"],
     [11, [251, 146, 60], "Élevé (6 à 11 t/ha/an)"],
     [22, [239, 68, 68], "Sévère (11 à 22 t/ha/an)"],
-    [Infinity, [168, 32, 90], "Très sévère (> 22 t/ha/an)"]
+    [Infinity, [168, 32, 90], "Critique (> 22 t/ha/an)"]
   ];
 
   // Types de sols et paramètres hydropédologiques
   const SOIL_TYPES = {
     loam: { name: "Loam (de référence)", k: 0.040, f: 8 },
-    sandy_loam: { name: "Loam sableux", k: 0.026, f: 15 },
-    sand: { name: "Sable", k: 0.015, f: 25 },
     silt_loam: { name: "Loam limoneux", k: 0.048, f: 6 },
     clay_loam: { name: "Loam argileux", k: 0.035, f: 4 },
-    clay: { name: "Argile", k: 0.028, f: 2 }
+    clay: { name: "Argile", k: 0.028, f: 2 },
+    sandy_loam: { name: "Loam sableux", k: 0.026, f: 15 },
+    sand: { name: "Sable", k: 0.015, f: 25 }
   };
 
   // Couvert végétal et facteurs C
   const CROP_FACTORS = {
-    bare: { name: "Sol nu (C = 1,00)", c: 1.0 },
-    corn_plow: { name: "Maïs grain labour (C = 0,38)", c: 0.38 },
-    corn_notill: { name: "Maïs semis direct (C = 0,15)", c: 0.15 },
+    bare: { name: "Sol nu sans couvert (C = 1,00 - Témoin)", c: 1.0 },
+    corn_plow: { name: "Maïs grain labour conventionnel (C = 0,38)", c: 0.38 },
+    corn_notill: { name: "Maïs semis direct / résidus (C = 0,15)", c: 0.15 },
     soybean: { name: "Soya (C = 0,28)", c: 0.28 },
-    cereals: { name: "Céréales (C = 0,12)", c: 0.12 },
-    hay: { name: "Prairie / Foin (C = 0,02)", c: 0.02 },
-    potato: { name: "Pomme de terre (C = 0,35)", c: 0.35 }
+    cereals: { name: "Céréales paille conservée (C = 0,12)", c: 0.12 },
+    hay: { name: "Prairie / Foin / Pâturage (C = 0,02)", c: 0.02 },
+    potato: { name: "Pomme de terre / Sarclés (C = 0,35)", c: 0.35 },
+    canola: { name: "Canola / Oléagineux (C = 0,20)", c: 0.20 }
   };
 
   // Pratiques culturales et facteurs P
   const PRACTICE_FACTORS = {
     none: { name: "Sens de la pente (P = 1,00)", p: 1.0 },
-    contour: { name: "Travail en contour (P = 0,75)", p: 0.75 },
-    strip: { name: "Cultures en bandes (P = 0,50)", p: 0.50 }
+    contour: { name: "Travail selon les courbes de niveau (P = 0,75)", p: 0.75 },
+    strip: { name: "Cultures en bandes alternées (P = 0,50)", p: 0.50 }
   };
 
   // Stations de référence d'érosivité des pluies (RUSLEFAC / AAC pour le Québec)
-  // Valeurs R annuelles (MJ·mm/ha·h·an) incluant l'ajustement de fonte et ruissellement printanier
   const QUEBEC_EROSIVITY_STATIONS = [
     { name: "Montréal / Montérégie Ouest", lat: 45.42, lng: -73.93, r: 1120 },
     { name: "Saint-Jean-sur-Richelieu", lat: 45.30, lng: -73.27, r: 1180 },
@@ -76,7 +77,7 @@
 
   /**
    * Estime le facteur d'érosivité R pour les coordonnées de la parcelle
-   * par interpolation spatiale (IDW) sur les stations officielles RUSLEFAC du Québec.
+   * par pondération inverse à la distance (IDW) sur les stations RUSLEFAC du Québec.
    */
   function estimateRFactor(lat, lng) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return 1150;
@@ -92,13 +93,12 @@
   }
 
   /**
-   * Raffine le facteur R en interrogeant l'API publique Open-Meteo pour les précipitations normales
-   * combiné à la formule de Rango & Arnoldus adaptée au climat québécois.
+   * Raffine le facteur R avec l'API publique Open-Meteo pour les normales climatiques
    */
   async function fetchClimaticRFactor(lat, lng) {
     try {
       const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&start_date=2023-01-01&end_date=2023-12-31&daily=precipitation_sum&timezone=auto`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
       if (res.ok) {
         const d = await res.json();
         if (d && d.daily && d.daily.precipitation_sum) {
@@ -106,8 +106,6 @@
           let annual = 0;
           for (let i = 0; i < precip.length; i++) annual += (precip[i] || 0);
           if (annual > 500 && annual < 2500) {
-            // Modèle Ateshian calibré pour l'est canadien : R = 0.417 * (p2yr_6hr)^2.17
-            // Dans le sud du Québec, p2yr_6hr est proportionnel à la précipitation annuelle (~3.5% de l'annuel)
             const p6hr = Math.max(25, Math.min(55, annual * 0.035));
             const calculatedR = Math.round(0.417 * Math.pow(p6hr, 2.17));
             if (calculatedR >= 600 && calculatedR <= 1800) {
@@ -116,56 +114,333 @@
           }
         }
       }
-    } catch (e) {
-      // Fallback immédiat
-    }
+    } catch (e) {}
     return estimateRFactor(lat, lng);
   }
 
-  class ParcelSimulationManager {
+  // Cache mémoire des MNT par parcelle pour éviter les téléchargements redondants
+  const DEM_CACHE = new Map();
+
+  /**
+   * Extraction et préparation du MNT LiDAR 1m pour une parcelle
+   */
+  async function loadParcelDem(parcelFeature, signal) {
+    if (!parcelFeature || !parcelFeature.geometry) {
+      throw new Error("Contour géométrique de parcelle invalide.");
+    }
+
+    const geom = parcelFeature.geometry;
+    const geomBbox = computeGeomBbox(geom);
+    if (!geomBbox) {
+      throw new Error("Boîte englobante de parcelle introuvable.");
+    }
+
+    const cacheKey = JSON.stringify(geomBbox);
+    if (DEM_CACHE.has(cacheKey)) {
+      return DEM_CACHE.get(cacheKey);
+    }
+
+    const spanLng = geomBbox[2] - geomBbox[0];
+    const spanLat = geomBbox[3] - geomBbox[1];
+    const padLng = Math.max(0.0004, spanLng * 0.10);
+    const padLat = Math.max(0.0004, spanLat * 0.10);
+    const bbox = [geomBbox[0] - padLng, geomBbox[1] - padLat, geomBbox[2] + padLng, geomBbox[3] + padLat];
+
+    const targetSize = 480; // Résolution native ~1m LiDAR
+    let region = null;
+
+    const isCustomProject = window.topoManager && window.topoManager.selectedProjectId !== "default" && window.topoManager.selectedProjectUrl;
+    const projectUrl = isCustomProject ? window.topoManager.selectedProjectUrl : null;
+
+    if (projectUrl && typeof readSingleHrdemProjectRegion === "function") {
+      try {
+        region = await readSingleHrdemProjectRegion(projectUrl, bbox, targetSize, signal, "bilinear");
+      } catch (e) {
+        console.warn("readSingleHrdemProjectRegion note:", e);
+      }
+    }
+
+    if (!region && typeof readMultiHrdemRegion === "function") {
+      region = await readMultiHrdemRegion(bbox, targetSize, signal, "bilinear");
+    }
+
+    if (!region || !region.data || region.data.length === 0 || !region.sourceBBox) {
+      throw new Error("Données altimétriques LiDAR 1m indisponibles pour cette parcelle.");
+    }
+
+    const W = region.width;
+    const H = region.height;
+    const sB = region.sourceBBox;
+    const dx = Math.max(0.5, Math.abs((sB[2] - sB[0]) / Math.max(1, W - 1)));
+    const dy = Math.max(0.5, Math.abs((sB[3] - sB[1]) / Math.max(1, H - 1)));
+
+    const p4 = (typeof proj4 === "function") ? proj4 : null;
+    const projDef = region.projection || (typeof EPSG_3979_DEF !== "undefined" ? EPSG_3979_DEF : "+proj=lcc +lat_1=49 +lat_2=77 +lat_0=49 +lon_0=-95 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+
+    const pos = (x, y) => {
+      const u = W > 1 ? x / (W - 1) : 0;
+      const v = H > 1 ? y / (H - 1) : 0;
+      if (p4) {
+        const mX = sB[0] + u * (sB[2] - sB[0]);
+        const mY = sB[3] - v * (sB[3] - sB[1]);
+        return p4(projDef, "EPSG:4326", [mX, mY]);
+      }
+      const [tl, tr, br, bl] = region.cornersWgs84;
+      const top = [tl[0] + u * (tr[0] - tl[0]), tl[1] + u * (tr[1] - tl[1])];
+      const bot = [bl[0] + u * (br[0] - bl[0]), bl[1] + u * (br[1] - bl[1])];
+      return [top[0] + v * (bot[0] - top[0]), top[1] + v * (bot[1] - top[1])];
+    };
+
+    const N = W * H;
+    const zRaw = region.data;
+    const zMasked = new Float32Array(N).fill(NaN);
+    let validInside = 0;
+
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        const v = zRaw[i];
+        if (!Number.isFinite(v) || v <= -900 || v >= 9000) continue;
+
+        const pt = pos(x, y);
+        if (pt[0] < geomBbox[0] || pt[0] > geomBbox[2] || pt[1] < geomBbox[1] || pt[1] > geomBbox[3]) {
+          continue;
+        }
+        if (isPointInGeom(pt, geom)) {
+          zMasked[i] = v;
+          validInside++;
+        }
+      }
+    }
+
+    if (validInside < 10) {
+      throw new Error("La parcelle ne contient pas suffisamment de points LiDAR valides.");
+    }
+
+    const gridObj = {
+      W,
+      H,
+      dx,
+      dy,
+      z: zMasked,
+      pos,
+      sourceBBox: sB,
+      geomBbox,
+      validCount: validInside,
+      key: `dem-${Date.now()}`
+    };
+
+    // Double lissage 3x3 pour supprimer le micro-bruit LiDAR
+    const smoothed = smooth3(smooth3(gridObj));
+    // Calcul hydrologique de remplissage des cuvettes (Priority Flood)
+    smoothed.zf = fillDepressions(smoothed.z, smoothed.W, smoothed.H, 1e-4);
+
+    DEM_CACHE.set(cacheKey, smoothed);
+    return smoothed;
+  }
+
+  function smooth3(G) {
+    const { W, H, z } = G;
+    const out = new Float32Array(z.length).fill(NaN);
+    for (let y = 0; y < H; y++) {
+      const yW = y * W;
+      const yMin = Math.max(0, y - 1);
+      const yMax = Math.min(H - 1, y + 1);
+      for (let x = 0; x < W; x++) {
+        const i = yW + x;
+        if (Number.isNaN(z[i])) continue;
+        let sum = 0, count = 0;
+        const xMin = Math.max(0, x - 1);
+        const xMax = Math.min(W - 1, x + 1);
+        for (let yy = yMin; yy <= yMax; yy++) {
+          const yyW = yy * W;
+          for (let xx = xMin; xx <= xMax; xx++) {
+            const val = z[yyW + xx];
+            if (!Number.isNaN(val)) {
+              sum += val;
+              count++;
+            }
+          }
+        }
+        out[i] = count > 0 ? sum / count : NaN;
+      }
+    }
+    return Object.assign({}, G, { z: out });
+  }
+
+  function fillDepressions(z, W, H, eps = 1e-4) {
+    const N = W * H;
+    const out = new Float32Array(z);
+    const done = new Uint8Array(N);
+    const heap = [];
+
+    const push = (i, v) => {
+      heap.push([v, i]);
+      let c = heap.length - 1;
+      while (c > 0) {
+        const p = (c - 1) >> 1;
+        if (heap[p][0] <= heap[c][0]) break;
+        [heap[p], heap[c]] = [heap[c], heap[p]];
+        c = p;
+      }
+    };
+
+    const pop = () => {
+      const top = heap[0];
+      const last = heap.pop();
+      if (heap.length) {
+        heap[0] = last;
+        let c = 0;
+        for (;;) {
+          const l = 2 * c + 1, r = l + 1;
+          let m = c;
+          if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+          if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+          if (m === c) break;
+          [heap[m], heap[c]] = [heap[c], heap[m]];
+          c = m;
+        }
+      }
+      return top;
+    };
+
+    const valid = (i) => !Number.isNaN(z[i]);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (!valid(i)) continue;
+        let edge = (x === 0 || y === 0 || x === W - 1 || y === H - 1);
+        if (!edge) {
+          for (const j of [i - 1, i + 1, i - W, i + W]) {
+            if (!valid(j)) { edge = true; break; }
+          }
+        }
+        if (edge) { done[i] = 1; push(i, out[i]); }
+      }
+    }
+
+    while (heap.length) {
+      const [v, i] = pop();
+      const x = i % W, y = (i / W) | 0;
+      for (let dyy = -1; dyy <= 1; dyy++) {
+        for (let dxx = -1; dxx <= 1; dxx++) {
+          if (!dxx && !dyy) continue;
+          const xx = x + dxx, yy = y + dyy;
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const j = yy * W + xx;
+          if (done[j] || !valid(j)) continue;
+          done[j] = 1;
+          if (out[j] <= v + eps) out[j] = v + eps;
+          push(j, out[j]);
+        }
+      }
+    }
+    return out;
+  }
+
+  function getGridCorners(G) {
+    return [
+      G.pos(-0.5, -0.5),
+      G.pos(G.W - 0.5, -0.5),
+      G.pos(G.W - 0.5, G.H - 0.5),
+      G.pos(-0.5, G.H - 0.5)
+    ];
+  }
+
+  function isPointInRing(pt, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      const intersect = ((yi > pt[1]) !== (yj > pt[1]))
+        && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function isPointInGeom(pt, geom) {
+    if (!geom || !geom.coordinates) return true;
+    if (geom.type === "Polygon") {
+      if (!geom.coordinates.length || !isPointInRing(pt, geom.coordinates[0])) return false;
+      for (let k = 1; k < geom.coordinates.length; k++) {
+        if (isPointInRing(pt, geom.coordinates[k])) return false;
+      }
+      return true;
+    } else if (geom.type === "MultiPolygon") {
+      for (const poly of geom.coordinates) {
+        if (poly.length && isPointInRing(pt, poly[0])) {
+          let inHole = false;
+          for (let k = 1; k < poly.length; k++) {
+            if (isPointInRing(pt, poly[k])) { inHole = true; break; }
+          }
+          if (!inHole) return true;
+        }
+      }
+      return false;
+    }
+    return true;
+  }
+
+  function computeGeomBbox(geom) {
+    if (!geom || !geom.coordinates) return null;
+    let minLng = Infinity, maxLng = -Infinity;
+    let minLat = Infinity, maxLat = -Infinity;
+
+    function walk(coords) {
+      if (typeof coords[0] === "number") {
+        const [lng, lat] = coords;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        return;
+      }
+      for (const item of coords) walk(item);
+    }
+
+    walk(geom.coordinates);
+    if (!Number.isFinite(minLng) || !Number.isFinite(minLat)) return null;
+    return [minLng, minLat, maxLng, maxLat];
+  }
+
+  function assembleParcel(feature) {
+    if (window.terrain3DManager && typeof window.terrain3DManager.assembleParcelFeature === "function") {
+      return window.terrain3DManager.assembleParcelFeature(feature);
+    }
+    return feature;
+  }
+
+  // ===========================================================================
+  // 1. MODULE DE SIMULATION DE PLUIE & RUISSELLEMENT (ParcelRainManager)
+  // ===========================================================================
+  class ParcelRainManager {
     constructor(mapInstance) {
       this.map = mapInstance;
       this.currentParcel = null;
       this.currentGrid = null;
-      this.activeTab = "rain"; // "rain" ou "erosion"
-      this.isOpen = false;
-      this.isLoading = false;
-
-      // Options de simulation
-      this.intensity = 40; // mm/h
-      this.speed = 4; // x1, x4, x16
+      this.intensity = 40; // mm/h (fixe)
+      this.speed = 4; // x4 (fixe)
       this.soilKey = "loam";
-      this.cropKey = "bare";
-      this.practiceKey = "none";
-      this.rFactor = 1200; // MJ·mm/(ha·h·an)
-      this.showErosionMap = true;
-
-      // États internes
-      this.sim = null; // État de simulation de pluie
-      this.eroResult = null; // Résultats RUSLE
+      this.isOpen = false;
+      this.sim = null;
       this.rafId = 0;
       this.abortController = null;
 
-      // Identifiants des couches MapLibre
       this.SRC_RAIN = "sim-rain-source";
       this.LAYER_RAIN = "sim-rain-layer";
-      this.SRC_ERO = "sim-erosion-source";
-      this.LAYER_ERO = "sim-erosion-layer";
-      this.SRC_HL = "sim-parcel-hl-source";
-      this.LAYER_HL = "sim-parcel-hl-layer";
+      this.SRC_HL = "sim-rain-hl-source";
+      this.LAYER_HL = "sim-rain-hl-layer";
 
       this.initDom();
     }
 
-    // -------------------------------------------------------------------------
-    // Initialisation du DOM et des écouteurs
-    // -------------------------------------------------------------------------
     initDom() {
-      // Boutons du header du dock
       const btnClose = document.getElementById("btn-close-sim-dock");
       const btnCollapse = document.getElementById("btn-collapse-sim-dock");
-      const tabRain = document.getElementById("btn-sim-tab-rain");
-      const tabEro = document.getElementById("btn-sim-tab-erosion");
+      const btnPlay = document.getElementById("btn-sim-rain-play");
+      const btnReset = document.getElementById("btn-sim-rain-reset");
+      const selSoil = document.getElementById("sim-rain-soil");
 
       if (btnClose) btnClose.addEventListener("click", () => this.closeDock());
       if (btnCollapse) {
@@ -174,19 +449,6 @@
           if (dock) dock.classList.toggle("collapsed");
         });
       }
-
-      if (tabRain) {
-        tabRain.addEventListener("click", () => this.switchTab("rain"));
-      }
-      if (tabEro) {
-        tabEro.addEventListener("click", () => this.switchTab("erosion"));
-      }
-
-      // Contrôles Pluie
-      const btnPlay = document.getElementById("btn-sim-rain-play");
-      const btnReset = document.getElementById("btn-sim-rain-reset");
-      const rngIntensity = document.getElementById("sim-rain-intensity");
-      const selSoil = document.getElementById("sim-rain-soil");
 
       if (btnPlay) {
         btnPlay.addEventListener("click", () => {
@@ -202,111 +464,30 @@
         btnReset.addEventListener("click", () => this.resetRain());
       }
 
-      if (rngIntensity) {
-        rngIntensity.addEventListener("input", (e) => {
-          this.intensity = Number(e.target.value);
-          const valEl = document.getElementById("sim-rain-intensity-val");
-          if (valEl) valEl.textContent = `${this.intensity} mm/h`;
-          this.syncRainHint();
-        });
-      }
-
       if (selSoil) {
         selSoil.addEventListener("change", (e) => {
           this.soilKey = e.target.value;
           this.syncRainHint();
-          if (this.activeTab === "erosion") this.computeErosion();
         });
-      }
-
-      // Vitesse ×1, ×4, ×16
-      document.querySelectorAll(".sim-speed-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const s = Number(btn.dataset.speed) || 1;
-          this.speed = s;
-          document.querySelectorAll(".sim-speed-btn").forEach((b) => {
-            const match = Number(b.dataset.speed) === s;
-            b.classList.toggle("active", match);
-            b.style.fontWeight = match ? "700" : "normal";
-            b.style.borderColor = match ? "#0284c7" : "#cbd5e1";
-            b.style.background = match ? "#e0f2fe" : "#ffffff";
-            b.style.color = match ? "#0284c7" : "#0f172a";
-          });
-        });
-      });
-
-      // Contrôles Érosion
-      const chkEroMap = document.getElementById("sim-ero-show-map");
-      const selCrop = document.getElementById("sim-ero-crop");
-      const selPractice = document.getElementById("sim-ero-practice");
-      const btnRecompute = document.getElementById("btn-sim-ero-recompute");
-
-      if (chkEroMap) {
-        chkEroMap.addEventListener("change", (e) => {
-          this.showErosionMap = e.target.checked;
-          this.renderErosionLayer();
-        });
-      }
-
-      if (selCrop) {
-        selCrop.addEventListener("change", (e) => {
-          this.cropKey = e.target.value;
-          this.computeErosion();
-        });
-      }
-
-      if (selPractice) {
-        selPractice.addEventListener("change", (e) => {
-          this.practiceKey = e.target.value;
-          this.computeErosion();
-        });
-      }
-
-      if (btnRecompute) {
-        btnRecompute.addEventListener("click", () => this.computeErosion());
       }
     }
 
-    // -------------------------------------------------------------------------
-    // Lancement de la simulation sur une parcelle
-    // -------------------------------------------------------------------------
-    async startSimulation(parcelFeature, preferredMode = "rain") {
+    async startSimulation(parcelFeature) {
       if (!parcelFeature || !parcelFeature.geometry) return;
 
-      // Fermeture des autres docks éventuels (NDVI, profil)
+      // Fermeture des autres docks
       const pDock = document.getElementById("elevation-profile-dock");
       if (pDock) pDock.classList.remove("open");
       const nDock = document.getElementById("ndvi-dock");
       if (nDock) nDock.classList.remove("open");
 
-      this.currentParcel = this.assembleParcel(parcelFeature);
+      this.currentParcel = assembleParcel(parcelFeature);
       this.openDock();
-      this.switchTab(preferredMode);
       this.updateParcelHeader();
       this.highlightParcel(this.currentParcel.geometry);
 
-      // Calcul automatique du facteur R selon la localisation (RUSLEFAC / Données climatiques)
-      const parcelBbox = this.computeBbox(this.currentParcel.geometry);
-      if (parcelBbox) {
-        const centerLng = (parcelBbox[0] + parcelBbox[2]) / 2;
-        const centerLat = (parcelBbox[1] + parcelBbox[3]) / 2;
-        this.rFactor = estimateRFactor(centerLat, centerLng);
-        this.updateRBadge(this.rFactor, "RUSLEFAC");
-
-        // Raffinement asynchrone via l'API climatique publique
-        fetchClimaticRFactor(centerLat, centerLng).then((refinedR) => {
-          if (refinedR && refinedR !== this.rFactor) {
-            this.rFactor = refinedR;
-            this.updateRBadge(this.rFactor, "API Climat");
-            if (this.currentGrid && this.activeTab === "erosion") {
-              this.computeErosion();
-            }
-          }
-        }).catch(() => {});
-      }
-
-      // Zoom doux sur la parcelle
-      const bbox = this.computeBbox(this.currentParcel.geometry);
+      // Cadrage sur la parcelle
+      const bbox = computeGeomBbox(this.currentParcel.geometry);
       if (bbox && this.map) {
         this.map.fitBounds(
           [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
@@ -314,277 +495,41 @@
         );
       }
 
-      // Préparation du modèle de terrain (grille)
       this.setLoading(true);
       try {
-        await this.prepareGrid();
+        if (this.abortController) this.abortController.abort();
+        this.abortController = new AbortController();
+        this.currentGrid = await loadParcelDem(this.currentParcel, this.abortController.signal);
         this.setLoading(false);
-
-        // Calcul initial de l'érosion
-        this.computeErosion();
-
-        if (preferredMode === "rain") {
-          this.playRain();
-        } else {
-          this.renderErosionLayer();
-        }
+        this.updateParcelHeader();
+        this.resetRain();
+        this.playRain();
       } catch (err) {
         this.setLoading(false);
-        console.error("Erreur lors de la préparation de la simulation :", err);
+        console.error("Erreur chargement MNT pluie :", err);
         const hintEl = document.getElementById("sim-rain-hint");
         if (hintEl) {
-          hintEl.innerHTML = `<span style="color:#ef4444; font-weight:600;">⚠️ ${err.message || "Erreur de chargement des données altimétriques LiDAR."}</span>`;
+          hintEl.innerHTML = `<span style="color:#ef4444; font-weight:600;">⚠️ ${err.message || "Erreur de chargement altimétrique LiDAR 1m."}</span>`;
         }
       }
     }
 
-    // -------------------------------------------------------------------------
-    // Récupération et préparation du MNT de la parcelle
-    // -------------------------------------------------------------------------
-    async prepareGrid() {
-      if (!this.currentParcel || !this.currentParcel.geometry) {
-        throw new Error("Aucune parcelle sélectionnée.");
-      }
-
-      const geom = this.currentParcel.geometry;
-      const geomBbox = this.computeBbox(geom);
-      if (!geomBbox) {
-        throw new Error("Contour géométrique de parcelle invalide.");
-      }
-
-      // Marge de 10% autour de la parcelle pour les calculs de gradient
-      const spanLng = geomBbox[2] - geomBbox[0];
-      const spanLat = geomBbox[3] - geomBbox[1];
-      const padLng = Math.max(0.0004, spanLng * 0.10);
-      const padLat = Math.max(0.0004, spanLat * 0.10);
-      const bbox = [geomBbox[0] - padLng, geomBbox[1] - padLat, geomBbox[2] + padLng, geomBbox[3] + padLat];
-
-      const targetSize = 480; // Résolution native ~1m LiDAR tout en évitant les puissances de 2 (bug #6607 MapLibre)
-      let region = null;
-
-      // Projet personnalisé ou import direct
-      const isCustomProject = window.topoManager && window.topoManager.selectedProjectId !== "default" && window.topoManager.selectedProjectUrl;
-      const projectUrl = isCustomProject ? window.topoManager.selectedProjectUrl : null;
-
-      if (this.abortController) this.abortController.abort();
-      this.abortController = new AbortController();
-      const signal = this.abortController.signal;
-
-      if (projectUrl && typeof readSingleHrdemProjectRegion === "function") {
-        try {
-          region = await readSingleHrdemProjectRegion(projectUrl, bbox, targetSize, signal, "bilinear");
-        } catch (e) {
-          console.warn("readSingleHrdemProjectRegion note:", e);
-        }
-      }
-
-      if (!region && typeof readMultiHrdemRegion === "function") {
-        region = await readMultiHrdemRegion(bbox, targetSize, signal, "bilinear");
-      }
-
-      if (!region || !region.data || region.data.length === 0 || !region.sourceBBox) {
-        throw new Error("Données altimétriques LiDAR 1m indisponibles pour cette parcelle.");
-      }
-
-      const W = region.width;
-      const H = region.height;
-      const sB = region.sourceBBox;
-      const dx = Math.max(0.5, Math.abs((sB[2] - sB[0]) / Math.max(1, W - 1)));
-      const dy = Math.max(0.5, Math.abs((sB[3] - sB[1]) / Math.max(1, H - 1)));
-
-      // Conversion des coordonnées grille -> WGS84
-      const p4 = (typeof proj4 === "function") ? proj4 : null;
-      const projDef = region.projection || (typeof EPSG_3979_DEF !== "undefined" ? EPSG_3979_DEF : "+proj=lcc +lat_1=49 +lat_2=77 +lat_0=49 +lon_0=-95 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
-
-      const pos = (x, y) => {
-        const u = W > 1 ? x / (W - 1) : 0;
-        const v = H > 1 ? y / (H - 1) : 0;
-        if (p4) {
-          const mX = sB[0] + u * (sB[2] - sB[0]);
-          const mY = sB[3] - v * (sB[3] - sB[1]);
-          return p4(projDef, "EPSG:4326", [mX, mY]);
-        }
-        const [tl, tr, br, bl] = region.cornersWgs84;
-        const top = [tl[0] + u * (tr[0] - tl[0]), tl[1] + u * (tr[1] - tl[1])];
-        const bot = [bl[0] + u * (br[0] - bl[0]), bl[1] + u * (br[1] - bl[1])];
-        return [top[0] + v * (bot[0] - top[0]), top[1] + v * (bot[1] - top[1])];
-      };
-
-      // Masquage STRICT selon la géométrie du polygone de la parcelle
-      const N = W * H;
-      const zRaw = region.data;
-      const zMasked = new Float32Array(N).fill(NaN);
-      let validInside = 0;
-
-      for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-          const i = y * W + x;
-          const v = zRaw[i];
-          if (!Number.isFinite(v) || v <= -900 || v >= 9000) continue;
-
-          const pt = pos(x, y);
-          // Rejet rapide hors boîte englobante de la parcelle
-          if (pt[0] < geomBbox[0] || pt[0] > geomBbox[2] || pt[1] < geomBbox[1] || pt[1] > geomBbox[3]) {
-            continue;
-          }
-          if (this.isPointInGeom(pt, geom)) {
-            zMasked[i] = v;
-            validInside++;
-          }
-        }
-      }
-
-      if (validInside < 10) {
-        throw new Error("La parcelle ne contient pas suffisamment de points LiDAR valides.");
-      }
-
-      const gridObj = {
-        W,
-        H,
-        dx,
-        dy,
-        z: zMasked,
-        pos,
-        sourceBBox: sB,
-        key: `sim-${Date.now()}`
-      };
-
-      // Double lissage 3x3 pour supprimer le micro-bruit LiDAR et les artefacts de scan
-      this.currentGrid = this.smooth3(this.smooth3(gridObj));
-      // Modèle hydrologique de remplissage des cuvettes (Priority Flood) pour le routage de l'eau
-      this.currentGrid.zf = this.fillDepressions(this.currentGrid.z, this.currentGrid.W, this.currentGrid.H, 1e-4);
-      this.updateParcelHeader();
-      this.resetRain();
-    }
-
-    // -------------------------------------------------------------------------
-    // Lissage et remplissage des cuvettes (Priority Flood)
-    // -------------------------------------------------------------------------
-    smooth3(G) {
-      const { W, H, z } = G;
-      const out = new Float32Array(z.length).fill(NaN);
-      for (let y = 0; y < H; y++) {
-        const yW = y * W;
-        const yMin = Math.max(0, y - 1);
-        const yMax = Math.min(H - 1, y + 1);
-        for (let x = 0; x < W; x++) {
-          const i = yW + x;
-          if (Number.isNaN(z[i])) continue;
-          let sum = 0, count = 0;
-          const xMin = Math.max(0, x - 1);
-          const xMax = Math.min(W - 1, x + 1);
-          for (let yy = yMin; yy <= yMax; yy++) {
-            const yyW = yy * W;
-            for (let xx = xMin; xx <= xMax; xx++) {
-              const val = z[yyW + xx];
-              if (!Number.isNaN(val)) {
-                sum += val;
-                count++;
-              }
-            }
-          }
-          out[i] = count > 0 ? sum / count : NaN;
-        }
-      }
-      return Object.assign({}, G, { z: out });
-    }
-
-    fillDepressions(z, W, H, eps = 1e-4) {
-      const N = W * H;
-      const out = new Float32Array(z);
-      const done = new Uint8Array(N);
-      const heap = [];
-
-      const push = (i, v) => {
-        heap.push([v, i]);
-        let c = heap.length - 1;
-        while (c > 0) {
-          const p = (c - 1) >> 1;
-          if (heap[p][0] <= heap[c][0]) break;
-          [heap[p], heap[c]] = [heap[c], heap[p]];
-          c = p;
-        }
-      };
-
-      const pop = () => {
-        const top = heap[0];
-        const last = heap.pop();
-        if (heap.length) {
-          heap[0] = last;
-          let c = 0;
-          for (;;) {
-            const l = 2 * c + 1, r = l + 1;
-            let m = c;
-            if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
-            if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
-            if (m === c) break;
-            [heap[m], heap[c]] = [heap[c], heap[m]];
-            c = m;
-          }
-        }
-        return top;
-      };
-
-      const valid = (i) => !Number.isNaN(z[i]);
-      for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-          const i = y * W + x;
-          if (!valid(i)) continue;
-          let edge = (x === 0 || y === 0 || x === W - 1 || y === H - 1);
-          if (!edge) {
-            for (const j of [i - 1, i + 1, i - W, i + W]) {
-              if (!valid(j)) { edge = true; break; }
-            }
-          }
-          if (edge) { done[i] = 1; push(i, out[i]); }
-        }
-      }
-
-      while (heap.length) {
-        const [v, i] = pop();
-        const x = i % W, y = (i / W) | 0;
-        for (let dyy = -1; dyy <= 1; dyy++) {
-          for (let dxx = -1; dxx <= 1; dxx++) {
-            if (!dxx && !dyy) continue;
-            const xx = x + dxx, yy = y + dyy;
-            if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
-            const j = yy * W + xx;
-            if (done[j] || !valid(j)) continue;
-            done[j] = 1;
-            if (out[j] <= v + eps) out[j] = v + eps;
-            push(j, out[j]);
-          }
-        }
-      }
-      return out;
-    }
-
-    // -------------------------------------------------------------------------
-    // Moteur de simulation de pluie (gouttes, écoulement, cuvettes)
-    // -------------------------------------------------------------------------
     newRainSim(G) {
       const { W, H } = G;
       const N = W * H;
       const maxDim = Math.max(W, H);
-      // Facteur d'échelle haute définition
       const S = Math.max(2, Math.min(4, Math.floor(1000 / maxDim) || 2));
 
-      // Contournement du bug MapLibre GL JS #6607 :
-      // Les canvas carrés dont la dimension vaut 64 * 2^n (ex: 256, 512, 1024)
-      // sont interprétés à tort comme des tuiles internes et s'affichent en "carré noir".
-      // On s'assure impérativement que width != height et que ni width ni height ne sont des puissances de 2.
+      // Contournement MapLibre GL JS #6607
       let cvW = Math.round(W * S);
       let cvH = Math.round(H * S);
       if (cvW === cvH) cvW += 2;
       if ((cvW & (cvW - 1)) === 0) cvW += 2;
       if ((cvH & (cvH - 1)) === 0) cvH += 2;
 
-      // Nettoyer un éventuel canvas précédent dans le DOM
       if (typeof document !== "undefined") {
-        const prevCanvas = document.getElementById("sim-rain-active-canvas");
-        if (prevCanvas && prevCanvas.parentNode) {
-          prevCanvas.parentNode.removeChild(prevCanvas);
-        }
+        const prev = document.getElementById("sim-rain-active-canvas");
+        if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
       }
 
       const canvas = document.createElement("canvas");
@@ -615,9 +560,9 @@
         small,
         sctx: small.getContext("2d"),
         img: small.getContext("2d").createImageData(W, H),
-        water: new Float32Array(N), // Eau stockée dans les cuvettes (m)
-        flow: new Float32Array(N),  // Trace récente de passage de l'eau
-        shown: new Float32Array(N), // Lissage temporel pour l'affichage
+        water: new Float32Array(N),
+        flow: new Float32Array(N),
+        shown: new Float32Array(N),
         drops: [],
         cells,
         active: cells.length,
@@ -642,8 +587,6 @@
       if (cap > 1e-4) {
         const w = Math.min(cap, s.water[i]);
         const fillRatio = w / cap;
-        // La surface de l'eau transite en continu du fond de cuvette (z)
-        // vers la surface de déversement (zf) au fur et à mesure du remplissage
         return z[i] * (1 - fillRatio) + zf[i] * fillRatio;
       }
       return z[i] + s.water[i];
@@ -671,14 +614,13 @@
       const cell = dx * dy;
       const I = this.intensity;
       const soil = SOIL_TYPES[this.soilKey] || SOIL_TYPES.loam;
-      const f = soil.f; // infiltration en mm/h
+      const f = soil.f;
 
-      const excess = Math.max(0, I - f) / 1000 / 3600; // m/s en ruissellement
+      const excess = Math.max(0, I - f) / 1000 / 3600;
       s.time += dt;
       s.rain += (I / 1000 / 3600) * dt * s.active * cell;
       s.inf += (Math.min(I, f) / 1000 / 3600) * dt * s.active * cell;
 
-      // Génération des nouvelles gouttes proportionnelle à la surface et à la résolution
       if (excess > 0) {
         const vol = excess * dt * s.active * cell;
         const n = Math.max(2, Math.round(Math.min(1600, s.active * 0.008)));
@@ -696,7 +638,6 @@
         }
       }
 
-      // Mouvement des gouttes (inertie, gravité, frottement)
       const keep = [];
       for (const p of s.drops) {
         const cx = p.x | 0, cy = p.y | 0;
@@ -715,28 +656,24 @@
         s.flow[i] += p.v / cell;
         p.age++;
 
-        // Ralentissement ou cuvette : dépôt si la cuvette n'est pas encore pleine
         const cap = zf ? Math.max(0, zf[i] - z[i]) : 0;
         const isDepression = cap > 1e-4;
         const isFull = isDepression && s.water[i] >= cap * 0.95;
 
         if ((sp < 0.03 || slope < 2e-5) && p.age > 3) {
           if (isDepression && !isFull) {
-            // La cuvette n'est pas pleine : piéger l'eau et remplir la cuvette
             const room = cap - s.water[i];
             const take = Math.min(p.v / cell, room);
             s.water[i] += take;
             s.wetList.add(i);
             p.v -= take * cell;
-            if (p.v <= 1e-7) continue; // Absorbée
+            if (p.v <= 1e-7) continue;
           } else if (!isDepression) {
-            // Replat temporaire
             s.water[i] += p.v / cell;
             s.wetList.add(i);
             continue;
           }
 
-          // Si la cuvette est pleine : la goutte continue vers l'exutoire naturel selon zf
           if (isFull) {
             const slf = Math.hypot(gx, gy);
             if (slf > 1e-7) {
@@ -750,7 +687,7 @@
         p.y += p.vy;
         const nx = p.x | 0, ny = p.y | 0;
         if (p.x < 0 || p.y < 0 || nx >= W || ny >= H || Number.isNaN(z[ny * W + nx])) {
-          s.out += p.v; // Sortie du champ
+          s.out += p.v;
           continue;
         }
         if (p.age > 3500) {
@@ -764,7 +701,7 @@
       }
       s.drops = keep;
 
-      // Étalement et débordement hydrologique des cuvettes
+      // Étalement et infiltration dans les cuvettes
       const infil = (f / 1000 / 3600) * dt;
       const nextWet = new Set();
       for (const i of s.wetList) {
@@ -777,7 +714,6 @@
         const x = i % W, y = (i / W) | 0;
         const capI = zf ? Math.max(0, zf[i] - z[i]) : 0;
 
-        // Si la cellule n'est pas dans une cuvette : relâcher l'eau excédentaire en écoulement actif
         if (capI <= 1e-4) {
           if (w > 1e-4 && s.drops.length < 22000) {
             s.drops.push({ x: x + 0.5, y: y + 0.5, vx: 0, vy: 0, v: w * cell, age: 1 });
@@ -786,12 +722,10 @@
           continue;
         }
 
-        // Si l'eau dépasse la capacité de la cuvette, le surplus déborde par l'exutoire naturel sous forme de ruissellement !
         if (w > capI) {
           const overflow = w - capI;
           w = capI;
           if (s.drops.length < 22000) {
-            // Créer une goutte qui part immédiatement vers le point de déversement
             s.drops.push({ x: x + 0.5, y: y + 0.5, vx: 0, vy: 0, v: overflow * cell, age: 1 });
           } else {
             s.out += overflow * cell;
@@ -809,7 +743,6 @@
           const j = yy * W + xx;
           if (Number.isNaN(z[j])) continue;
 
-          // Règle physique stricte : l'eau stagnante ne peut jamais franchir une crête au-dessus du déversement (zf)
           const spillZ = zf ? zf[i] : z[i];
           if (z[j] >= spillZ - 1e-4) continue;
 
@@ -839,7 +772,6 @@
       const N = W * H;
       const px = s.img.data;
 
-      // 97e centile pour isoler les axes d'écoulement préférentiels (thalwegs)
       if (!(s.frame++ % 10) || !s.ref) {
         const sample = [];
         const sampleCount = Math.min(8000, s.cells.length);
@@ -854,7 +786,7 @@
       const ref = s.ref;
 
       for (let i = 0; i < N; i++) {
-        s.flow[i] *= 0.99; // Estompage progressif
+        s.flow[i] *= 0.99;
         const w = s.water[i];
         const f = s.flow[i] / ref;
         const o = i * 4;
@@ -863,21 +795,18 @@
         const v = (s.shown[i] = s.shown[i] * 0.9 + target * 0.1);
 
         if (v >= 2) {
-          // Cuvette : bleu soutenu à profond selon la hauteur d'eau
           const k = Math.min(1, v - 2);
           px[o] = 40 - 30 * k;
           px[o + 1] = 120 - 70 * k;
           px[o + 2] = 240 - 40 * k;
           px[o + 3] = 160 + 90 * k;
         } else if (v > 0.02) {
-          // Thalweg / écoulement : cyan lumineux
           const k = Math.min(1, v);
           px[o] = 30 + 170 * k;
           px[o + 1] = 160 + 90 * k;
           px[o + 2] = 255;
           px[o + 3] = 70 + 185 * k;
         } else {
-          // Hors filet d'eau et hors parcelle : transparent pour laisser le satellite visible
           px[o + 3] = 0;
         }
       }
@@ -891,7 +820,6 @@
       c.imageSmoothingQuality = "high";
       c.drawImage(s.small, 0, 0, s.canvas.width, s.canvas.height);
 
-      // Halo lumineux pour un rendu visuel d'eau réaliste
       if ("filter" in c) {
         try {
           c.save();
@@ -903,7 +831,6 @@
         } catch (e) {}
       }
 
-      // Gouttes de pluie tombantes (densité adaptée à la haute résolution)
       c.fillStyle = "rgba(225, 245, 255, 0.45)";
       const r = Math.max(0.7, S * 0.25);
       const step = s.drops.length > 12000 ? 3 : (s.drops.length > 6000 ? 2 : 1);
@@ -927,14 +854,8 @@
       this.drawRain(this.sim);
 
       const src = this.map && this.map.getSource(this.SRC_RAIN);
-      if (src && typeof src.play === "function") {
-        src.play();
-      }
-
-      // Rafraîchissement MapLibre
-      if (this.map && typeof this.map.triggerRepaint === "function") {
-        this.map.triggerRepaint();
-      }
+      if (src && typeof src.play === "function") src.play();
+      if (this.map && typeof this.map.triggerRepaint === "function") this.map.triggerRepaint();
 
       this.updateStatsDisplay();
       this.rafId = requestAnimationFrame(() => this.loop());
@@ -953,9 +874,7 @@
       this.syncPlayButton(true);
 
       const src = this.map && this.map.getSource(this.SRC_RAIN);
-      if (src && typeof src.play === "function") {
-        src.play();
-      }
+      if (src && typeof src.play === "function") src.play();
 
       if (this.map.getLayer(this.LAYER_RAIN)) {
         this.map.setLayoutProperty(this.LAYER_RAIN, "visibility", "visible");
@@ -971,9 +890,7 @@
       if (this.sim) this.sim.running = false;
       this.syncPlayButton(false);
       const src = this.map && this.map.getSource(this.SRC_RAIN);
-      if (src && typeof src.pause === "function") {
-        src.pause();
-      }
+      if (src && typeof src.pause === "function") src.pause();
     }
 
     resetRain() {
@@ -994,7 +911,7 @@
 
     ensureRainLayer(s) {
       if (!this.map || typeof this.map.getSource !== "function") return;
-      const coords = this.getGridCorners(s.G);
+      const coords = getGridCorners(s.G);
 
       if (this.map.getSource(this.SRC_RAIN)) {
         if (this.map.getLayer(this.LAYER_RAIN)) this.map.removeLayer(this.LAYER_RAIN);
@@ -1024,9 +941,7 @@
       }, beforeLayer);
 
       const src = this.map.getSource(this.SRC_RAIN);
-      if (src && typeof src.play === "function") {
-        src.play();
-      }
+      if (src && typeof src.play === "function") src.play();
     }
 
     removeRainLayer() {
@@ -1038,192 +953,12 @@
       if (this.map.getSource(this.SRC_RAIN)) this.map.removeSource(this.SRC_RAIN);
     }
 
-    // -------------------------------------------------------------------------
-    // Modèle d'érosion des sols RUSLE (Moore & Burch, Freeman D-infinity)
-    // -------------------------------------------------------------------------
-    computeErosion() {
-      if (!this.currentGrid) return;
-      const G = this.currentGrid;
-      const { W, H, dx, dy, z } = G;
-      const N = W * H;
-
-      const zf = G.zf || this.fillDepressions(z, W, H, 1e-4);
-      const cell = dx * dy;
-      const width = (dx + dy) / 2;
-
-      const DX = [1, 1, 0, -1, -1, -1, 0, 1];
-      const DY = [0, 1, 1, 1, 0, -1, -1, -1];
-      const DIST = DX.map((a, d) => Math.hypot(a * dx, DY[d] * dy));
-
-      const order = [];
-      for (let i = 0; i < N; i++) {
-        if (!Number.isNaN(zf[i])) order.push(i);
-      }
-      order.sort((a, b) => zf[b] - zf[a]); // Tri par altitude décroissante
-
-      // Écoulement multidirectionnel (Freeman 1.1) : aire contributive
-      const acc = new Float64Array(N);
-      for (const i of order) acc[i] += cell;
-
-      for (const i of order) {
-        const x = i % W, y = (i / W) | 0;
-        const zc = zf[i];
-        let sum = 0;
-        const w8 = new Float64Array(8);
-
-        for (let d = 0; d < 8; d++) {
-          const xx = x + DX[d], yy = y + DY[d];
-          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
-          const j = yy * W + xx, zn = zf[j];
-          if (Number.isNaN(zn) || zn >= zc) continue;
-          const s = (zc - zn) / DIST[d];
-          w8[d] = Math.pow(s, 1.1) * (d % 2 ? 0.354 : 0.5);
-          sum += w8[d];
-        }
-
-        if (sum <= 0) continue;
-        for (let d = 0; d < 8; d++) {
-          if (w8[d] > 0) {
-            acc[(y + DY[d]) * W + x + DX[d]] += acc[i] * (w8[d] / sum);
-          }
-        }
-      }
-
-      // Facteur LS (Moore & Burch 1986) et calcul RUSLE : A = R · K · LS · C · P
-      const R = this.rFactor;
-      const soil = SOIL_TYPES[this.soilKey] || SOIL_TYPES.loam;
-      const K = soil.k;
-      const crop = CROP_FACTORS[this.cropKey] || CROP_FACTORS.bare;
-      const C = crop.c;
-      const practice = PRACTICE_FACTORS[this.practiceKey] || PRACTICE_FACTORS.none;
-      const P = practice.p;
-
-      const A = new Float32Array(N).fill(NaN);
-      let sumA = 0, countA = 0;
-      const Z = (xx, yy) => (xx < 0 || yy < 0 || xx >= W || yy >= H ? NaN : z[yy * W + xx]);
-
-      for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-          const i = y * W + x;
-          if (Number.isNaN(z[i])) continue;
-
-          const zx1 = Z(x + 1, y), zx0 = Z(x - 1, y);
-          const zy1 = Z(x, y + 1), zy0 = Z(x, y - 1);
-
-          const gx = !Number.isNaN(zx1) && !Number.isNaN(zx0) ? (zx1 - zx0) / (2 * dx) : !Number.isNaN(zx1) ? (zx1 - z[i]) / dx : !Number.isNaN(zx0) ? (z[i] - zx0) / dx : 0;
-          const gy = !Number.isNaN(zy1) && !Number.isNaN(zy0) ? (zy1 - zy0) / (2 * dy) : !Number.isNaN(zy1) ? (zy1 - z[i]) / dy : !Number.isNaN(zy0) ? (z[i] - zy0) / dy : 0;
-
-          const sinb = Math.sin(Math.atan(Math.hypot(gx, gy)));
-          const As = Math.min(300, acc[i] / width); // Aire contributive spécifique (m) plafonnée à 300m
-          const LS = Math.pow(As / 22.13, 0.4) * Math.pow(sinb / 0.0896, 1.3);
-
-          A[i] = R * K * LS * C * P;
-          sumA += A[i];
-          countA++;
-        }
-      }
-
-      const mean = countA ? sumA / countA : 0;
-      const areaHa = (countA * cell) / 10000;
-      const total = mean * areaHa;
-
-      this.eroResult = { A, mean, total, areaHa };
-      this.updateErosionDisplay();
-      this.renderErosionLayer();
-    }
-
-    createErosionDataUrl() {
-      if (!this.currentGrid || !this.eroResult) return null;
-      const { W, H } = this.currentGrid;
-      const A = this.eroResult.A;
-
-      const cv = document.createElement("canvas");
-      cv.width = W;
-      cv.height = H;
-      const ctx = cv.getContext("2d");
-      const img = ctx.createImageData(W, H);
-      const px = img.data;
-
-      for (let i = 0; i < A.length; i++) {
-        const v = A[i];
-        if (!Number.isFinite(v)) continue;
-
-        const match = RUSLE_CLASSES.find((c) => v < c[0]);
-        const rgb = match ? match[1] : [168, 32, 90];
-        const o = i * 4;
-        px[o] = rgb[0];
-        px[o + 1] = rgb[1];
-        px[o + 2] = rgb[2];
-        px[o + 3] = 205; // Opacité nette
-      }
-
-      ctx.putImageData(img, 0, 0);
-      return cv.toDataURL();
-    }
-
-    renderErosionLayer() {
-      if (!this.map || typeof this.map.getSource !== "function" || !this.currentGrid) return;
-      const shouldShow = this.showErosionMap && this.eroResult;
-
-      if (!shouldShow) {
-        if (this.map.getLayer(this.LAYER_ERO)) {
-          this.map.setLayoutProperty(this.LAYER_ERO, "visibility", "none");
-        }
-        return;
-      }
-
-      const url = this.createErosionDataUrl();
-      if (!url) return;
-      const coords = this.getGridCorners(this.currentGrid);
-
-      if (!this.map.getSource(this.SRC_ERO)) {
-        this.map.addSource(this.SRC_ERO, {
-          type: "image",
-          url: url,
-          coordinates: coords
-        });
-
-        const beforeLayer = this.map.getLayer(this.LAYER_RAIN)
-          ? this.LAYER_RAIN
-          : (this.map.getLayer("parcelles-line") ? "parcelles-line" : undefined);
-
-        this.map.addLayer({
-          id: this.LAYER_ERO,
-          type: "raster",
-          source: this.SRC_ERO,
-          paint: {
-            "raster-opacity": 0.85,
-            "raster-fade-duration": 0,
-            "raster-resampling": "linear"
-          }
-        }, beforeLayer);
-      } else {
-        this.map.getSource(this.SRC_ERO).updateImage({ url, coordinates: coords });
-        this.map.setLayoutProperty(this.LAYER_ERO, "visibility", "visible");
-      }
-
-      // Si la pluie tourne en même temps, la pluie reste par-dessus
-      if (this.sim && this.sim.running && this.map.getLayer(this.LAYER_RAIN)) {
-        this.map.moveLayer(this.LAYER_RAIN);
-      }
-    }
-
-    removeErosionLayer() {
-      if (!this.map || typeof this.map.getSource !== "function") return;
-      if (this.map.getLayer(this.LAYER_ERO)) this.map.removeLayer(this.LAYER_ERO);
-      if (this.map.getSource(this.SRC_ERO)) this.map.removeSource(this.SRC_ERO);
-    }
-
-    // -------------------------------------------------------------------------
-    // Affichage et mise à jour de l'interface
-    // -------------------------------------------------------------------------
     updateParcelHeader() {
       if (!this.currentParcel) return;
       const props = this.currentParcel.properties || {};
       const pid = props.IDPAR || props.idpar || "";
       const lot = props.NO_LOT || "";
       const sup = props.SUPHEC || props.suphec || "";
-      const crop = props.DESCODPR1 || props.descodpr1 || "";
 
       const badgeEl = document.getElementById("sim-parcel-badge");
       if (badgeEl) {
@@ -1245,29 +980,6 @@
           resEl.style.display = "inline-flex";
         } else {
           resEl.style.display = "none";
-        }
-      }
-
-      // Pré-sélection intelligente de la culture si renseignée dans le BDPPAD
-      if (crop) {
-        const cLower = crop.toLowerCase();
-        let targetKey = "bare";
-        if (cLower.includes("maïs") || cLower.includes("mais")) {
-          targetKey = "corn_plow";
-        } else if (cLower.includes("soya")) {
-          targetKey = "soybean";
-        } else if (cLower.includes("blé") || cLower.includes("orge") || cLower.includes("avoine") || cLower.includes("céréale")) {
-          targetKey = "cereals";
-        } else if (cLower.includes("foin") || cLower.includes("prairie") || cLower.includes("pâturage")) {
-          targetKey = "hay";
-        } else if (cLower.includes("pomme de terre")) {
-          targetKey = "potato";
-        }
-
-        const selCrop = document.getElementById("sim-ero-crop");
-        if (selCrop && targetKey !== "bare") {
-          selCrop.value = targetKey;
-          this.cropKey = targetKey;
         }
       }
     }
@@ -1316,41 +1028,9 @@
       const hintEl = document.getElementById("sim-rain-hint");
       if (!hintEl) return;
       if (this.intensity <= soil.f) {
-        hintEl.innerHTML = `<span style="color:#d97706; font-weight:600;">⚠️ Le sol absorbe toute la pluie (infiltration ≈ ${soil.f} mm/h) : augmentez l'intensité au-dessus de ${soil.f} mm/h pour voir apparaître le ruissellement.</span>`;
+        hintEl.innerHTML = `<span style="color:#d97706; font-weight:600;">⚠️ Le sol absorbe toute la pluie (infiltration ≈ ${soil.f} mm/h).</span>`;
       } else {
         hintEl.textContent = `Les gouttes descendent la plus forte pente selon le MNE 1m, tracent les thalwegs et remplissent les dépressions qui débordent une fois pleines. Seul l'excès d'eau sur l'infiltration ruisselle (modèle Horton).`;
-      }
-    }
-
-    updateErosionDisplay() {
-      if (!this.eroResult) return;
-      const { mean, total } = this.eroResult;
-
-      this.updateRBadge(this.rFactor);
-
-      const elMean = document.getElementById("sim-ero-mean-val");
-      const elTotal = document.getElementById("sim-ero-total-val");
-      const elBadge = document.getElementById("sim-ero-tolerance-badge");
-
-      if (elMean) elMean.textContent = `${mean.toFixed(1)} t/ha/an`;
-      if (elTotal) elTotal.textContent = `${Math.round(total)} t/an`;
-
-      if (elBadge) {
-        if (mean <= 6.0) {
-          elBadge.textContent = `Pertes sous le seuil de tolérance usuel (≈ 6 t/ha/an) — Érosion maîtrisée`;
-          elBadge.style.color = "#15803d";
-        } else {
-          elBadge.textContent = `Attention : Pertes supérieures au seuil de tolérance (≈ 6 t/ha/an) — Risque d'appauvrissement du sol`;
-          elBadge.style.color = "#ea580c";
-        }
-      }
-    }
-
-    updateRBadge(rVal, source = "RUSLEFAC") {
-      const badge = document.getElementById("sim-ero-r-badge");
-      if (badge) {
-        badge.textContent = `${rVal} MJ·mm/ha·h·an`;
-        badge.title = `Érosivité R = ${rVal} MJ·mm/(ha·h·an) déterminée automatiquement selon la localisation (${source})`;
       }
     }
 
@@ -1366,34 +1046,7 @@
       }
     }
 
-    switchTab(tabName) {
-      this.activeTab = tabName;
-      const isRain = tabName === "rain";
-
-      const btnRain = document.getElementById("btn-sim-tab-rain");
-      const btnEro = document.getElementById("btn-sim-tab-erosion");
-      const secRain = document.getElementById("sim-section-rain");
-      const secEro = document.getElementById("sim-section-erosion");
-
-      if (btnRain) {
-        btnRain.classList.toggle("active", isRain);
-        btnRain.style.background = isRain ? "#ffffff" : "transparent";
-        btnRain.style.color = isRain ? "#0284c7" : "#64748b";
-        btnRain.style.boxShadow = isRain ? "0 1px 3px rgba(0,0,0,0.1)" : "none";
-      }
-      if (btnEro) {
-        btnEro.classList.toggle("active", !isRain);
-        btnEro.style.background = !isRain ? "#ffffff" : "transparent";
-        btnEro.style.color = !isRain ? "#ea580c" : "#64748b";
-        btnEro.style.boxShadow = !isRain ? "0 1px 3px rgba(0,0,0,0.1)" : "none";
-      }
-
-      if (secRain) secRain.style.display = isRain ? "block" : "none";
-      if (secEro) secEro.style.display = !isRain ? "block" : "none";
-    }
-
     setLoading(loading) {
-      this.isLoading = loading;
       const bar = document.getElementById("sim-loading-bar");
       if (bar) bar.style.display = loading ? "block" : "none";
     }
@@ -1410,7 +1063,6 @@
     closeDock() {
       this.pauseRain();
       this.removeRainLayer();
-      this.removeErosionLayer();
       this.clearHighlight();
 
       const resEl = document.getElementById("sim-res-badge");
@@ -1421,18 +1073,6 @@
       this.isOpen = false;
       this.currentParcel = null;
       this.currentGrid = null;
-    }
-
-    // -------------------------------------------------------------------------
-    // Géométrie et outils de détourage
-    // -------------------------------------------------------------------------
-    getGridCorners(G) {
-      return [
-        G.pos(-0.5, -0.5),
-        G.pos(G.W - 0.5, -0.5),
-        G.pos(G.W - 0.5, G.H - 0.5),
-        G.pos(-0.5, G.H - 0.5)
-      ];
     }
 
     highlightParcel(geom) {
@@ -1466,71 +1106,680 @@
         this.map.setLayoutProperty(this.LAYER_HL, "visibility", "none");
       }
     }
+  }
 
-    isPointInRing(pt, ring) {
-      let inside = false;
-      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const xi = ring[i][0], yi = ring[i][1];
-        const xj = ring[j][0], yj = ring[j][1];
-        const intersect = ((yi > pt[1]) !== (yj > pt[1]))
-          && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-      }
-      return inside;
+  // ===========================================================================
+  // 2. MODULE D'ÉROSION DES SOLS RUSLE DANS LE MENU DE GAUCHE (ParcelErosionManager)
+  // ===========================================================================
+  class ParcelErosionManager {
+    constructor(mapInstance) {
+      this.map = mapInstance;
+      this.currentParcel = null;
+      this.currentGrid = null;
+      this.eroResult = null;
+      this.seriesDb = null;
+      this.isLoading = false;
+
+      // Paramètres RUSLE
+      this.rFactor = 1150;
+      this.soilKey = "loam";
+      this.cropKey = "bare";
+      this.practiceKey = "none";
+      this.opacity = 0.85;
+      this.isVisible = true;
+
+      // Couches MapLibre
+      this.SRC_ERO = "rusle-erosion-source";
+      this.LAYER_ERO = "rusle-erosion-layer";
+      this.SRC_HL = "rusle-parcel-hl-source";
+      this.LAYER_HL = "rusle-parcel-hl-layer";
+
+      this.initDom();
+      this.loadSeriesSummaries();
     }
 
-    isPointInGeom(pt, geom) {
-      if (!geom || !geom.coordinates) return true;
-      if (geom.type === "Polygon") {
-        if (!geom.coordinates.length || !this.isPointInRing(pt, geom.coordinates[0])) return false;
-        for (let k = 1; k < geom.coordinates.length; k++) {
-          if (this.isPointInRing(pt, geom.coordinates[k])) return false;
+    async loadSeriesSummaries() {
+      if (this.seriesDb) return;
+      if (window.soilAi && window.soilAi.seriesDb) {
+        this.seriesDb = window.soilAi.seriesDb;
+        return;
+      }
+      try {
+        const res = await fetch("data/series_summaries.json");
+        if (res.ok) this.seriesDb = await res.json();
+      } catch (e) {
+        console.warn("loadSeriesSummaries note:", e);
+      }
+    }
+
+    initDom() {
+      const toggle = document.getElementById("toggle-rusle");
+      const selSoil = document.getElementById("rusle-soil-select");
+      const selCrop = document.getElementById("rusle-crop-select");
+      const selPractice = document.getElementById("rusle-practice-select");
+      const btnCompute = document.getElementById("btn-rusle-compute");
+      const rngOpacity = document.getElementById("rusle-opacity");
+
+      if (toggle) {
+        toggle.addEventListener("change", (e) => {
+          this.isVisible = e.target.checked;
+          const p = this.currentParcel || (window.terrain3DManager && window.terrain3DManager.lastClickedParcel);
+          if (this.isVisible && !this.eroResult && p) {
+            this.calculateForParcel(p);
+          } else {
+            this.renderLayer();
+          }
+        });
+      }
+
+      if (selSoil) {
+        selSoil.addEventListener("change", (e) => {
+          this.soilKey = e.target.value;
+          const badge = document.getElementById("rusle-soil-source-badge");
+          if (badge) badge.textContent = "Manuel";
+          if (this.currentGrid) this.compute();
+        });
+      }
+
+      if (selCrop) {
+        selCrop.addEventListener("change", (e) => {
+          this.cropKey = e.target.value;
+          const badge = document.getElementById("rusle-crop-detected-badge");
+          if (badge) badge.textContent = "Personnalisé";
+          if (this.currentGrid) this.compute();
+        });
+      }
+
+      if (selPractice) {
+        selPractice.addEventListener("change", (e) => {
+          this.practiceKey = e.target.value;
+          if (this.currentGrid) this.compute();
+        });
+      }
+
+      if (btnCompute) {
+        btnCompute.addEventListener("click", () => {
+          if (this.currentParcel) {
+            this.calculateForParcel(this.currentParcel);
+          } else if (window.terrain3DManager && window.terrain3DManager.lastClickedParcel) {
+            this.calculateForParcel(window.terrain3DManager.lastClickedParcel);
+          }
+        });
+      }
+
+      if (rngOpacity) {
+        rngOpacity.addEventListener("input", (e) => {
+          this.opacity = Number(e.target.value) / 100;
+          const badge = document.getElementById("rusle-opacity-val");
+          if (badge) badge.textContent = `${Math.round(this.opacity * 100)}%`;
+          if (this.map && this.map.getLayer(this.LAYER_ERO)) {
+            this.map.setPaintProperty(this.LAYER_ERO, "raster-opacity", this.opacity);
+          }
+        });
+      }
+    }
+
+    /**
+     * Ouvre et active le panneau RUSLE dans le menu de gauche
+     */
+    openLeftCard() {
+      const panelTools = document.getElementById("panel-tools");
+      const backdrop = document.getElementById("tools-backdrop");
+      if (panelTools) {
+        panelTools.classList.add("open");
+        if (backdrop) backdrop.classList.add("active");
+      }
+
+      const card = document.getElementById("card-rusle");
+      if (card) {
+        card.open = true;
+        card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        card.style.transition = "box-shadow 0.3s ease";
+        card.style.boxShadow = "0 0 0 3px #ea580c";
+        setTimeout(() => { card.style.boxShadow = ""; }, 1200);
+      }
+
+      const toggle = document.getElementById("toggle-rusle");
+      if (toggle) toggle.checked = true;
+      this.isVisible = true;
+    }
+
+    /**
+     * Détermine la texture du sol en priorité via la pédologie IRDA/AAC,
+     * ou à défaut via Soil World (API ISRIC SoilGrids).
+     */
+    async detectSoilTexture(centerLat, centerLng, parcelProps) {
+      await this.loadSeriesSummaries();
+
+      let pedoTexture = null;
+      let pedoSeriesName = "";
+
+      // 1. Détection via les données pédologiques québécoises
+      let seriesDesc = parcelProps && (parcelProps.s1_desc || parcelProps.SERIE || parcelProps.serie);
+      let appellation = parcelProps && (parcelProps.Appellation_cartographique || parcelProps.appellation);
+
+      if ((!seriesDesc && !appellation) && this.map) {
+        try {
+          const pt = this.map.project([centerLng, centerLat]);
+          const hits = this.map.queryRenderedFeatures(pt, {
+            layers: ["pedologie-fill", "pedologie-hit-layer"].filter(l => this.map.getLayer(l))
+          });
+          if (hits && hits.length > 0) {
+            const hp = hits[0].properties || {};
+            seriesDesc = hp.s1_desc || hp.SERIE || hp.serie;
+            appellation = hp.Appellation_cartographique || hp.appellation;
+          }
+        } catch (e) {}
+      }
+
+      if (seriesDesc || appellation) {
+        let matched = null;
+        if (this.seriesDb) {
+          const norm = (s) => {
+            if (!s) return "";
+            let c = s.replace(/^Série\s+/i, "").trim().toLowerCase();
+            c = c.replace(/\bst[-.\s]/i, "saint-").replace(/\bste[-.\s]/i, "sainte-");
+            return c.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+          };
+          const slug1 = norm(seriesDesc);
+          const slug2 = norm(appellation);
+          matched = this.seriesDb[slug1] || this.seriesDb[slug2];
         }
-        return true;
-      } else if (geom.type === "MultiPolygon") {
-        for (const poly of geom.coordinates) {
-          if (poly.length && this.isPointInRing(pt, poly[0])) {
-            let inHole = false;
-            for (let k = 1; k < poly.length; k++) {
-              if (this.isPointInRing(pt, poly[k])) { inHole = true; break; }
+
+        if (matched && matched.texture) {
+          pedoTexture = matched.texture;
+          pedoSeriesName = matched.nom || seriesDesc;
+        } else if (seriesDesc) {
+          pedoSeriesName = seriesDesc;
+        }
+      }
+
+      if (pedoTexture || pedoSeriesName) {
+        const raw = (pedoTexture || pedoSeriesName).toLowerCase();
+        let soilKey = "loam";
+        if (raw.includes("argile lourde") || (raw.includes("argile") && !raw.includes("loam"))) {
+          soilKey = "clay";
+        } else if (raw.includes("argil") && raw.includes("loam")) {
+          soilKey = "clay_loam";
+        } else if (raw.includes("limon") || raw.includes("limoneux")) {
+          soilKey = "silt_loam";
+        } else if (raw.includes("sable") && raw.includes("loam")) {
+          soilKey = "sandy_loam";
+        } else if (raw.includes("sable")) {
+          soilKey = "sand";
+        } else {
+          soilKey = "loam";
+        }
+
+        return {
+          source: "pedo",
+          sourceLabel: `Pédologie QC : ${pedoSeriesName || "Série identifiée"}`,
+          desc: pedoTexture ? `Série ${pedoSeriesName} — Texture : ${pedoTexture}` : `Série ${pedoSeriesName}`,
+          soilKey: soilKey
+        };
+      }
+
+      // 2. Détection via Soil World (ISRIC SoilGrids REST API)
+      try {
+        const sgUrl = `https://rest.isric.org/soilgrids/v2.0/properties/query?lon=${centerLng.toFixed(4)}&lat=${centerLat.toFixed(4)}&property=clay&property=sand&property=silt&depth=0-5cm&value=mean`;
+        const res = await fetch(sgUrl, { signal: AbortSignal.timeout(3500) });
+        if (res.ok) {
+          const data = await res.json();
+          const layers = (data && data.properties && data.properties.layers) || [];
+          let clay = null, sand = null, silt = null;
+          for (const lay of layers) {
+            const val = lay.depths && lay.depths[0] && lay.depths[0].values && lay.depths[0].values.mean;
+            if (typeof val === "number") {
+              if (lay.name === "clay") clay = val / 10;
+              if (lay.name === "sand") sand = val / 10;
+              if (lay.name === "silt") silt = val / 10;
             }
-            if (!inHole) return true;
+          }
+
+          if (clay !== null && sand !== null && silt !== null) {
+            let soilKey = "loam";
+            let texName = "Loam";
+            if (clay >= 40) {
+              soilKey = "clay"; texName = "Argile";
+            } else if (clay >= 27 && sand <= 45) {
+              soilKey = "clay_loam"; texName = "Loam argileux";
+            } else if (silt >= 50 || (silt >= 40 && clay >= 15)) {
+              soilKey = "silt_loam"; texName = "Loam limoneux";
+            } else if (sand >= 52 || (sand >= 43 && clay <= 20)) {
+              soilKey = "sandy_loam"; texName = "Loam sableux";
+            } else if (sand >= 85) {
+              soilKey = "sand"; texName = "Sable";
+            } else {
+              soilKey = "loam"; texName = "Loam";
+            }
+
+            return {
+              source: "soilgrids",
+              sourceLabel: `Soil World : ${texName}`,
+              desc: `Soil World : ${texName} (${Math.round(clay)}% argile, ${Math.round(silt)}% limon, ${Math.round(sand)}% sable)`,
+              soilKey: soilKey
+            };
           }
         }
-        return false;
-      }
-      return true;
+      } catch (e) {}
+
+      // 3. Fallback standard
+      return {
+        source: "default",
+        sourceLabel: "Défaut : Loam",
+        desc: "Texture de référence (Loam standard, K = 0,040)",
+        soilKey: "loam"
+      };
     }
 
-    computeBbox(geom) {
-      if (!geom || !geom.coordinates) return null;
-      let minLng = Infinity, maxLng = -Infinity;
-      let minLat = Infinity, maxLat = -Infinity;
+    /**
+     * Détecte la dernière culture renseignée dans la parcelle BDPPAD
+     * pour le facteur C par défaut.
+     */
+    detectLatestCrop(parcelProps) {
+      if (!parcelProps) return { cropKey: "bare", cropLabel: "Sol nu (témoin)", year: "" };
 
-      function walk(coords) {
-        if (typeof coords[0] === "number") {
-          const [lng, lat] = coords;
-          if (lng < minLng) minLng = lng;
-          if (lng > maxLng) maxLng = lng;
-          if (lat < minLat) minLat = lat;
-          if (lat > maxLat) maxLat = lat;
-          return;
+      const crop = (parcelProps.DESCODPR1 || parcelProps.descodpr1 || parcelProps.culture || parcelProps.CULTURE || "").trim();
+      const year = (parcelProps.AN_PR1 || parcelProps.an_pr1 || "").trim();
+
+      if (!crop) return { cropKey: "bare", cropLabel: "Sol nu (par défaut)", year: "" };
+
+      const cLower = crop.toLowerCase();
+      let cropKey = "bare";
+
+      if (cLower.includes("pomme de terre") || cLower.includes("patate") || cLower.includes("sarclé") || cLower.includes("sarcle") || cLower.includes("maraîch") || cLower.includes("maraich")) {
+        cropKey = "potato";
+      } else if (cLower.includes("maïs") || cLower.includes("mais")) {
+        cropKey = "corn_plow";
+      } else if (cLower.includes("soya")) {
+        cropKey = "soybean";
+      } else if (cLower.includes("céréale") || cLower.includes("cereale") || cLower.includes("orge") || cLower.includes("avoine") || cLower.includes("seigle") || cLower.includes("triticale") || cLower.includes("blé") || cLower.includes("ble ") || cLower.startsWith("ble")) {
+        cropKey = "cereals";
+      } else if (cLower.includes("foin") || cLower.includes("prairie") || cLower.includes("pâturage") || cLower.includes("paturage") || cLower.includes("luzerne") || cLower.includes("trèfle") || cLower.includes("trefle")) {
+        cropKey = "hay";
+      } else if (cLower.includes("canola") || cLower.includes("colza") || cLower.includes("tournesol")) {
+        cropKey = "canola";
+      }
+
+      return {
+        cropKey: cropKey,
+        cropLabel: crop,
+        year: year
+      };
+    }
+
+    /**
+     * Lance le calcul et l'affichage complet du modèle RUSLE sur une parcelle
+     */
+    async calculateForParcel(parcelFeature) {
+      if (!parcelFeature || !parcelFeature.geometry) return;
+
+      this.currentParcel = assembleParcel(parcelFeature);
+      this.openLeftCard();
+      this.highlightParcel(this.currentParcel.geometry);
+
+      // Calcul des coordonnées du centroïde de la parcelle
+      const geomBbox = computeGeomBbox(this.currentParcel.geometry);
+      const centerLng = (geomBbox[0] + geomBbox[2]) / 2;
+      const centerLat = (geomBbox[1] + geomBbox[3]) / 2;
+
+      // Mise à jour de l'en-tête de parcelle dans la carte gauche
+      this.updateCardHeader(this.currentParcel.properties);
+
+      // 1. Facteur R (climatique)
+      this.rFactor = estimateRFactor(centerLat, centerLng);
+      this.updateRBadge(this.rFactor, "RUSLEFAC");
+      fetchClimaticRFactor(centerLat, centerLng).then((refinedR) => {
+        if (refinedR && refinedR !== this.rFactor) {
+          this.rFactor = refinedR;
+          this.updateRBadge(this.rFactor, "API Climat");
+          if (this.currentGrid) this.compute();
         }
-        for (const item of coords) walk(item);
+      }).catch(() => {});
+
+      // 2. Facteur C : Détection automatique de la dernière culture
+      const detectedCrop = this.detectLatestCrop(this.currentParcel.properties);
+      this.cropKey = detectedCrop.cropKey;
+      const selCrop = document.getElementById("rusle-crop-select");
+      if (selCrop) selCrop.value = this.cropKey;
+
+      const badgeCrop = document.getElementById("rusle-crop-detected-badge");
+      if (badgeCrop) {
+        badgeCrop.textContent = detectedCrop.year ? `Culture ${detectedCrop.year}` : "Dernière culture";
+        badgeCrop.title = `Détecté automatiquement : ${detectedCrop.cropLabel}`;
+      }
+      const infoCrop = document.getElementById("rusle-crop-info");
+      if (infoCrop) {
+        infoCrop.innerHTML = `Culture détectée : <strong>${detectedCrop.cropLabel}</strong>${detectedCrop.year ? ` (${detectedCrop.year})` : ""} &rarr; Facteur C = ${(CROP_FACTORS[this.cropKey] || {}).c || 0.38}`;
       }
 
-      walk(geom.coordinates);
-      if (!Number.isFinite(minLng) || !Number.isFinite(minLat)) return null;
-      return [minLng, minLat, maxLng, maxLat];
+      // 3. Facteur K : Détection automatique de la texture du sol (Pédologie ou Soil World)
+      const soilInfo = await this.detectSoilTexture(centerLat, centerLng, this.currentParcel.properties);
+      this.soilKey = soilInfo.soilKey;
+      const selSoil = document.getElementById("rusle-soil-select");
+      if (selSoil) selSoil.value = this.soilKey;
+
+      const badgeSoil = document.getElementById("rusle-soil-source-badge");
+      if (badgeSoil) {
+        badgeSoil.textContent = soilInfo.source === "pedo" ? "Pédologie QC" : (soilInfo.source === "soilgrids" ? "Soil World" : "Défaut");
+        badgeSoil.title = soilInfo.desc;
+      }
+      const descSoil = document.getElementById("rusle-soil-desc");
+      if (descSoil) {
+        descSoil.innerHTML = `${soilInfo.desc} &rarr; Facteur K = ${(SOIL_TYPES[this.soilKey] || {}).k || 0.040}`;
+      }
+
+      // Cadrage carte
+      if (geomBbox && this.map) {
+        this.map.fitBounds(
+          [[geomBbox[0], geomBbox[1]], [geomBbox[2], geomBbox[3]]],
+          { padding: { top: 60, bottom: 60, left: 340, right: 60 }, duration: 800 }
+        );
+      }
+
+      // 4. Chargement MNT LiDAR 1m & Calcul RUSLE
+      try {
+        const hint = document.getElementById("rusle-no-parcel-hint");
+        if (hint) hint.innerHTML = `<span style="color:#0284c7; font-weight:600;">Chargement altimétrique LiDAR 1m et calcul de la surface contributive...</span>`;
+
+        this.currentGrid = await loadParcelDem(this.currentParcel);
+        if (hint) hint.style.display = "none";
+
+        const resBadge = document.getElementById("rusle-res-badge");
+        if (resBadge) {
+          const resNum = (this.currentGrid.dx + this.currentGrid.dy) / 2;
+          resBadge.textContent = `LiDAR ${resNum <= 1.05 ? "1m" : resNum.toFixed(1) + "m"}`;
+          resBadge.style.display = "inline-flex";
+        }
+
+        this.compute();
+      } catch (err) {
+        console.error("Erreur calcul RUSLE :", err);
+        const hint = document.getElementById("rusle-no-parcel-hint");
+        if (hint) {
+          hint.style.display = "block";
+          hint.innerHTML = `<span style="color:#ef4444; font-weight:600;">⚠️ ${err.message || "Erreur de calcul d'érosion."}</span>`;
+        }
+      }
     }
 
-    assembleParcel(feature) {
-      if (window.terrain3DManager && typeof window.terrain3DManager.assembleParcelFeature === "function") {
-        return window.terrain3DManager.assembleParcelFeature(feature);
+    /**
+     * Calcul numérique RUSLE : A = R · K · LS · C · P
+     */
+    compute() {
+      if (!this.currentGrid) return;
+      const G = this.currentGrid;
+      const { W, H, dx, dy, z } = G;
+      const N = W * H;
+
+      const zf = G.zf || fillDepressions(z, W, H, 1e-4);
+      const cell = dx * dy;
+      const width = (dx + dy) / 2;
+
+      const DX = [1, 1, 0, -1, -1, -1, 0, 1];
+      const DY = [0, 1, 1, 1, 0, -1, -1, -1];
+      const DIST = DX.map((a, d) => Math.hypot(a * dx, DY[d] * dy));
+
+      const order = [];
+      for (let i = 0; i < N; i++) {
+        if (!Number.isNaN(zf[i])) order.push(i);
       }
-      return feature;
+      order.sort((a, b) => zf[b] - zf[a]);
+
+      // Aire contributive spécifique (Freeman 1.1)
+      const acc = new Float64Array(N);
+      for (const i of order) acc[i] += cell;
+
+      for (const i of order) {
+        const x = i % W, y = (i / W) | 0;
+        const zc = zf[i];
+        let sum = 0;
+        const w8 = new Float64Array(8);
+
+        for (let d = 0; d < 8; d++) {
+          const xx = x + DX[d], yy = y + DY[d];
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const j = yy * W + xx, zn = zf[j];
+          if (Number.isNaN(zn) || zn >= zc) continue;
+          const s = (zc - zn) / DIST[d];
+          w8[d] = Math.pow(s, 1.1) * (d % 2 ? 0.354 : 0.5);
+          sum += w8[d];
+        }
+
+        if (sum <= 0) continue;
+        for (let d = 0; d < 8; d++) {
+          if (w8[d] > 0) {
+            acc[(y + DY[d]) * W + x + DX[d]] += acc[i] * (w8[d] / sum);
+          }
+        }
+      }
+
+      // Facteurs RUSLE
+      const R = this.rFactor;
+      const soil = SOIL_TYPES[this.soilKey] || SOIL_TYPES.loam;
+      const K = soil.k;
+      const crop = CROP_FACTORS[this.cropKey] || CROP_FACTORS.bare;
+      const C = crop.c;
+      const practice = PRACTICE_FACTORS[this.practiceKey] || PRACTICE_FACTORS.none;
+      const P = practice.p;
+
+      const A = new Float32Array(N).fill(NaN);
+      let sumA = 0, countA = 0;
+      const Z = (xx, yy) => (xx < 0 || yy < 0 || xx >= W || yy >= H ? NaN : z[yy * W + xx]);
+
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const i = y * W + x;
+          if (Number.isNaN(z[i])) continue;
+
+          const zx1 = Z(x + 1, y), zx0 = Z(x - 1, y);
+          const zy1 = Z(x, y + 1), zy0 = Z(x, y - 1);
+
+          const gx = !Number.isNaN(zx1) && !Number.isNaN(zx0) ? (zx1 - zx0) / (2 * dx) : !Number.isNaN(zx1) ? (zx1 - z[i]) / dx : !Number.isNaN(zx0) ? (z[i] - zx0) / dx : 0;
+          const gy = !Number.isNaN(zy1) && !Number.isNaN(zy0) ? (zy1 - zy0) / (2 * dy) : !Number.isNaN(zy1) ? (zy1 - z[i]) / dy : !Number.isNaN(zy0) ? (z[i] - zy0) / dy : 0;
+
+          const sinb = Math.sin(Math.atan(Math.hypot(gx, gy)));
+          const As = Math.min(300, acc[i] / width);
+          const LS = Math.pow(As / 22.13, 0.4) * Math.pow(sinb / 0.0896, 1.3);
+
+          A[i] = R * K * LS * C * P;
+          sumA += A[i];
+          countA++;
+        }
+      }
+
+      const mean = countA ? sumA / countA : 0;
+      const areaHa = (countA * cell) / 10000;
+      const total = mean * areaHa;
+
+      this.eroResult = { A, mean, total, areaHa };
+      this.updateStatsDisplay();
+      this.renderLayer();
+    }
+
+    createDataUrl() {
+      if (!this.currentGrid || !this.eroResult) return null;
+      const { W, H } = this.currentGrid;
+      const A = this.eroResult.A;
+
+      const cv = document.createElement("canvas");
+      cv.width = W;
+      cv.height = H;
+      const ctx = cv.getContext("2d");
+      const img = ctx.createImageData(W, H);
+      const px = img.data;
+
+      for (let i = 0; i < A.length; i++) {
+        const v = A[i];
+        if (!Number.isFinite(v)) continue;
+
+        const match = RUSLE_CLASSES.find((c) => v < c[0]);
+        const rgb = match ? match[1] : [168, 32, 90];
+        const o = i * 4;
+        px[o] = rgb[0];
+        px[o + 1] = rgb[1];
+        px[o + 2] = rgb[2];
+        px[o + 3] = 210;
+      }
+
+      ctx.putImageData(img, 0, 0);
+      return cv.toDataURL();
+    }
+
+    renderLayer() {
+      if (!this.map || typeof this.map.getSource !== "function" || !this.currentGrid) return;
+
+      const shouldShow = this.isVisible && this.eroResult;
+      if (!shouldShow) {
+        if (this.map.getLayer(this.LAYER_ERO)) {
+          this.map.setLayoutProperty(this.LAYER_ERO, "visibility", "none");
+        }
+        return;
+      }
+
+      const url = this.createDataUrl();
+      if (!url) return;
+      const coords = getGridCorners(this.currentGrid);
+
+      if (!this.map.getSource(this.SRC_ERO)) {
+        this.map.addSource(this.SRC_ERO, {
+          type: "image",
+          url: url,
+          coordinates: coords
+        });
+
+        // Placé sous la couche pluie dynamique et sous les limites de parcelle
+        const beforeLayer = this.map.getLayer("sim-rain-layer")
+          ? "sim-rain-layer"
+          : (this.map.getLayer("parcelles-line") ? "parcelles-line" : undefined);
+
+        this.map.addLayer({
+          id: this.LAYER_ERO,
+          type: "raster",
+          source: this.SRC_ERO,
+          paint: {
+            "raster-opacity": this.opacity,
+            "raster-fade-duration": 0,
+            "raster-resampling": "linear"
+          }
+        }, beforeLayer);
+      } else {
+        this.map.getSource(this.SRC_ERO).updateImage({ url, coordinates: coords });
+        this.map.setLayoutProperty(this.LAYER_ERO, "visibility", "visible");
+        this.map.setPaintProperty(this.LAYER_ERO, "raster-opacity", this.opacity);
+      }
+    }
+
+    updateCardHeader(props) {
+      props = props || {};
+      const pid = props.IDPAR || props.idpar || "";
+      const lot = props.NO_LOT || "";
+      const sup = props.SUPHEC || props.suphec || "";
+
+      const nameEl = document.getElementById("rusle-parcel-name");
+      if (nameEl) {
+        nameEl.textContent = pid ? `Parcelle nº ${pid}` : (lot ? `Lot nº ${lot}` : "Parcelle agricole");
+      }
+
+      const areaEl = document.getElementById("rusle-parcel-area");
+      if (areaEl) {
+        const sNum = parseFloat(sup);
+        areaEl.textContent = !isNaN(sNum) ? `${sNum.toFixed(1)} ha` : (sup ? `${sup} ha` : "");
+        areaEl.style.display = areaEl.textContent ? "inline-flex" : "none";
+      }
+    }
+
+    updateStatsDisplay() {
+      if (!this.eroResult) return;
+      const { mean, total } = this.eroResult;
+
+      const elMean = document.getElementById("rusle-mean-val");
+      const elTotal = document.getElementById("rusle-total-val");
+      const elBadge = document.getElementById("rusle-tolerance-badge");
+
+      if (elMean) elMean.textContent = `${mean.toFixed(1)} t/ha/an`;
+      if (elTotal) elTotal.textContent = `${Math.round(total)} t/an`;
+
+      if (elBadge) {
+        if (mean <= 6.0) {
+          elBadge.textContent = `Pertes sous le seuil tolérable (≈ 6 t/ha/an) — Érosion maîtrisée`;
+          elBadge.style.color = "#15803d";
+        } else {
+          elBadge.textContent = `Attention : Pertes supérieures au seuil tolérable (≈ 6 t/ha/an) — Risque d'appauvrissement du sol`;
+          elBadge.style.color = "#ea580c";
+        }
+      }
+    }
+
+    updateRBadge(rVal, source = "RUSLEFAC") {
+      const badge = document.getElementById("rusle-r-badge");
+      if (badge) {
+        badge.textContent = `${rVal} MJ·mm/ha·h·an`;
+        badge.title = `Érosivité R = ${rVal} calculée automatiquement (${source})`;
+      }
+    }
+
+    highlightParcel(geom) {
+      if (!this.map || typeof this.map.getSource !== "function" || !geom) return;
+      const geojson = {
+        type: "FeatureCollection",
+        features: [{ type: "Feature", geometry: geom, properties: {} }]
+      };
+
+      if (!this.map.getSource(this.SRC_HL)) {
+        this.map.addSource(this.SRC_HL, { type: "geojson", data: geojson });
+        this.map.addLayer({
+          id: this.LAYER_HL,
+          type: "line",
+          source: this.SRC_HL,
+          paint: {
+            "line-color": "#ea580c",
+            "line-width": 3,
+            "line-dasharray": [2, 1.5],
+            "line-opacity": 0.95
+          }
+        });
+      } else {
+        this.map.getSource(this.SRC_HL).setData(geojson);
+        this.map.setLayoutProperty(this.LAYER_HL, "visibility", "visible");
+      }
+    }
+
+    clearHighlight() {
+      if (this.map && typeof this.map.getLayer === "function" && this.map.getLayer(this.LAYER_HL)) {
+        this.map.setLayoutProperty(this.LAYER_HL, "visibility", "none");
+      }
     }
   }
 
+  // ===========================================================================
+  // 3. FAÇADE DE COGNITION & COMPATIBILITÉ (ParcelSimulationManager)
+  // ===========================================================================
+  class ParcelSimulationManager {
+    constructor(mapInstance) {
+      this.map = mapInstance;
+      this.rainManager = new ParcelRainManager(mapInstance);
+      this.erosionManager = new ParcelErosionManager(mapInstance);
+
+      // Exposer globalement
+      root.rainManager = this.rainManager;
+      root.erosionManager = this.erosionManager;
+    }
+
+    startSimulation(parcelFeature, mode = "rain") {
+      if (mode === "erosion") {
+        return this.erosionManager.calculateForParcel(parcelFeature);
+      }
+      return this.rainManager.startSimulation(parcelFeature);
+    }
+
+    closeDock() {
+      this.rainManager.closeDock();
+    }
+  }
+
+  root.ParcelRainManager = ParcelRainManager;
+  root.ParcelErosionManager = ParcelErosionManager;
   root.ParcelSimulationManager = ParcelSimulationManager;
+
 })(window);

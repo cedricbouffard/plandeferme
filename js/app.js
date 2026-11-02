@@ -767,6 +767,9 @@
             properties: parcelProps || pedoProps
           };
           window.terrain3DManager.lastClickedParcel = currentTargetP;
+          if (window.erosionManager) {
+            window.erosionManager.currentParcel = currentTargetP;
+          }
 
           // Si l'utilisateur était en mode sélection de parcelle pour la 3D
           if (window.terrain3DManager.isSelectingParcel && parcelGeom) {
@@ -1362,41 +1365,27 @@
           // Simulation triggers
 
           const btnRainActions = popupDom.querySelectorAll(".btn-popup-action-rain, #btn-popup-start-rain");
-
           btnRainActions.forEach(btn => {
-
             btn.addEventListener("click", () => {
-
               popup.remove();
-
-              if (window.simManager) {
-
+              if (window.rainManager) {
+                window.rainManager.startSimulation(targetP);
+              } else if (window.simManager) {
                 window.simManager.startSimulation(targetP, "rain");
-
               }
-
             });
-
           });
 
-
-
           const btnErosionActions = popupDom.querySelectorAll(".btn-popup-action-erosion, #btn-popup-start-erosion");
-
           btnErosionActions.forEach(btn => {
-
             btn.addEventListener("click", () => {
-
               popup.remove();
-
-              if (window.simManager) {
-
+              if (window.erosionManager) {
+                window.erosionManager.calculateForParcel(targetP);
+              } else if (window.simManager) {
                 window.simManager.startSimulation(targetP, "erosion");
-
               }
-
             });
-
           });
 
 

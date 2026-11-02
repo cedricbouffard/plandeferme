@@ -505,7 +505,151 @@
         </div>
       </details>
 
-      <!-- 5. Couches géomatiques et WMS (Québec) -->
+      <!-- 4. Érosion des sols (RUSLE) -->
+      <details class="tool-card topo-master-card" id="card-rusle" open>
+        <summary class="tool-card-header" style="cursor: pointer; margin-bottom: 0;">
+          <div class="tool-card-title">
+            <svg class="topo-master-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.5"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path></svg>
+            <span>Érosion des sols (RUSLE)</span>
+          </div>
+          <label class="switch-label" onclick="event.stopPropagation()" title="Afficher/Masquer la carte d'érosion des sols (RUSLE)">
+            <input type="checkbox" id="toggle-rusle" />
+            <span class="switch-slider"></span>
+          </label>
+        </summary>
+
+        <div class="topo-master-body" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+          <div class="tool-sublabel" style="margin-bottom: 2px;">
+            Pertes de sol annuelles A = R · K · LS · C · P (LiDAR 1m)
+          </div>
+
+          <!-- Badge statut de la parcelle sélectionnée -->
+          <div id="rusle-parcel-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; padding: 5px 8px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px;">
+            <div style="display: flex; align-items: center; gap: 5px;">
+              <span id="rusle-parcel-name" style="font-size: 11px; font-weight: 700; color: #9a3412;">Aucune parcelle</span>
+              <span id="rusle-parcel-area" class="stat-chip" style="display: none; font-size: 10px; color: #7c2d12; background: #ffedd5; border-color: #fdba74;"></span>
+            </div>
+            <span id="rusle-res-badge" class="stat-chip" style="display: none; font-size: 10px; font-weight: 600; color: #0f766e; background: #ccfbf1; border-color: #99f6e4;">LiDAR 1m</span>
+          </div>
+
+          <div id="rusle-no-parcel-hint" style="font-size: 10.5px; color: #64748b; line-height: 1.35; padding: 2px 0;">
+            Cliquez sur une parcelle sur la carte ou dans le popup pour lancer le diagnostic d'érosion.
+          </div>
+
+          <!-- Conteneur des paramètres et résultats -->
+          <div id="rusle-controls-wrap" style="display: flex; flex-direction: column; gap: 7px;">
+            <!-- Facteur K / Texture du sol -->
+            <div>
+              <div class="tool-label-row">
+                <span class="tool-sublabel" style="font-weight: 600; color: #334155;">Texture du sol (Facteur K)</span>
+                <span id="rusle-soil-source-badge" class="val-badge" style="font-size: 9.5px; color: #0369a1; background: #f0f9ff; border: 1px solid #bae6fd;">Auto</span>
+              </div>
+              <select id="rusle-soil-select" class="tool-select" style="width: 100%; font-size: 11px; padding: 3px 6px; margin-top: 2px;">
+                <option value="loam" selected>Loam (K = 0,040 - Réf.)</option>
+                <option value="silt_loam">Loam limoneux (K = 0,048 - Érodible)</option>
+                <option value="clay_loam">Loam argileux (K = 0,035)</option>
+                <option value="clay">Argile (K = 0,028)</option>
+                <option value="sandy_loam">Loam sableux (K = 0,026)</option>
+                <option value="sand">Sable (K = 0,015)</option>
+              </select>
+              <div id="rusle-soil-desc" style="font-size: 9.5px; color: #64748b; margin-top: 2px; line-height: 1.3;">
+                Source texture : Données pédologiques IRDA/AAC ou Soil World / SoilGrids.
+              </div>
+            </div>
+
+            <!-- Facteur R / Érosivité climatique -->
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px;">
+              <div>
+                <span style="font-size: 10.5px; font-weight: 600; color: #334155;">Érosivité climatique (R)</span>
+                <div style="font-size: 9px; color: #64748b;">RUSLEFAC / Climatologie publique</div>
+              </div>
+              <span id="rusle-r-badge" class="val-badge" style="font-size: 10.5px; font-weight: 700; color: #c2410c; background: #fff7ed; border: 1px solid #fed7aa; padding: 2px 6px;">Auto</span>
+            </div>
+
+            <!-- Facteur C / Culture & Couvert végétal -->
+            <div>
+              <div class="tool-label-row">
+                <span class="tool-sublabel" style="font-weight: 600; color: #334155;">Culture &amp; Couvert végétal (C)</span>
+                <span id="rusle-crop-detected-badge" class="val-badge" style="font-size: 9.5px; color: #15803d; background: #f0fdf4; border: 1px solid #bbf7d0;">Dernière culture</span>
+              </div>
+              <select id="rusle-crop-select" class="tool-select" style="width: 100%; font-size: 11px; padding: 3px 6px; margin-top: 2px;">
+                <option value="bare">Sol nu sans couvert (C = 1,00 - Témoin)</option>
+                <option value="corn_plow">Maïs grain labour conventionnel (C = 0,38)</option>
+                <option value="corn_notill">Maïs semis direct / résidus (C = 0,15)</option>
+                <option value="soybean">Soya (C = 0,28)</option>
+                <option value="cereals">Céréales paille conservée (C = 0,12)</option>
+                <option value="hay">Prairie / Foin / Pâturage (C = 0,02)</option>
+                <option value="potato">Pomme de terre / Sarclés (C = 0,35)</option>
+                <option value="canola">Canola / Oléagineux (C = 0,20)</option>
+              </select>
+              <div id="rusle-crop-info" style="font-size: 9.5px; color: #64748b; margin-top: 2px; line-height: 1.3;">
+                Pré-sélectionné automatiquement d'après la dernière déclaration de culture BDPPAD.
+              </div>
+            </div>
+
+            <!-- Facteur P / Pratiques culturales -->
+            <div>
+              <div class="tool-label-row">
+                <span class="tool-sublabel" style="font-weight: 600; color: #334155;">Pratiques de conservation (P)</span>
+              </div>
+              <select id="rusle-practice-select" class="tool-select" style="width: 100%; font-size: 11px; padding: 3px 6px; margin-top: 2px;">
+                <option value="none" selected>Sens de la pente (P = 1,00)</option>
+                <option value="contour">Travail selon les courbes de niveau (P = 0,75)</option>
+                <option value="strip">Cultures en bandes alternées (P = 0,50)</option>
+              </select>
+            </div>
+
+            <!-- Bouton Recalculer -->
+            <button type="button" id="btn-rusle-compute" class="profile-dock-btn" style="background: #ea580c; color: #ffffff; font-weight: 700; padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 2px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              <span>Recalculer l'érosion</span>
+            </button>
+
+            <!-- Résultats RUSLE -->
+            <div id="rusle-results-box" style="background: #fff7ed; border: 1px solid #fed7aa; border-left: 3.5px solid #ea580c; border-radius: 6px; padding: 6px 9px; display: flex; flex-direction: column; gap: 3px; margin-top: 2px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span style="font-size: 11px; font-weight: 600; color: #9a3412;">Perte de sol moyenne :</span>
+                <span id="rusle-mean-val" style="font-size: 13.5px; font-weight: 800; color: #ea580c;">— t/ha/an</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span style="font-size: 10.5px; color: #7c2d12;">Perte totale annuelle :</span>
+                <span id="rusle-total-val" style="font-size: 12px; font-weight: 700; color: #7c2d12;">— t/an</span>
+              </div>
+              <div id="rusle-tolerance-badge" style="font-size: 10px; font-weight: 600; margin-top: 2px; color: #15803d; line-height: 1.3;">
+                Seuil de tolérance tolérable : ≈ 6 t/ha/an
+              </div>
+            </div>
+
+            <!-- Opacité du calque -->
+            <div class="tool-label-row" style="margin-top: 2px;">
+              <span class="tool-sublabel">Opacité de la carte</span>
+              <span id="rusle-opacity-val" class="val-badge">85%</span>
+            </div>
+            <input type="range" id="rusle-opacity" min="0" max="100" value="85" class="slider" />
+
+            <!-- Légende des classes de perte de sol -->
+            <div style="padding: 5px 7px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+              <div style="font-size: 9.5px; font-weight: 700; color: #475569; margin-bottom: 4px; display: flex; justify-content: space-between;">
+                <span>Classes de pertes de sol</span>
+                <span style="color: #64748b; font-weight: normal;">t/ha/an</span>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3px; font-size: 9.5px; font-weight: 600; color: #334155;">
+                <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: rgb(34,197,94);"></span> &lt; 1 (Très faible)</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: rgb(163,230,53);"></span> 1–3 (Faible)</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: rgb(250,204,21);"></span> 3–6 (Toléré)</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: rgb(251,146,60);"></span> 6–11 (Élevé)</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: rgb(239,68,68);"></span> 11–22 (Sévère)</div>
+                <div style="display: flex; align-items: center; gap: 4px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: rgb(168,32,90);"></span> &gt; 22 (Critique)</div>
+              </div>
+            </div>
+
+            <div style="font-size: 9px; color: #64748b; line-height: 1.35;">
+              Facteur LS selon Moore &amp; Burch (1986) calculé sur MNT LiDAR 1m avec accumulation multidirectionnelle (Freeman 1.1).
+            </div>
+          </div>
+        </div>
+      </details>
       <div class="tool-card" id="card-wms">
         <div class="tool-card-header">
           <div class="tool-card-title">
@@ -704,7 +848,7 @@
   </div>
 
   <!-- Floating Rain & Erosion Simulation Bottom Dock -->
-  <div id="sim-dock" class="elevation-profile-dock sim-dock" role="region" aria-label="Simulation de pluie et érosion">
+  <div id="sim-dock" class="elevation-profile-dock sim-dock" role="region" aria-label="Simulation de pluie et ruissellement">
     <div class="profile-dock-header">
       <div class="profile-dock-title" id="sim-dock-title-wrap">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -713,29 +857,14 @@
           <line x1="16" y1="19" x2="16" y2="21"></line><line x1="16" y1="13" x2="16" y2="15"></line>
           <line x1="12" y1="21" x2="12" y2="23"></line><line x1="12" y1="15" x2="12" y2="17"></line>
         </svg>
-        <span id="sim-dock-title" style="font-weight: 700; color: #0f172a;">Simulation Pluie &amp; Érosion</span>
+        <span id="sim-dock-title" style="font-weight: 700; color: #0f172a;">Simulation Pluie &amp; Ruissellement</span>
         <span id="sim-parcel-badge" class="stat-chip" style="margin-left: 6px; font-weight: 600; color: #0369a1; background: #e0f2fe; border-color: #bae6fd;">Parcelle</span>
         <span id="sim-area-badge" class="stat-chip" style="margin-left: 4px; font-weight: 600; color: #334155; background: #f1f5f9; border-color: #cbd5e1; display: none;"></span>
         <span id="sim-res-badge" class="stat-chip" style="margin-left: 4px; font-weight: 600; color: #0f766e; background: #ccfbf1; border-color: #99f6e4; display: none;" title="Résolution spatiale native du MNT LiDAR">LiDAR 1m</span>
       </div>
 
       <div class="profile-dock-header-right" style="display: flex; align-items: center; gap: 8px;">
-        <!-- Sub-tabs toggle -->
-        <div class="sim-mode-toggle" style="display: inline-flex; background: #f1f5f9; padding: 2px; border-radius: 6px; border: 1px solid #cbd5e1;">
-          <button type="button" id="btn-sim-tab-rain" class="sim-mode-btn active" style="padding: 3px 10px; font-size: 11px; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: #ffffff; color: #0284c7; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            Pluie &amp; Ruissellement
-          </button>
-          <button type="button" id="btn-sim-tab-erosion" class="sim-mode-btn" style="padding: 3px 10px; font-size: 11px; font-weight: 600; border: none; border-radius: 4px; cursor: pointer; background: transparent; color: #64748b;">
-            Érosion des sols (RUSLE)
-          </button>
         </div>
-
-        <button id="btn-collapse-sim-dock" class="btn-dock-collapse" type="button" title="Réduire / Agrandir le panneau" aria-label="Réduire ou agrandir">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        </button>
-        <button id="btn-close-sim-dock" class="profile-dock-close" type="button" aria-label="Fermer la simulation">&times;</button>
-      </div>
-    </div>
 
     <!-- Dock Body -->
     <div class="sim-dock-body" id="sim-dock-body">
@@ -759,13 +888,6 @@
             </button>
           </div>
 
-          <!-- Rain intensity -->
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <label for="sim-rain-intensity" style="font-size: 11px; font-weight: 600; color: #334155;">Intensité :</label>
-            <input type="range" id="sim-rain-intensity" min="5" max="120" step="5" value="40" class="slider" style="width: 75px; accent-color: #0284c7;" />
-            <span id="sim-rain-intensity-val" class="val-badge" style="font-weight: 700; color: #0284c7; min-width: 52px;">40 mm/h</span>
-          </div>
-
           <!-- Soil infiltration selection -->
           <div style="display: flex; align-items: center; gap: 6px;">
             <label for="sim-rain-soil" style="font-size: 11px; font-weight: 600; color: #334155;">Sol (Infiltration) :</label>
@@ -779,14 +901,7 @@
             </select>
           </div>
 
-          <!-- Speed multipliers -->
-          <div style="display: flex; align-items: center; gap: 4px; margin-left: auto;">
-            <span style="font-size: 11px; color: #64748b; font-weight: 600;">Vitesse :</span>
-            <button type="button" class="sim-speed-btn" data-speed="1" style="padding: 2px 7px; font-size: 10.5px; border-radius: 4px; border: 1px solid #cbd5e1; background: #ffffff; cursor: pointer;">×1</button>
-            <button type="button" class="sim-speed-btn active" data-speed="4" style="padding: 2px 7px; font-size: 10.5px; border-radius: 4px; border: 1px solid #0284c7; background: #e0f2fe; color: #0284c7; font-weight: 700; cursor: pointer;">×4</button>
-            <button type="button" class="sim-speed-btn" data-speed="16" style="padding: 2px 7px; font-size: 10.5px; border-radius: 4px; border: 1px solid #cbd5e1; background: #ffffff; cursor: pointer;">×16</button>
           </div>
-        </div>
 
         <!-- Real-time Stats Cards -->
         <div id="sim-rain-stats-row" class="sim-stats-grid" style="display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap;">
@@ -821,90 +936,7 @@
         </div>
       </div>
 
-      <!-- Content Section 2: Erosion Simulation (RUSLE) -->
-      <div id="sim-section-erosion" class="sim-tab-content" style="display: none;">
-        <!-- Controls row -->
-        <div class="sim-controls-row" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 0;">
-          <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #0f172a; cursor: pointer;">
-            <input type="checkbox" id="sim-ero-show-map" checked style="accent-color: #ea580c; width: 14px; height: 14px; cursor: pointer;" />
-            <span>Afficher la carte RUSLE</span>
-          </label>
-
-          <!-- Facteur R automatique -->
-          <div style="display: flex; align-items: center; gap: 4px; margin-left: 4px;" title="Facteur R d'érosivité climatique calculé automatiquement selon les coordonnées géographiques de la parcelle (normes RUSLEFAC / Données climatiques)">
-            <span style="font-size: 11px; color: #64748b; font-weight: 600;">Érosivité R :</span>
-            <span id="sim-ero-r-badge" class="val-badge" style="font-size: 10.5px; font-weight: 700; color: #c2410c; background: #fff7ed; border: 1px solid #fed7aa; padding: 1px 6px; border-radius: 4px;">Auto</span>
-          </div>
-
-          <!-- Crop C factor -->
-          <div style="display: flex; align-items: center; gap: 4px;">
-            <label for="sim-ero-crop" style="font-size: 11px; font-weight: 600; color: #334155;">Culture (C) :</label>
-            <select id="sim-ero-crop" class="tool-select" style="font-size: 11px; padding: 2px 5px;">
-              <option value="bare">Sol nu (C = 1,00 - Réf.)</option>
-              <option value="corn_plow">Maïs labour (C = 0,38)</option>
-              <option value="corn_notill">Maïs semis direct (C = 0,15)</option>
-              <option value="soybean">Soya (C = 0,28)</option>
-              <option value="cereals">Céréales (C = 0,12)</option>
-              <option value="hay">Prairie / Foin (C = 0,02)</option>
-              <option value="potato">Pomme de terre (C = 0,35)</option>
-            </select>
-          </div>
-
-          <!-- Practice P factor -->
-          <div style="display: flex; align-items: center; gap: 4px;">
-            <label for="sim-ero-practice" style="font-size: 11px; font-weight: 600; color: #334155;">Pratique (P) :</label>
-            <select id="sim-ero-practice" class="tool-select" style="font-size: 11px; padding: 2px 5px;">
-              <option value="none" selected>Sens de la pente (P = 1,00)</option>
-              <option value="contour">Travail en contour (P = 0,75)</option>
-              <option value="strip">Cultures en bandes (P = 0,50)</option>
-            </select>
-          </div>
-
-          <!-- Recalculate button -->
-          <button type="button" id="btn-sim-ero-recompute" class="profile-dock-btn" style="background: #ea580c; color: #ffffff; font-weight: 700; padding: 3px 9px; margin-left: auto; border: none; border-radius: 4px; cursor: pointer;">
-            Recalculer
-          </button>
-        </div>
-
-        <!-- Erosion Result Cards & Legend -->
-        <div style="display: flex; gap: 8px; align-items: stretch; margin-top: 5px; flex-wrap: wrap;">
-          <!-- Results box -->
-          <div style="flex: 1.1; min-width: 200px; background: #fff7ed; border: 1px solid #fed7aa; border-left: 3.5px solid #ea580c; border-radius: 6px; padding: 5px 9px; display: flex; flex-direction: column; justify-content: center; gap: 2px;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-              <span style="font-size: 11px; font-weight: 600; color: #9a3412;">Perte de sol moyenne :</span>
-              <span id="sim-ero-mean-val" style="font-size: 14px; font-weight: 800; color: #ea580c;">— t/ha/an</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-              <span style="font-size: 10.5px; color: #7c2d12;">Perte totale annuelle :</span>
-              <span id="sim-ero-total-val" style="font-size: 12px; font-weight: 700; color: #7c2d12;">— t/an</span>
-            </div>
-            <div id="sim-ero-tolerance-badge" style="font-size: 10px; font-weight: 600; margin-top: 1px; color: #15803d;">
-              Seuil de tolérance tolérable : ≈ 6 t/ha/an
-            </div>
-          </div>
-
-          <!-- Color classes legend -->
-          <div style="flex: 2; min-width: 260px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 9px; display: flex; flex-direction: column; justify-content: center; gap: 4px;">
-            <div style="font-size: 10px; font-weight: 700; color: #334155; display: flex; justify-content: space-between;">
-              <span>Classes de pertes de sol (RUSLE)</span>
-              <span style="color: #64748b; font-weight: normal;">t/ha/an</span>
-            </div>
-            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-              <span class="sim-legend-chip" style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; color: #334155; background: #ffffff; padding: 1px 4px; border-radius: 3px; border: 1px solid #e2e8f0;"><i style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: rgb(34,197,94);"></i>&lt; 1</span>
-              <span class="sim-legend-chip" style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; color: #334155; background: #ffffff; padding: 1px 4px; border-radius: 3px; border: 1px solid #e2e8f0;"><i style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: rgb(163,230,53);"></i>1–3</span>
-              <span class="sim-legend-chip" style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; color: #334155; background: #ffffff; padding: 1px 4px; border-radius: 3px; border: 1px solid #e2e8f0;"><i style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: rgb(250,204,21);"></i>3–6</span>
-              <span class="sim-legend-chip" style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; color: #334155; background: #ffffff; padding: 1px 4px; border-radius: 3px; border: 1px solid #e2e8f0;"><i style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: rgb(251,146,60);"></i>6–11</span>
-              <span class="sim-legend-chip" style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; color: #334155; background: #ffffff; padding: 1px 4px; border-radius: 3px; border: 1px solid #e2e8f0;"><i style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: rgb(239,68,68);"></i>11–22</span>
-              <span class="sim-legend-chip" style="display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; color: #334155; background: #ffffff; padding: 1px 4px; border-radius: 3px; border: 1px solid #e2e8f0;"><i style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: rgb(168,32,90);"></i>&gt; 22</span>
-            </div>
-          </div>
-        </div>
-
-        <div style="font-size: 9.5px; color: #64748b; line-height: 1.4; margin-top: 4px;">
-          Équation RUSLE : A = R · K · LS · C · P. L'érosivité climatique R est déterminée automatiquement selon la localisation de la parcelle (RUSLEFAC / Données climatiques publiques). Le facteur LS est dérivé de la surface contributive multidirectionnelle (Freeman 1.1) et de la pente LiDAR 1m (Moore &amp; Burch 1986).
-        </div>
       </div>
-    </div>
   </div>
 
 
