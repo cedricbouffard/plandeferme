@@ -359,7 +359,7 @@
       const padLat = Math.max(0.0004, spanLat * 0.10);
       const bbox = [geomBbox[0] - padLng, geomBbox[1] - padLat, geomBbox[2] + padLng, geomBbox[3] + padLat];
 
-      const targetSize = 512; // 512x512 = résolution maximale (1m LiDAR natif HRDEM)
+      const targetSize = 480; // Résolution native ~1m LiDAR tout en évitant les puissances de 2 (bug #6607 MapLibre)
       let region = null;
 
       // Projet personnalisé ou import direct
@@ -564,12 +564,37 @@
       const { W, H } = G;
       const N = W * H;
       const maxDim = Math.max(W, H);
-      // Facteur d'échelle haute définition adapté à la résolution de la grille (min 1024px)
-      const S = Math.max(2, Math.min(4, Math.floor(1024 / maxDim) || 2));
+      // Facteur d'échelle haute définition
+      const S = Math.max(2, Math.min(4, Math.floor(1000 / maxDim) || 2));
+
+      // Contournement du bug MapLibre GL JS #6607 :
+      // Les canvas carrés dont la dimension vaut 64 * 2^n (ex: 256, 512, 1024)
+      // sont interprétés à tort comme des tuiles internes et s'affichent en "carré noir".
+      // On s'assure impérativement que width != height et que ni width ni height ne sont des puissances de 2.
+      let cvW = Math.round(W * S);
+      let cvH = Math.round(H * S);
+      if (cvW === cvH) cvW += 2;
+      if ((cvW & (cvW - 1)) === 0) cvW += 2;
+      if ((cvH & (cvH - 1)) === 0) cvH += 2;
+
+      // Nettoyer un éventuel canvas précédent dans le DOM
+      if (typeof document !== "undefined") {
+        const prevCanvas = document.getElementById("sim-rain-active-canvas");
+        if (prevCanvas && prevCanvas.parentNode) {
+          prevCanvas.parentNode.removeChild(prevCanvas);
+        }
+      }
 
       const canvas = document.createElement("canvas");
-      canvas.width = W * S;
-      canvas.height = H * S;
+      canvas.id = "sim-rain-active-canvas";
+      canvas.width = cvW;
+      canvas.height = cvH;
+      canvas.style.display = "none";
+      canvas.style.position = "absolute";
+      canvas.style.pointerEvents = "none";
+      if (typeof document !== "undefined" && document.body) {
+        document.body.appendChild(canvas);
+      }
 
       const small = document.createElement("canvas");
       small.width = W;
@@ -773,13 +798,8 @@
           px[o + 1] = 160 + 90 * k;
           px[o + 2] = 255;
           px[o + 3] = 70 + 185 * k;
-        } else if (!Number.isNaN(s.G.z[i])) {
-          // Voile sombre subtil sur la parcelle pour mettre en valeur les filets d'eau
-          px[o] = 10;
-          px[o + 1] = 18;
-          px[o + 2] = 35;
-          px[o + 3] = 95;
         } else {
+          // Hors filet d'eau et hors parcelle : transparent pour laisser le satellite visible
           px[o + 3] = 0;
         }
       }
@@ -791,16 +811,18 @@
       c.clearRect(0, 0, s.canvas.width, s.canvas.height);
       c.imageSmoothingEnabled = true;
       c.imageSmoothingQuality = "high";
-      c.drawImage(s.small, 0, 0, W * S, H * S);
+      c.drawImage(s.small, 0, 0, s.canvas.width, s.canvas.height);
 
       // Halo lumineux pour un rendu visuel d'eau réaliste
       if ("filter" in c) {
-        c.save();
-        c.globalCompositeOperation = "lighter";
-        c.globalAlpha = 0.28;
-        c.filter = `blur(${Math.max(2, S * 1.2).toFixed(1)}px)`;
-        c.drawImage(s.small, 0, 0, W * S, H * S);
-        c.restore();
+        try {
+          c.save();
+          c.globalCompositeOperation = "lighter";
+          c.globalAlpha = 0.28;
+          c.filter = `blur(${Math.max(2, S * 1.2).toFixed(1)}px)`;
+          c.drawImage(s.small, 0, 0, s.canvas.width, s.canvas.height);
+          c.restore();
+        } catch (e) {}
       }
 
       // Gouttes de pluie tombantes (densité adaptée à la haute résolution)
@@ -826,6 +848,11 @@
 
       this.drawRain(this.sim);
 
+      const src = this.map && this.map.getSource(this.SRC_RAIN);
+      if (src && typeof src.play === "function") {
+        src.play();
+      }
+
       // Rafraîchissement MapLibre
       if (this.map && typeof this.map.triggerRepaint === "function") {
         this.map.triggerRepaint();
@@ -847,6 +874,11 @@
       this.sim.running = true;
       this.syncPlayButton(true);
 
+      const src = this.map && this.map.getSource(this.SRC_RAIN);
+      if (src && typeof src.play === "function") {
+        src.play();
+      }
+
       if (this.map.getLayer(this.LAYER_RAIN)) {
         this.map.setLayoutProperty(this.LAYER_RAIN, "visibility", "visible");
         this.map.moveLayer(this.LAYER_RAIN);
@@ -860,6 +892,10 @@
     pauseRain() {
       if (this.sim) this.sim.running = false;
       this.syncPlayButton(false);
+      const src = this.map && this.map.getSource(this.SRC_RAIN);
+      if (src && typeof src.pause === "function") {
+        src.pause();
+      }
     }
 
     resetRain() {
@@ -889,7 +925,7 @@
 
       this.map.addSource(this.SRC_RAIN, {
         type: "canvas",
-        canvas: s.canvas,
+        canvas: s.canvas.id || s.canvas,
         coordinates: coords,
         animate: true
       });
@@ -908,9 +944,17 @@
           "raster-resampling": "linear"
         }
       }, beforeLayer);
+
+      const src = this.map.getSource(this.SRC_RAIN);
+      if (src && typeof src.play === "function") {
+        src.play();
+      }
     }
 
     removeRainLayer() {
+      if (this.sim && this.sim.canvas && this.sim.canvas.parentNode) {
+        this.sim.canvas.parentNode.removeChild(this.sim.canvas);
+      }
       if (!this.map || typeof this.map.getSource !== "function") return;
       if (this.map.getLayer(this.LAYER_RAIN)) this.map.removeLayer(this.LAYER_RAIN);
       if (this.map.getSource(this.SRC_RAIN)) this.map.removeSource(this.SRC_RAIN);
