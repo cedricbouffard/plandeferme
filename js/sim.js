@@ -359,7 +359,7 @@
       const padLat = Math.max(0.0004, spanLat * 0.10);
       const bbox = [geomBbox[0] - padLng, geomBbox[1] - padLat, geomBbox[2] + padLng, geomBbox[3] + padLat];
 
-      const targetSize = 160; // 160x160 = excellente fidélité et 60 FPS fluide
+      const targetSize = 512; // 512x512 = résolution maximale (1m LiDAR natif HRDEM)
       let region = null;
 
       // Projet personnalisé ou import direct
@@ -423,6 +423,10 @@
           if (!Number.isFinite(v) || v <= -900 || v >= 9000) continue;
 
           const pt = pos(x, y);
+          // Rejet rapide hors boîte englobante de la parcelle
+          if (pt[0] < geomBbox[0] || pt[0] > geomBbox[2] || pt[1] < geomBbox[1] || pt[1] > geomBbox[3]) {
+            continue;
+          }
           if (this.isPointInGeom(pt, geom)) {
             zMasked[i] = v;
             validInside++;
@@ -447,6 +451,7 @@
 
       // Double lissage 3x3 pour supprimer le micro-bruit LiDAR et les artefacts de scan
       this.currentGrid = this.smooth3(this.smooth3(gridObj));
+      this.updateParcelHeader();
       this.resetRain();
     }
 
@@ -457,20 +462,26 @@
       const { W, H, z } = G;
       const out = new Float32Array(z.length).fill(NaN);
       for (let y = 0; y < H; y++) {
+        const yW = y * W;
+        const yMin = Math.max(0, y - 1);
+        const yMax = Math.min(H - 1, y + 1);
         for (let x = 0; x < W; x++) {
-          const i = y * W + x;
+          const i = yW + x;
           if (Number.isNaN(z[i])) continue;
           let sum = 0, count = 0;
-          for (let yy = Math.max(0, y - 1); yy <= Math.min(H - 1, y + 1); yy++) {
-            for (let xx = Math.max(0, x - 1); xx <= Math.min(W - 1, x + 1); xx++) {
-              const val = z[yy * W + xx];
+          const xMin = Math.max(0, x - 1);
+          const xMax = Math.min(W - 1, x + 1);
+          for (let yy = yMin; yy <= yMax; yy++) {
+            const yyW = yy * W;
+            for (let xx = xMin; xx <= xMax; xx++) {
+              const val = z[yyW + xx];
               if (!Number.isNaN(val)) {
                 sum += val;
                 count++;
               }
             }
           }
-          out[i] = sum / count;
+          out[i] = count > 0 ? sum / count : NaN;
         }
       }
       return Object.assign({}, G, { z: out });
@@ -552,7 +563,9 @@
     newRainSim(G) {
       const { W, H } = G;
       const N = W * H;
-      const S = Math.max(2, Math.min(6, Math.floor(960 / Math.max(W, H))));
+      const maxDim = Math.max(W, H);
+      // Facteur d'échelle haute définition adapté à la résolution de la grille (min 1024px)
+      const S = Math.max(2, Math.min(4, Math.floor(1024 / maxDim) || 2));
 
       const canvas = document.createElement("canvas");
       canvas.width = W * S;
@@ -623,13 +636,14 @@
       s.rain += (I / 1000 / 3600) * dt * s.active * cell;
       s.inf += (Math.min(I, f) / 1000 / 3600) * dt * s.active * cell;
 
-      // Génération des nouvelles gouttes
+      // Génération des nouvelles gouttes proportionnelle à la surface et à la résolution
       if (excess > 0) {
         const vol = excess * dt * s.active * cell;
-        const n = Math.max(1, Math.round(Math.min(800, s.active * 0.004)));
+        const n = Math.max(2, Math.round(Math.min(1600, s.active * 0.008)));
         const v = vol / n;
+        const maxDrops = Math.min(22000, Math.max(8000, Math.round(s.active * 0.18)));
         for (let k = 0; k < n; k++) {
-          if (s.drops.length >= 8000) {
+          if (s.drops.length >= maxDrops) {
             s.drops[(Math.random() * s.drops.length) | 0].v += v;
             continue;
           }
@@ -725,7 +739,8 @@
       // 97e centile pour isoler les axes d'écoulement préférentiels (thalwegs)
       if (!(s.frame++ % 10) || !s.ref) {
         const sample = [];
-        for (let k = 0; k < 5000; k++) {
+        const sampleCount = Math.min(8000, s.cells.length);
+        for (let k = 0; k < sampleCount; k++) {
           const i = s.cells[(Math.random() * s.cells.length) | 0];
           sample.push(s.flow[i]);
         }
@@ -775,22 +790,24 @@
       const S = s.S;
       c.clearRect(0, 0, s.canvas.width, s.canvas.height);
       c.imageSmoothingEnabled = true;
+      c.imageSmoothingQuality = "high";
       c.drawImage(s.small, 0, 0, W * S, H * S);
 
       // Halo lumineux pour un rendu visuel d'eau réaliste
       if ("filter" in c) {
         c.save();
         c.globalCompositeOperation = "lighter";
-        c.globalAlpha = 0.25;
-        c.filter = `blur(${Math.max(2, S)}px)`;
+        c.globalAlpha = 0.28;
+        c.filter = `blur(${Math.max(2, S * 1.2).toFixed(1)}px)`;
         c.drawImage(s.small, 0, 0, W * S, H * S);
         c.restore();
       }
 
-      // Gouttes de pluie tombantes
-      c.fillStyle = "rgba(225, 245, 255, 0.4)";
-      const r = Math.max(0.6, S * 0.20);
-      for (let k = 0; k < s.drops.length; k += 3) {
+      // Gouttes de pluie tombantes (densité adaptée à la haute résolution)
+      c.fillStyle = "rgba(225, 245, 255, 0.45)";
+      const r = Math.max(0.7, S * 0.25);
+      const step = s.drops.length > 12000 ? 3 : (s.drops.length > 6000 ? 2 : 1);
+      for (let k = 0; k < s.drops.length; k += step) {
         const p = s.drops[k];
         c.beginPath();
         c.arc(p.x * S, p.y * S, r, 0, 6.2832);
@@ -1055,7 +1072,7 @@
           paint: {
             "raster-opacity": 0.85,
             "raster-fade-duration": 0,
-            "raster-resampling": "nearest"
+            "raster-resampling": "linear"
           }
         }, beforeLayer);
       } else {
@@ -1096,6 +1113,17 @@
         const sNum = parseFloat(sup);
         areaEl.textContent = !isNaN(sNum) ? `${sNum.toFixed(1)} ha` : (sup ? `${sup} ha` : "");
         areaEl.style.display = areaEl.textContent ? "inline-flex" : "none";
+      }
+
+      const resEl = document.getElementById("sim-res-badge");
+      if (resEl) {
+        if (this.currentGrid) {
+          const resNum = (this.currentGrid.dx + this.currentGrid.dy) / 2;
+          resEl.textContent = `LiDAR ${resNum <= 1.05 ? "1m" : resNum.toFixed(1) + "m"}`;
+          resEl.style.display = "inline-flex";
+        } else {
+          resEl.style.display = "none";
+        }
       }
 
       // Pré-sélection intelligente de la culture si renseignée dans le BDPPAD
@@ -1262,6 +1290,9 @@
       this.removeRainLayer();
       this.removeErosionLayer();
       this.clearHighlight();
+
+      const resEl = document.getElementById("sim-res-badge");
+      if (resEl) resEl.style.display = "none";
 
       const dock = document.getElementById("sim-dock");
       if (dock) dock.classList.remove("open");
