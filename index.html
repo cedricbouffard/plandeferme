@@ -506,7 +506,7 @@
       </details>
 
       <!-- 4. Érosion des sols (RUSLE) -->
-      <details class="tool-card topo-master-card" id="card-rusle" open>
+      <details class="tool-card topo-master-card" id="card-rusle">
         <summary class="tool-card-header" style="cursor: pointer; margin-bottom: 0;">
           <div class="tool-card-title">
             <svg class="topo-master-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -558,15 +558,6 @@
               </div>
             </div>
 
-            <!-- Facteur R / Érosivité climatique -->
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px;">
-              <div>
-                <span style="font-size: 10.5px; font-weight: 600; color: #334155;">Érosivité climatique (R)</span>
-                <div style="font-size: 9px; color: #64748b;">RUSLEFAC / Climatologie publique</div>
-              </div>
-              <span id="rusle-r-badge" class="val-badge" style="font-size: 10.5px; font-weight: 700; color: #c2410c; background: #fff7ed; border: 1px solid #fed7aa; padding: 2px 6px;">Auto</span>
-            </div>
-
             <!-- Facteur C / Culture & Couvert végétal -->
             <div>
               <div class="tool-label-row">
@@ -599,12 +590,6 @@
                 <option value="strip">Cultures en bandes alternées (P = 0,50)</option>
               </select>
             </div>
-
-            <!-- Bouton Recalculer -->
-            <button type="button" id="btn-rusle-compute" class="profile-dock-btn" style="background: #ea580c; color: #ffffff; font-weight: 700; padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 2px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-              <span>Recalculer l'érosion</span>
-            </button>
 
             <!-- Résultats RUSLE -->
             <div id="rusle-results-box" style="background: #fff7ed; border: 1px solid #fed7aa; border-left: 3.5px solid #ea580c; border-radius: 6px; padding: 6px 9px; display: flex; flex-direction: column; gap: 3px; margin-top: 2px;">

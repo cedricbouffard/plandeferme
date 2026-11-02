@@ -1126,7 +1126,7 @@
       this.cropKey = "bare";
       this.practiceKey = "none";
       this.opacity = 0.85;
-      this.isVisible = true;
+      this.isVisible = false;
 
       // Couches MapLibre
       this.SRC_ERO = "rusle-erosion-source";
