@@ -829,10 +829,10 @@
             <span>Afficher la carte RUSLE</span>
           </label>
 
-          <!-- R factor -->
-          <div style="display: flex; align-items: center; gap: 4px; margin-left: 4px;">
-            <label for="sim-ero-r" style="font-size: 11px; font-weight: 600; color: #334155;">Érosivité R :</label>
-            <input type="number" id="sim-ero-r" value="1200" min="200" max="8000" step="50" style="width: 60px; font-size: 11px; padding: 2px 4px; border: 1px solid #cbd5e1; border-radius: 4px;" title="Facteur R d'érosivité climatique (sud du Québec : 800 à 1600)" />
+          <!-- Facteur R automatique -->
+          <div style="display: flex; align-items: center; gap: 4px; margin-left: 4px;" title="Facteur R d'érosivité climatique calculé automatiquement selon les coordonnées géographiques de la parcelle (normes RUSLEFAC / Données climatiques)">
+            <span style="font-size: 11px; color: #64748b; font-weight: 600;">Érosivité R :</span>
+            <span id="sim-ero-r-badge" class="val-badge" style="font-size: 10.5px; font-weight: 700; color: #c2410c; background: #fff7ed; border: 1px solid #fed7aa; padding: 1px 6px; border-radius: 4px;">Auto</span>
           </div>
 
           <!-- Crop C factor -->
@@ -900,7 +900,7 @@
         </div>
 
         <div style="font-size: 9.5px; color: #64748b; line-height: 1.4; margin-top: 4px;">
-          Équation RUSLE : A = R · K · LS · C · P. Le facteur LS est dérivé de la surface contributive multidirectionnelle (Freeman 1.1) et de la pente (Moore &amp; Burch 1986).
+          Équation RUSLE : A = R · K · LS · C · P. L'érosivité climatique R est déterminée automatiquement selon la localisation de la parcelle (RUSLEFAC / Données climatiques publiques). Le facteur LS est dérivé de la surface contributive multidirectionnelle (Freeman 1.1) et de la pente LiDAR 1m (Moore &amp; Burch 1986).
         </div>
       </div>
     </div>
