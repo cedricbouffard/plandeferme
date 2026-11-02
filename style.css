@@ -1240,6 +1240,33 @@
     .ndvi-dock.collapsed .btn-dock-collapse svg {
       transform: rotate(180deg);
     }
+    .sim-dock {
+      max-height: 480px;
+      border-top: 2.5px solid #0284c7;
+      transition: max-height 0.25s ease, padding 0.2s ease;
+      overflow: hidden;
+    }
+    .sim-dock.collapsed {
+      max-height: 52px;
+      padding: 10px 16px;
+      overflow: hidden;
+    }
+    .sim-dock.collapsed .sim-dock-body {
+      display: none !important;
+    }
+    .sim-dock.collapsed .btn-dock-collapse svg {
+      transform: rotate(180deg);
+    }
+    .sim-dock-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+    @keyframes sim-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
     .profile-dock-header {
       display: flex;
       justify-content: space-between;
@@ -2848,4 +2875,4 @@
       cursor: pointer;
       padding: 0 4px;
     }
-    .pwa-install-dismiss:hover { color: #ffffff; }
+    .pwa-install-dismiss:hover { color: #ffffff; }

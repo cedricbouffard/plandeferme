@@ -167,6 +167,8 @@
     let parcelHydrologyManager = null;
     let terrain3DManager = null;
 
+    let simManager = null;
+
     map.on("load", () => {
       // 1. Google Hybrid Raster Source
       map.addSource("google-hybrid-source", {
@@ -460,6 +462,18 @@
       if (parcelHydrologyManager.enabled) {
         parcelHydrologyManager.scheduleViewportUpdate();
       }
+
+      // Instantiate Parcel Simulation Manager (Pluie animée & Érosion RUSLE)
+
+      if (window.ParcelSimulationManager) {
+
+        simManager = new window.ParcelSimulationManager(map);
+
+        window.simManager = simManager;
+
+      }
+
+
 
       // Instantiate Sentinel-2 NDVI Manager
       ndviManager = new NdviManager(map);
@@ -1052,6 +1066,17 @@
                   <span>Exporter MNT (TIF)</span>
                 </button>
               </div>
+
+              <div style="display: flex; gap: 6px; margin-top: 6px;">
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-rain" style="flex: 1; padding: 7px 8px; background: #0284c7; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);" title="Simuler l'écoulement gravitationnel de la pluie sur cette parcelle">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path><line x1="8" y1="19" x2="8" y2="21"></line><line x1="8" y1="13" x2="8" y2="15"></line><line x1="16" y1="19" x2="16" y2="21"></line><line x1="16" y1="13" x2="16" y2="15"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="12" y1="15" x2="12" y2="17"></line></svg>
+                  <span>Simuler Pluie</span>
+                </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-erosion" style="flex: 1; padding: 7px 8px; background: #ea580c; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);" title="Calculer les pertes de sol selon le modèle RUSLE">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path></svg>
+                  <span>Érosion (RUSLE)</span>
+                </button>
+              </div>
             </div>
 
             <div class="popup-crop-history" style="margin-top: 8px;">
@@ -1086,6 +1111,52 @@
             </div>
           `;
         }
+
+        // Tab 5: Simulation HTML (Pluie animée & Érosion RUSLE)
+
+        const simulationTabHtml = `
+
+          <div style="font-size: 12px; color: #334155; line-height: 1.5; padding: 4px 0;">
+
+            <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px; font-size: 12.5px; display: flex; align-items: center; gap: 6px;">
+
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path><line x1="8" y1="19" x2="8" y2="21"></line><line x1="8" y1="13" x2="8" y2="15"></line><line x1="16" y1="19" x2="16" y2="21"></line><line x1="16" y1="13" x2="16" y2="15"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="12" y1="15" x2="12" y2="17"></line></svg>
+
+              <span>Simulation Pluie &amp; Érosion des sols</span>
+
+            </div>
+
+            <p style="margin: 0 0 8px 0; color: #475569; font-size: 11.5px;">
+
+              Modélisez l'écoulement gravitationnel de l'eau (Horton) et évaluez les risques de perte de sol (RUSLE) sur le modèle numérique de terrain 1m de cette parcelle.
+
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+
+              <button id="btn-popup-start-rain" type="button" class="btn-popup-parcel-action" style="padding: 8px 10px; background: #0284c7; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);">
+
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path><line x1="8" y1="19" x2="8" y2="21"></line><line x1="8" y1="13" x2="8" y2="15"></line><line x1="16" y1="19" x2="16" y2="21"></line><line x1="16" y1="13" x2="16" y2="15"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="12" y1="15" x2="12" y2="17"></line></svg>
+
+                <span>Lancer la simulation de pluie animée</span>
+
+              </button>
+
+              <button id="btn-popup-start-erosion" type="button" class="btn-popup-parcel-action" style="padding: 8px 10px; background: #ea580c; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);">
+
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path></svg>
+
+                <span>Calculer l'érosion des sols (RUSLE)</span>
+
+              </button>
+
+            </div>
+
+          </div>
+
+        `;
+
+
 
         // Tab 3: NDVI HTML
         const ndviTabHtml = `
@@ -1287,6 +1358,48 @@
               tabPanes.forEach(p => p.classList.toggle("active", p.dataset.tab === tabName));
             });
           });
+
+          // Simulation triggers
+
+          const btnRainActions = popupDom.querySelectorAll(".btn-popup-action-rain, #btn-popup-start-rain");
+
+          btnRainActions.forEach(btn => {
+
+            btn.addEventListener("click", () => {
+
+              popup.remove();
+
+              if (window.simManager) {
+
+                window.simManager.startSimulation(targetP, "rain");
+
+              }
+
+            });
+
+          });
+
+
+
+          const btnErosionActions = popupDom.querySelectorAll(".btn-popup-action-erosion, #btn-popup-start-erosion");
+
+          btnErosionActions.forEach(btn => {
+
+            btn.addEventListener("click", () => {
+
+              popup.remove();
+
+              if (window.simManager) {
+
+                window.simManager.startSimulation(targetP, "erosion");
+
+              }
+
+            });
+
+          });
+
+
 
           // NDVI trigger
           const btnNdviInPopup = popupDom.querySelector("#btn-tab-ndvi");
@@ -2795,4 +2908,4 @@
           showPwaBar("Ajoutez Plan de Ferme à l'écran d'accueil : bouton Partager puis « Sur l'écran d'accueil ».", "OK");
         }, 3000);
       }
-    }
+    }
