@@ -1124,7 +1124,6 @@
       this.rFactor = 1150;
       this.soilKey = "loam";
       this.cropKey = "bare";
-      this.practiceKey = "none";
       this.opacity = 0.85;
       this.isVisible = false;
 
@@ -1156,8 +1155,6 @@
       const toggle = document.getElementById("toggle-rusle");
       const selSoil = document.getElementById("rusle-soil-select");
       const selCrop = document.getElementById("rusle-crop-select");
-      const selPractice = document.getElementById("rusle-practice-select");
-      const btnCompute = document.getElementById("btn-rusle-compute");
       const rngOpacity = document.getElementById("rusle-opacity");
 
       if (toggle) {
@@ -1187,23 +1184,6 @@
           const badge = document.getElementById("rusle-crop-detected-badge");
           if (badge) badge.textContent = "Personnalisé";
           if (this.currentGrid) this.compute();
-        });
-      }
-
-      if (selPractice) {
-        selPractice.addEventListener("change", (e) => {
-          this.practiceKey = e.target.value;
-          if (this.currentGrid) this.compute();
-        });
-      }
-
-      if (btnCompute) {
-        btnCompute.addEventListener("click", () => {
-          if (this.currentParcel) {
-            this.calculateForParcel(this.currentParcel);
-          } else if (window.terrain3DManager && window.terrain3DManager.lastClickedParcel) {
-            this.calculateForParcel(window.terrain3DManager.lastClickedParcel);
-          }
         });
       }
 
@@ -1560,8 +1540,7 @@
       const K = soil.k;
       const crop = CROP_FACTORS[this.cropKey] || CROP_FACTORS.bare;
       const C = crop.c;
-      const practice = PRACTICE_FACTORS[this.practiceKey] || PRACTICE_FACTORS.none;
-      const P = practice.p;
+      const P = 1.0;
 
       const A = new Float32Array(N).fill(NaN);
       let sumA = 0, countA = 0;
@@ -1691,24 +1670,9 @@
 
     updateStatsDisplay() {
       if (!this.eroResult) return;
-      const { mean, total } = this.eroResult;
-
+      const { mean } = this.eroResult;
       const elMean = document.getElementById("rusle-mean-val");
-      const elTotal = document.getElementById("rusle-total-val");
-      const elBadge = document.getElementById("rusle-tolerance-badge");
-
       if (elMean) elMean.textContent = `${mean.toFixed(1)} t/ha/an`;
-      if (elTotal) elTotal.textContent = `${Math.round(total)} t/an`;
-
-      if (elBadge) {
-        if (mean <= 6.0) {
-          elBadge.textContent = `Pertes sous le seuil tolérable (≈ 6 t/ha/an) — Érosion maîtrisée`;
-          elBadge.style.color = "#15803d";
-        } else {
-          elBadge.textContent = `Attention : Pertes supérieures au seuil tolérable (≈ 6 t/ha/an) — Risque d'appauvrissement du sol`;
-          elBadge.style.color = "#ea580c";
-        }
-      }
     }
 
     updateRBadge(rVal, source = "RUSLEFAC") {
