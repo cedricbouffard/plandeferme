@@ -419,7 +419,7 @@
       this.map = mapInstance;
       this.currentParcel = null;
       this.currentGrid = null;
-      this.intensity = 40; // mm/h (fixe)
+      this.intensity = 65; // mm/h (pluie soutenue favorisant le ruissellement visible)
       this.speed = 4; // x4 (fixe)
       this.soilKey = "loam";
       this.isOpen = false;
@@ -608,9 +608,9 @@
 
       if (excess > 0) {
         const vol = excess * dt * s.active * cell;
-        const n = Math.max(2, Math.round(Math.min(1600, s.active * 0.008)));
+        const n = Math.max(6, Math.round(Math.min(2600, s.active * 0.016)));
         const v = vol / n;
-        const maxDrops = Math.min(22000, Math.max(8000, Math.round(s.active * 0.18)));
+        const maxDrops = Math.min(32000, Math.max(12000, Math.round(s.active * 0.26)));
         for (let k = 0; k < n; k++) {
           if (s.drops.length >= maxDrops) {
             s.drops[(Math.random() * s.drops.length) | 0].v += v;
@@ -765,32 +765,37 @@
           sample.push(s.flow[i]);
         }
         sample.sort((a, b) => a - b);
-        const r = Math.max(1e-9, sample[Math.floor(sample.length * 0.97)] || 0);
+        const r = Math.max(1e-9, sample[Math.floor(sample.length * 0.90)] || 0);
         s.ref = s.ref ? s.ref * 0.85 + r * 0.15 : r;
       }
       const ref = s.ref;
 
       for (let i = 0; i < N; i++) {
-        s.flow[i] *= 0.99;
+        s.flow[i] *= 0.993;
         const w = s.water[i];
         const f = s.flow[i] / ref;
         const o = i * 4;
 
-        const target = w > 0.002 ? 2 + Math.min(1, w / 0.15) : f > 0.6 ? Math.min(1, (f - 0.6) / 3) : -0.0001;
-        const v = (s.shown[i] = s.shown[i] * 0.9 + target * 0.1);
+        // Rendu : cuvettes si eau stagnante (target >= 2), sinon couloir d'écoulement visible (target 0 à 1)
+        const target = w > 0.002
+          ? 2 + Math.min(1, w / 0.15)
+          : (f > 0.03 ? Math.min(1, Math.pow(f / 0.6, 0.65)) : -0.0001);
+        const v = (s.shown[i] = s.shown[i] * 0.88 + target * 0.12);
 
         if (v >= 2) {
+          // Eau stagnante en cuvette (bleu profond avec bonne opacité)
           const k = Math.min(1, v - 2);
-          px[o] = 40 - 30 * k;
-          px[o + 1] = 120 - 70 * k;
-          px[o + 2] = 240 - 40 * k;
-          px[o + 3] = 160 + 90 * k;
+          px[o] = Math.round(30 - 20 * k);
+          px[o + 1] = Math.round(110 - 55 * k);
+          px[o + 2] = Math.round(240 - 35 * k);
+          px[o + 3] = Math.round(160 + 90 * k);
         } else if (v > 0.02) {
+          // Écoulement de surface et thalwegs (cyan lumineux à bleu ciel électrique)
           const k = Math.min(1, v);
-          px[o] = 30 + 170 * k;
-          px[o + 1] = 160 + 90 * k;
+          px[o] = Math.round(14 + 60 * (1 - k));
+          px[o + 1] = Math.round(165 + 65 * k);
           px[o + 2] = 255;
-          px[o + 3] = 70 + 185 * k;
+          px[o + 3] = Math.round(60 + 175 * k);
         } else {
           px[o + 3] = 0;
         }
@@ -809,21 +814,44 @@
         try {
           c.save();
           c.globalCompositeOperation = "lighter";
-          c.globalAlpha = 0.28;
-          c.filter = `blur(${Math.max(2, S * 1.2).toFixed(1)}px)`;
+          c.globalAlpha = 0.32;
+          c.filter = `blur(${Math.max(1.8, S * 1.0).toFixed(1)}px)`;
           c.drawImage(s.small, 0, 0, s.canvas.width, s.canvas.height);
           c.restore();
         } catch (e) {}
       }
 
-      c.fillStyle = "rgba(225, 245, 255, 0.45)";
-      const r = Math.max(0.7, S * 0.25);
-      const step = s.drops.length > 12000 ? 3 : (s.drops.length > 6000 ? 2 : 1);
-      for (let k = 0; k < s.drops.length; k += step) {
+      // Rendu dynamique des gouttes en mouvement avec traînées d'écoulement
+      const numDrops = s.drops.length;
+      const step = numDrops > 18000 ? 2 : 1;
+      const dropRadius = Math.max(1.1, S * 0.35);
+
+      c.lineWidth = Math.max(1.2, S * 0.35);
+      c.lineCap = "round";
+
+      for (let k = 0; k < numDrops; k += step) {
         const p = s.drops[k];
-        c.beginPath();
-        c.arc(p.x * S, p.y * S, r, 0, 6.2832);
-        c.fill();
+        const dpx = p.x * S;
+        const dpy = p.y * S;
+        const sp = Math.hypot(p.vx, p.vy);
+
+        if (sp > 0.06) {
+          // Goutte en mouvement rapide : traînée d'écoulement montrant la direction de pente
+          const tailLen = Math.min(4.5 * S, sp * 5.5 * S);
+          const tx = dpx - (p.vx / sp) * tailLen;
+          const ty = dpy - (p.vy / sp) * tailLen;
+          c.strokeStyle = "rgba(186, 230, 253, 0.75)";
+          c.beginPath();
+          c.moveTo(tx, ty);
+          c.lineTo(dpx, dpy);
+          c.stroke();
+        } else {
+          // Goutte lente ou nouvelle
+          c.fillStyle = "rgba(224, 242, 254, 0.85)";
+          c.beginPath();
+          c.arc(dpx, dpy, dropRadius, 0, 6.2832);
+          c.fill();
+        }
       }
     }
 
