@@ -799,103 +799,39 @@
     </div>
   </div>
 
-  <!-- Floating Rain & Erosion Simulation Bottom Dock -->
-  <div id="sim-dock" class="elevation-profile-dock sim-dock" role="region" aria-label="Simulation de pluie et ruissellement">
-    <div class="profile-dock-header">
-      <div class="profile-dock-title" id="sim-dock-title-wrap">
+  <!-- Floating Rain Simulation Bottom Dock -->
+  <div id="sim-dock" class="elevation-profile-dock sim-dock" role="region" aria-label="Simulation de pluie et ruissellement" style="max-height: 84px; padding: 10px 16px;">
+    <div class="profile-dock-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+      <div class="profile-dock-title" id="sim-dock-title-wrap" style="display: flex; align-items: center; gap: 8px;">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path>
           <line x1="8" y1="19" x2="8" y2="21"></line><line x1="8" y1="13" x2="8" y2="15"></line>
           <line x1="16" y1="19" x2="16" y2="21"></line><line x1="16" y1="13" x2="16" y2="15"></line>
           <line x1="12" y1="21" x2="12" y2="23"></line><line x1="12" y1="15" x2="12" y2="17"></line>
         </svg>
-        <span id="sim-dock-title" style="font-weight: 700; color: #0f172a;">Simulation Pluie &amp; Ruissellement</span>
-        <span id="sim-parcel-badge" class="stat-chip" style="margin-left: 6px; font-weight: 600; color: #0369a1; background: #e0f2fe; border-color: #bae6fd;">Parcelle</span>
-        <span id="sim-area-badge" class="stat-chip" style="margin-left: 4px; font-weight: 600; color: #334155; background: #f1f5f9; border-color: #cbd5e1; display: none;"></span>
-        <span id="sim-res-badge" class="stat-chip" style="margin-left: 4px; font-weight: 600; color: #0f766e; background: #ccfbf1; border-color: #99f6e4; display: none;" title="Résolution spatiale native du MNT LiDAR">LiDAR 1m</span>
+        <span id="sim-dock-title" style="font-weight: 700; color: #0f172a;">Simulation de pluie</span>
+        <span id="sim-parcel-name" style="font-size: 11.5px; font-weight: 600; color: #475569;"></span>
       </div>
 
       <div class="profile-dock-header-right" style="display: flex; align-items: center; gap: 8px;">
-          <button id="btn-collapse-sim-dock" class="btn-dock-collapse" type="button" title="Réduire / Agrandir le panneau" aria-label="Réduire ou agrandir">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
-          </button>
-          <button id="btn-close-sim-dock" class="profile-dock-close" type="button" aria-label="Fermer la simulation">&times;</button>
-        </div>
+        <button type="button" id="btn-sim-rain-play" class="profile-dock-btn" style="background: #0284c7; color: #ffffff; font-weight: 700; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 5px; cursor: pointer;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          <span>Lancer la pluie</span>
+        </button>
+        <button type="button" id="btn-sim-rain-reset" class="profile-dock-btn" style="padding: 4px 10px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 5px; cursor: pointer; color: #334155;">
+          Recommencer
+        </button>
+        <button id="btn-close-sim-dock" class="profile-dock-close" type="button" aria-label="Fermer la simulation">&times;</button>
       </div>
+    </div>
 
-    <!-- Dock Body -->
-    <div class="sim-dock-body" id="sim-dock-body">
-      <!-- Loading indicator -->
-      <div id="sim-loading-bar" class="sim-loading-bar" style="display: none; padding: 10px 12px; text-align: center; color: #0369a1; font-size: 11.5px; font-weight: 600; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; margin-top: 4px;">
-        <span class="sim-spinner" style="display: inline-block; width: 13px; height: 13px; border: 2px solid #bae6fd; border-top-color: #0284c7; border-radius: 50%; animation: sim-spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px;"></span>
-        Chargement de l'altimétrie LiDAR 1m et préparation du modèle hydrodynamique...
-      </div>
-
-      <!-- Content Section 1: Rain Simulation -->
-      <div id="sim-section-rain" class="sim-tab-content">
-        <div class="sim-controls-row" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 0;">
-          <!-- Play / Pause & Reset -->
-          <div style="display: flex; gap: 6px;">
-            <button type="button" id="btn-sim-rain-play" class="profile-dock-btn" style="background: #0284c7; color: #ffffff; font-weight: 700; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 5px; cursor: pointer;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-              <span>Lancer la pluie</span>
-            </button>
-            <button type="button" id="btn-sim-rain-reset" class="profile-dock-btn" style="padding: 4px 10px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 5px; cursor: pointer; color: #334155;">
-              Recommencer
-            </button>
-          </div>
-
-          <!-- Soil infiltration selection -->
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <label for="sim-rain-soil" style="font-size: 11px; font-weight: 600; color: #334155;">Sol (Infiltration) :</label>
-            <select id="sim-rain-soil" class="tool-select" style="font-size: 11px; padding: 2px 6px;">
-              <option value="loam" selected>Loam (≈ 8 mm/h)</option>
-              <option value="sandy_loam">Loam sableux (≈ 15 mm/h)</option>
-              <option value="sand">Sable (≈ 25 mm/h)</option>
-              <option value="silt_loam">Loam limoneux (≈ 6 mm/h)</option>
-              <option value="clay_loam">Loam argileux (≈ 4 mm/h)</option>
-              <option value="clay">Argile (≈ 2 mm/h)</option>
-            </select>
-          </div>
-
-          </div>
-
-        <!-- Real-time Stats Cards -->
-        <div id="sim-rain-stats-row" class="sim-stats-grid" style="display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap;">
-          <div class="sim-stat-box" style="flex: 1; min-width: 80px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 3px 7px;">
-            <div style="font-size: 9.5px; color: #64748b; text-transform: uppercase;">Temps simulé</div>
-            <div id="sim-stat-time" style="font-size: 12.5px; font-weight: 700; color: #0f172a;">0 min</div>
-          </div>
-          <div class="sim-stat-box" style="flex: 1; min-width: 80px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 3px 7px;">
-            <div style="font-size: 9.5px; color: #64748b; text-transform: uppercase;">Pluie cumulée</div>
-            <div id="sim-stat-rain" style="font-size: 12.5px; font-weight: 700; color: #0284c7;">0.0 mm</div>
-          </div>
-          <div class="sim-stat-box" style="flex: 1; min-width: 80px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 3px 7px;">
-            <div style="font-size: 9.5px; color: #64748b; text-transform: uppercase;">Infiltrée</div>
-            <div id="sim-stat-inf" style="font-size: 12.5px; font-weight: 700; color: #16a34a;">0 %</div>
-          </div>
-          <div class="sim-stat-box" style="flex: 1; min-width: 80px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 3px 7px;">
-            <div style="font-size: 9.5px; color: #64748b; text-transform: uppercase;">Ruissellement</div>
-            <div id="sim-stat-flow" style="font-size: 12.5px; font-weight: 700; color: #0284c7;">0 %</div>
-          </div>
-          <div class="sim-stat-box" style="flex: 1; min-width: 80px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 3px 7px;">
-            <div style="font-size: 9.5px; color: #64748b; text-transform: uppercase;">En cuvettes</div>
-            <div id="sim-stat-pond" style="font-size: 12.5px; font-weight: 700; color: #4338ca;">0 %</div>
-          </div>
-          <div class="sim-stat-box" style="flex: 1; min-width: 80px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 3px 7px;">
-            <div style="font-size: 9.5px; color: #64748b; text-transform: uppercase;">Sortie du champ</div>
-            <div id="sim-stat-out" style="font-size: 12.5px; font-weight: 700; color: #d97706;">0 %</div>
-          </div>
-        </div>
-
-        <div id="sim-rain-hint" style="font-size: 10.5px; color: #64748b; line-height: 1.4; margin-top: 5px;">
-          Les gouttes descendent la plus forte pente selon le MNE 1m, tracent les thalwegs et remplissent les dépressions qui débordent une fois pleines. Seul l'excès d'eau sur l'infiltration ruisselle (modèle Horton).
-        </div>
-      </div>
-
-      </div>
+    <!-- Loading indicator -->
+    <div id="sim-loading-bar" class="sim-loading-bar" style="display: none; padding: 5px 10px; text-align: center; color: #0369a1; font-size: 11px; font-weight: 600; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 5px; margin-top: 4px;">
+      <span class="sim-spinner" style="display: inline-block; width: 11px; height: 11px; border: 2px solid #bae6fd; border-top-color: #0284c7; border-radius: 50%; animation: sim-spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px;"></span>
+      Chargement du relief LiDAR 1m...
+    </div>
+    <div id="sim-rain-hint" style="display: none; font-size: 10.5px; color: #ef4444; font-weight: 600; margin-top: 4px;"></div>
   </div>
-
 
   <!-- Slide-Over Drawer for Agri-Réseau RAG -->
   <aside id="rag-dock" class="rag-dock" aria-label="Base documentaire Agri-Réseau">

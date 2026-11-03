@@ -437,18 +437,10 @@
 
     initDom() {
       const btnClose = document.getElementById("btn-close-sim-dock");
-      const btnCollapse = document.getElementById("btn-collapse-sim-dock");
       const btnPlay = document.getElementById("btn-sim-rain-play");
       const btnReset = document.getElementById("btn-sim-rain-reset");
-      const selSoil = document.getElementById("sim-rain-soil");
 
       if (btnClose) btnClose.addEventListener("click", () => this.closeDock());
-      if (btnCollapse) {
-        btnCollapse.addEventListener("click", () => {
-          const dock = document.getElementById("sim-dock");
-          if (dock) dock.classList.toggle("collapsed");
-        });
-      }
 
       if (btnPlay) {
         btnPlay.addEventListener("click", () => {
@@ -462,13 +454,6 @@
 
       if (btnReset) {
         btnReset.addEventListener("click", () => this.resetRain());
-      }
-
-      if (selSoil) {
-        selSoil.addEventListener("change", (e) => {
-          this.soilKey = e.target.value;
-          this.syncRainHint();
-        });
       }
     }
 
@@ -491,7 +476,7 @@
       if (bbox && this.map) {
         this.map.fitBounds(
           [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
-          { padding: { top: 60, bottom: 220, left: 60, right: 60 }, duration: 800 }
+          { padding: { top: 60, bottom: 90, left: 60, right: 60 }, duration: 800 }
         );
       }
 
@@ -856,8 +841,6 @@
       const src = this.map && this.map.getSource(this.SRC_RAIN);
       if (src && typeof src.play === "function") src.play();
       if (this.map && typeof this.map.triggerRepaint === "function") this.map.triggerRepaint();
-
-      this.updateStatsDisplay();
       this.rafId = requestAnimationFrame(() => this.loop());
     }
 
@@ -960,79 +943,19 @@
       const lot = props.NO_LOT || "";
       const sup = props.SUPHEC || props.suphec || "";
 
-      const badgeEl = document.getElementById("sim-parcel-badge");
-      if (badgeEl) {
-        badgeEl.textContent = pid ? `Parcelle nº ${pid}` : (lot ? `Lot nº ${lot}` : "Parcelle agricole");
-      }
-
-      const areaEl = document.getElementById("sim-area-badge");
-      if (areaEl) {
+      const nameEl = document.getElementById("sim-parcel-name");
+      if (nameEl) {
         const sNum = parseFloat(sup);
-        areaEl.textContent = !isNaN(sNum) ? `${sNum.toFixed(1)} ha` : (sup ? `${sup} ha` : "");
-        areaEl.style.display = areaEl.textContent ? "inline-flex" : "none";
-      }
-
-      const resEl = document.getElementById("sim-res-badge");
-      if (resEl) {
-        if (this.currentGrid) {
-          const resNum = (this.currentGrid.dx + this.currentGrid.dy) / 2;
-          resEl.textContent = `LiDAR ${resNum <= 1.05 ? "1m" : resNum.toFixed(1) + "m"}`;
-          resEl.style.display = "inline-flex";
-        } else {
-          resEl.style.display = "none";
-        }
+        const supStr = !isNaN(sNum) ? ` (${sNum.toFixed(1)} ha)` : (sup ? ` (${sup} ha)` : "");
+        nameEl.textContent = pid ? `— Parcelle nº ${pid}${supStr}` : (lot ? `— Lot nº ${lot}${supStr}` : `— Parcelle agricole${supStr}`);
       }
     }
 
-    updateStatsDisplay() {
-      if (!this.sim) return;
-      const s = this.sim;
-      const cell = s.G.dx * s.G.dy;
+    updateStatsDisplay() {}
 
-      let pond = 0;
-      for (let i = 0; i < s.water.length; i++) pond += s.water[i];
-      pond *= cell;
+    clearStats() {}
 
-      const rainTotal = Math.max(1e-9, s.rain);
-      const mm = (s.rain / (s.active * cell)) * 1000;
-      const tm = s.time / 60;
-      const timeStr = tm < 90 ? `${Math.round(tm)} min` : `${(tm / 60).toFixed(1)} h`;
-
-      let moving = 0;
-      for (const p of s.drops) moving += p.v;
-
-      const elTime = document.getElementById("sim-stat-time");
-      const elRain = document.getElementById("sim-stat-rain");
-      const elInf = document.getElementById("sim-stat-inf");
-      const elFlow = document.getElementById("sim-stat-flow");
-      const elPond = document.getElementById("sim-stat-pond");
-      const elOut = document.getElementById("sim-stat-out");
-
-      if (elTime) elTime.textContent = timeStr;
-      if (elRain) elRain.textContent = `${mm.toFixed(1)} mm`;
-      if (elInf) elInf.textContent = `${Math.min(100, Math.round((100 * s.inf) / rainTotal))} %`;
-      if (elFlow) elFlow.textContent = `${Math.min(100, Math.round((100 * moving) / rainTotal))} %`;
-      if (elPond) elPond.textContent = `${Math.min(100, Math.round((100 * pond) / rainTotal))} %`;
-      if (elOut) elOut.textContent = `${Math.min(100, Math.round((100 * s.out) / rainTotal))} %`;
-    }
-
-    clearStats() {
-      ["sim-stat-time", "sim-stat-rain", "sim-stat-inf", "sim-stat-flow", "sim-stat-pond", "sim-stat-out"].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = id === "sim-stat-time" ? "0 min" : (id === "sim-stat-rain" ? "0.0 mm" : "0 %");
-      });
-    }
-
-    syncRainHint() {
-      const soil = SOIL_TYPES[this.soilKey] || SOIL_TYPES.loam;
-      const hintEl = document.getElementById("sim-rain-hint");
-      if (!hintEl) return;
-      if (this.intensity <= soil.f) {
-        hintEl.innerHTML = `<span style="color:#d97706; font-weight:600;">⚠️ Le sol absorbe toute la pluie (infiltration ≈ ${soil.f} mm/h).</span>`;
-      } else {
-        hintEl.textContent = `Les gouttes descendent la plus forte pente selon le MNE 1m, tracent les thalwegs et remplissent les dépressions qui débordent une fois pleines. Seul l'excès d'eau sur l'infiltration ruisselle (modèle Horton).`;
-      }
-    }
+    syncRainHint() {}
 
     syncPlayButton(isPlaying) {
       const btn = document.getElementById("btn-sim-rain-play");
