@@ -829,20 +829,20 @@
           : (f > 0.03 ? Math.min(1, Math.pow(f / 0.6, 0.65)) : -0.0001);
         const v = (s.shown[i] = s.shown[i] * 0.88 + target * 0.12);
 
-        if (v >= 2) {
-          // Eau stagnante en cuvette (bleu profond avec bonne opacité)
-          const k = Math.min(1, v - 2);
-          px[o] = Math.round(30 - 20 * k);
-          px[o + 1] = Math.round(110 - 55 * k);
-          px[o + 2] = Math.round(240 - 35 * k);
-          px[o + 3] = Math.round(160 + 90 * k);
+        if (v >= 2.0) {
+          // Eau stagnante en cuvette : bleu océan à bleu foncé / nuit profond
+          const k = Math.min(1, v - 2.0);
+          px[o] = Math.round(45 - 35 * k);       // 45 -> 10
+          px[o + 1] = Math.round(105 - 80 * k);   // 105 -> 25
+          px[o + 2] = Math.round(225 - 115 * k);  // 225 -> 110
+          px[o + 3] = Math.round(190 + 60 * k);   // 190 -> 250
         } else if (v > 0.02) {
-          // Écoulement de surface et thalwegs (cyan lumineux à bleu ciel électrique)
-          const k = Math.min(1, v);
-          px[o] = Math.round(14 + 60 * (1 - k));
-          px[o + 1] = Math.round(165 + 65 * k);
-          px[o + 2] = 255;
-          px[o + 3] = Math.round(60 + 175 * k);
+          // Écoulement actif : échelle continue du blanc pur au bleu royal (sans cyan)
+          const k = Math.min(1, Math.max(0, (v - 0.02) / 0.98));
+          px[o] = Math.round(255 - 200 * k);      // 255 (blanc) -> 55 (bleu royal)
+          px[o + 1] = Math.round(255 - 135 * k);  // 255 (blanc) -> 120 (bleu royal)
+          px[o + 2] = Math.round(255 - 15 * k);   // 255 (blanc) -> 240 (bleu royal)
+          px[o + 3] = Math.round(90 + 120 * k);   // 90 -> 210
         } else {
           px[o + 3] = 0;
         }
@@ -883,19 +883,19 @@
         const sp = Math.hypot(p.vx, p.vy);
 
         if (sp > 0.06) {
-          // Goutte en mouvement rapide : traînée d'écoulement montrant la direction de pente
+          // Goutte en mouvement rapide : traînée blanche nette
           const mult = this.trailMultiplier || 10;
           const tailLen = Math.min(8 * S, sp * mult * S);
           const tx = dpx - (p.vx / sp) * tailLen;
           const ty = dpy - (p.vy / sp) * tailLen;
-          c.strokeStyle = "rgba(186, 230, 253, 0.75)";
+          c.strokeStyle = "rgba(255, 255, 255, 0.90)";
           c.beginPath();
           c.moveTo(tx, ty);
           c.lineTo(dpx, dpy);
           c.stroke();
         } else {
-          // Goutte lente ou nouvelle
-          c.fillStyle = "rgba(224, 242, 254, 0.85)";
+          // Goutte lente ou nouvelle : blanc pur
+          c.fillStyle = "rgba(255, 255, 255, 0.95)";
           c.beginPath();
           c.arc(dpx, dpy, dropRadius, 0, 6.2832);
           c.fill();
