@@ -1172,8 +1172,6 @@
       if (selSoil) {
         selSoil.addEventListener("change", (e) => {
           this.soilKey = e.target.value;
-          const badge = document.getElementById("rusle-soil-source-badge");
-          if (badge) badge.textContent = "Manuel";
           if (this.currentGrid) this.compute();
         });
       }
@@ -1181,8 +1179,6 @@
       if (selCrop) {
         selCrop.addEventListener("change", (e) => {
           this.cropKey = e.target.value;
-          const badge = document.getElementById("rusle-crop-detected-badge");
-          if (badge) badge.textContent = "Personnalisé";
           if (this.currentGrid) this.compute();
         });
       }
@@ -1423,15 +1419,7 @@
       const selCrop = document.getElementById("rusle-crop-select");
       if (selCrop) selCrop.value = this.cropKey;
 
-      const badgeCrop = document.getElementById("rusle-crop-detected-badge");
-      if (badgeCrop) {
-        badgeCrop.textContent = detectedCrop.year ? `Culture ${detectedCrop.year}` : "Dernière culture";
-        badgeCrop.title = `Détecté automatiquement : ${detectedCrop.cropLabel}`;
-      }
-      const infoCrop = document.getElementById("rusle-crop-info");
-      if (infoCrop) {
-        infoCrop.innerHTML = `Culture détectée : <strong>${detectedCrop.cropLabel}</strong>${detectedCrop.year ? ` (${detectedCrop.year})` : ""} &rarr; Facteur C = ${(CROP_FACTORS[this.cropKey] || {}).c || 0.38}`;
-      }
+
 
       // 3. Facteur K : Détection automatique de la texture du sol (Pédologie ou Soil World)
       const soilInfo = await this.detectSoilTexture(centerLat, centerLng, this.currentParcel.properties);
@@ -1439,15 +1427,7 @@
       const selSoil = document.getElementById("rusle-soil-select");
       if (selSoil) selSoil.value = this.soilKey;
 
-      const badgeSoil = document.getElementById("rusle-soil-source-badge");
-      if (badgeSoil) {
-        badgeSoil.textContent = soilInfo.source === "pedo" ? "Pédologie QC" : (soilInfo.source === "soilgrids" ? "Soil World" : "Défaut");
-        badgeSoil.title = soilInfo.desc;
-      }
-      const descSoil = document.getElementById("rusle-soil-desc");
-      if (descSoil) {
-        descSoil.innerHTML = `${soilInfo.desc} &rarr; Facteur K = ${(SOIL_TYPES[this.soilKey] || {}).k || 0.040}`;
-      }
+
 
       // Cadrage carte
       if (geomBbox && this.map) {
@@ -1465,12 +1445,7 @@
         this.currentGrid = await loadParcelDem(this.currentParcel);
         if (hint) hint.style.display = "none";
 
-        const resBadge = document.getElementById("rusle-res-badge");
-        if (resBadge) {
-          const resNum = (this.currentGrid.dx + this.currentGrid.dy) / 2;
-          resBadge.textContent = `LiDAR ${resNum <= 1.05 ? "1m" : resNum.toFixed(1) + "m"}`;
-          resBadge.style.display = "inline-flex";
-        }
+
 
         this.compute();
       } catch (err) {
@@ -1657,15 +1632,14 @@
 
       const nameEl = document.getElementById("rusle-parcel-name");
       if (nameEl) {
-        nameEl.textContent = pid ? `Parcelle nº ${pid}` : (lot ? `Lot nº ${lot}` : "Parcelle agricole");
+        const sNum = parseFloat(sup);
+        const supStr = !isNaN(sNum) ? ` (${sNum.toFixed(1)} ha)` : (sup ? ` (${sup} ha)` : "");
+        nameEl.textContent = pid ? `Parcelle nº ${pid}${supStr}` : (lot ? `Lot nº ${lot}${supStr}` : `Parcelle agricole${supStr}`);
+        nameEl.style.display = "block";
       }
 
-      const areaEl = document.getElementById("rusle-parcel-area");
-      if (areaEl) {
-        const sNum = parseFloat(sup);
-        areaEl.textContent = !isNaN(sNum) ? `${sNum.toFixed(1)} ha` : (sup ? `${sup} ha` : "");
-        areaEl.style.display = areaEl.textContent ? "inline-flex" : "none";
-      }
+      const hint = document.getElementById("rusle-no-parcel-hint");
+      if (hint) hint.style.display = "none";
     }
 
     updateStatsDisplay() {

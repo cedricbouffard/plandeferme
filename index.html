@@ -524,17 +524,11 @@
             Pertes de sol annuelles A = R · K · LS · C (LiDAR 1m)
           </div>
 
-          <!-- Badge statut de la parcelle sélectionnée -->
-          <div id="rusle-parcel-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; padding: 5px 8px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px;">
-            <div style="display: flex; align-items: center; gap: 5px;">
-              <span id="rusle-parcel-name" style="font-size: 11px; font-weight: 700; color: #9a3412;">Aucune parcelle</span>
-              <span id="rusle-parcel-area" class="stat-chip" style="display: none; font-size: 10px; color: #7c2d12; background: #ffedd5; border-color: #fdba74;"></span>
-            </div>
-            <span id="rusle-res-badge" class="stat-chip" style="display: none; font-size: 10px; font-weight: 600; color: #0f766e; background: #ccfbf1; border-color: #99f6e4;">LiDAR 1m</span>
-          </div>
+          <!-- Parcelle active -->
+          <div id="rusle-parcel-name" style="font-size: 11px; font-weight: 600; color: #334155; display: none;"></div>
 
           <div id="rusle-no-parcel-hint" style="font-size: 10.5px; color: #64748b; line-height: 1.35; padding: 2px 0;">
-            Cliquez sur une parcelle sur la carte ou dans le popup pour lancer le diagnostic d'érosion.
+            Cliquez sur une parcelle sur la carte ou dans le popup pour afficher l'érosion.
           </div>
 
           <!-- Conteneur des paramètres et résultats -->
@@ -543,7 +537,6 @@
             <div>
               <div class="tool-label-row">
                 <span class="tool-sublabel" style="font-weight: 600; color: #334155;">Texture du sol (Facteur K)</span>
-                <span id="rusle-soil-source-badge" class="val-badge" style="font-size: 9.5px; color: #0369a1; background: #f0f9ff; border: 1px solid #bae6fd;">Auto</span>
               </div>
               <select id="rusle-soil-select" class="tool-select" style="width: 100%; font-size: 11px; padding: 3px 6px; margin-top: 2px;">
                 <option value="loam" selected>Loam (K = 0,040 - Réf.)</option>
@@ -553,16 +546,12 @@
                 <option value="sandy_loam">Loam sableux (K = 0,026)</option>
                 <option value="sand">Sable (K = 0,015)</option>
               </select>
-              <div id="rusle-soil-desc" style="font-size: 9.5px; color: #64748b; margin-top: 2px; line-height: 1.3;">
-                Source texture : Données pédologiques IRDA/AAC ou Soil World / SoilGrids.
-              </div>
             </div>
 
             <!-- Facteur C / Culture & Couvert végétal -->
             <div>
               <div class="tool-label-row">
-                <span class="tool-sublabel" style="font-weight: 600; color: #334155;">Culture &amp; Couvert végétal (C)</span>
-                <span id="rusle-crop-detected-badge" class="val-badge" style="font-size: 9.5px; color: #15803d; background: #f0fdf4; border: 1px solid #bbf7d0;">Dernière culture</span>
+                <span class="tool-sublabel" style="font-weight: 600; color: #334155;">Culture &amp; couvert végétal (Facteur C)</span>
               </div>
               <select id="rusle-crop-select" class="tool-select" style="width: 100%; font-size: 11px; padding: 3px 6px; margin-top: 2px;">
                 <option value="bare">Sol nu sans couvert (C = 1,00 - Témoin)</option>
@@ -574,16 +563,13 @@
                 <option value="potato">Pomme de terre / Sarclés (C = 0,35)</option>
                 <option value="canola">Canola / Oléagineux (C = 0,20)</option>
               </select>
-              <div id="rusle-crop-info" style="font-size: 9.5px; color: #64748b; margin-top: 2px; line-height: 1.3;">
-                Pré-sélectionné automatiquement d'après la dernière déclaration de culture BDPPAD.
-              </div>
             </div>
 
             <!-- Résultats RUSLE -->
-            <div id="rusle-results-box" style="background: #fff7ed; border: 1px solid #fed7aa; border-left: 3.5px solid #ea580c; border-radius: 6px; padding: 6px 9px; display: flex; flex-direction: column; gap: 3px; margin-top: 2px;">
+            <div id="rusle-results-box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 9px; display: flex; flex-direction: column; gap: 3px; margin-top: 2px;">
               <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span style="font-size: 11px; font-weight: 600; color: #9a3412;">Perte de sol moyenne :</span>
-                <span id="rusle-mean-val" style="font-size: 13.5px; font-weight: 800; color: #ea580c;">— t/ha/an</span>
+                <span style="font-size: 11px; font-weight: 600; color: #475569;">Perte de sol moyenne :</span>
+                <span id="rusle-mean-val" style="font-size: 13.5px; font-weight: 700; color: #0f172a;">— t/ha/an</span>
               </div>
             </div>
 
