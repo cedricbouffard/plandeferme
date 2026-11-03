@@ -420,7 +420,9 @@
       this.currentParcel = null;
       this.currentGrid = null;
       this.intensity = 65; // mm/h (pluie soutenue favorisant le ruissellement visible)
-      this.speed = 4; // x4 (fixe)
+      this.speed = 2; // ralenti (x2 par défaut)
+      this.trailMultiplier = 10; // longueur des traînées par défaut
+      this.flowThreshold = 0.08; // seuil de visibilité du ruissellement
       this.soilKey = "loam";
       this.isOpen = false;
       this.sim = null;
@@ -439,6 +441,8 @@
       const btnClose = document.getElementById("btn-close-sim-dock");
       const btnPlay = document.getElementById("btn-sim-rain-play");
       const btnReset = document.getElementById("btn-sim-rain-reset");
+      const btnToggleOptions = document.getElementById("btn-sim-toggle-options");
+      const optPanel = document.getElementById("sim-options-panel");
 
       if (btnClose) btnClose.addEventListener("click", () => this.closeDock());
 
@@ -454,6 +458,49 @@
 
       if (btnReset) {
         btnReset.addEventListener("click", () => this.resetRain());
+      }
+
+      if (btnToggleOptions && optPanel) {
+        btnToggleOptions.addEventListener("click", () => {
+          const isHidden = optPanel.style.display === "none";
+          optPanel.style.display = isHidden ? "flex" : "none";
+        });
+      }
+
+      const rngSpeed = document.getElementById("sim-opt-speed");
+      const valSpeed = document.getElementById("sim-opt-speed-val");
+      if (rngSpeed) {
+        rngSpeed.addEventListener("input", (e) => {
+          this.speed = Math.max(1, parseInt(e.target.value, 10) || 2);
+          if (valSpeed) valSpeed.textContent = `${this.speed}x`;
+        });
+      }
+
+      const rngTrail = document.getElementById("sim-opt-trail");
+      const valTrail = document.getElementById("sim-opt-trail-val");
+      if (rngTrail) {
+        rngTrail.addEventListener("input", (e) => {
+          this.trailMultiplier = parseFloat(e.target.value) || 10;
+          if (valTrail) valTrail.textContent = `${this.trailMultiplier}`;
+        });
+      }
+
+      const rngThresh = document.getElementById("sim-opt-threshold");
+      const valThresh = document.getElementById("sim-opt-threshold-val");
+      if (rngThresh) {
+        rngThresh.addEventListener("input", (e) => {
+          this.flowThreshold = parseFloat(e.target.value) || 0.08;
+          if (valThresh) valThresh.textContent = this.flowThreshold.toFixed(2);
+        });
+      }
+
+      const rngIntens = document.getElementById("sim-opt-intensity");
+      const valIntens = document.getElementById("sim-opt-intensity-val");
+      if (rngIntens) {
+        rngIntens.addEventListener("input", (e) => {
+          this.intensity = parseFloat(e.target.value) || 65;
+          if (valIntens) valIntens.textContent = `${this.intensity} mm/h`;
+        });
       }
     }
 
@@ -837,7 +884,8 @@
 
         if (sp > 0.06) {
           // Goutte en mouvement rapide : traînée d'écoulement montrant la direction de pente
-          const tailLen = Math.min(4.5 * S, sp * 5.5 * S);
+          const mult = this.trailMultiplier || 10;
+          const tailLen = Math.min(8 * S, sp * mult * S);
           const tx = dpx - (p.vx / sp) * tailLen;
           const ty = dpy - (p.vy / sp) * tailLen;
           c.strokeStyle = "rgba(186, 230, 253, 0.75)";

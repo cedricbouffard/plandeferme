@@ -1241,7 +1241,7 @@
       transform: rotate(180deg);
     }
     .sim-dock {
-      max-height: 100px;
+      max-height: 140px;
       border-top: 2.5px solid #0284c7;
       padding: 10px 16px;
       overflow: hidden;
