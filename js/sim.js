@@ -420,8 +420,8 @@
       this.currentParcel = null;
       this.currentGrid = null;
       this.intensity = 65; // mm/h (pluie soutenue favorisant le ruissellement visible)
-      this.speed = 2; // ralenti (x2 par défaut)
-      this.trailMultiplier = 10; // longueur des traînées par défaut
+      this.speed = 1; // vitesse fixée à 1 (1 pas par frame)
+      this.trailMultiplier = 3; // longueur des traînées fixée à 3
       this.flowThreshold = 0.08; // seuil de visibilité du ruissellement
       this.soilKey = "loam";
       this.isOpen = false;
@@ -441,8 +441,6 @@
       const btnClose = document.getElementById("btn-close-sim-dock");
       const btnPlay = document.getElementById("btn-sim-rain-play");
       const btnReset = document.getElementById("btn-sim-rain-reset");
-      const btnToggleOptions = document.getElementById("btn-sim-toggle-options");
-      const optPanel = document.getElementById("sim-options-panel");
 
       if (btnClose) btnClose.addEventListener("click", () => this.closeDock());
 
@@ -458,49 +456,6 @@
 
       if (btnReset) {
         btnReset.addEventListener("click", () => this.resetRain());
-      }
-
-      if (btnToggleOptions && optPanel) {
-        btnToggleOptions.addEventListener("click", () => {
-          const isHidden = optPanel.style.display === "none";
-          optPanel.style.display = isHidden ? "flex" : "none";
-        });
-      }
-
-      const rngSpeed = document.getElementById("sim-opt-speed");
-      const valSpeed = document.getElementById("sim-opt-speed-val");
-      if (rngSpeed) {
-        rngSpeed.addEventListener("input", (e) => {
-          this.speed = Math.max(1, parseInt(e.target.value, 10) || 2);
-          if (valSpeed) valSpeed.textContent = `${this.speed}x`;
-        });
-      }
-
-      const rngTrail = document.getElementById("sim-opt-trail");
-      const valTrail = document.getElementById("sim-opt-trail-val");
-      if (rngTrail) {
-        rngTrail.addEventListener("input", (e) => {
-          this.trailMultiplier = parseFloat(e.target.value) || 10;
-          if (valTrail) valTrail.textContent = `${this.trailMultiplier}`;
-        });
-      }
-
-      const rngThresh = document.getElementById("sim-opt-threshold");
-      const valThresh = document.getElementById("sim-opt-threshold-val");
-      if (rngThresh) {
-        rngThresh.addEventListener("input", (e) => {
-          this.flowThreshold = parseFloat(e.target.value) || 0.08;
-          if (valThresh) valThresh.textContent = this.flowThreshold.toFixed(2);
-        });
-      }
-
-      const rngIntens = document.getElementById("sim-opt-intensity");
-      const valIntens = document.getElementById("sim-opt-intensity-val");
-      if (rngIntens) {
-        rngIntens.addEventListener("input", (e) => {
-          this.intensity = parseFloat(e.target.value) || 65;
-          if (valIntens) valIntens.textContent = `${this.intensity} mm/h`;
-        });
       }
     }
 
@@ -677,13 +632,26 @@
         const [gx, gy] = this.gradient(s, cx, cy);
         const slope = Math.hypot(gx, gy);
 
-        const a = 0.9;
-        const push = Math.min(1, 0.25 + slope * 300) * a * 0.22;
-        p.vx = p.vx * 0.8 - (slope > 1e-6 ? gx / slope : 0) * push;
-        p.vy = p.vy * 0.8 - (slope > 1e-6 ? gy / slope : 0) * push;
+        // Direction d'écoulement vers l'aval (opposée au gradient d'altitude)
+        const dirX = slope > 1e-6 ? -gx / slope : 0;
+        const dirY = slope > 1e-6 ? -gy / slope : 0;
+
+        // Vitesse des particules dépendant de la pente (loi hydraulique proportionnelle à la racine de la pente) :
+        // Pente abrupte -> les particules accélèrent nettement et vont vite
+        // Terrain plat ou cuvette -> les particules ralentissent fortement et avancent au ralenti
+        const targetSp = slope > 1e-5 ? Math.min(1.25, 0.04 + 2.5 * Math.sqrt(slope)) : 0.02;
+
+        // Inertie et force motrice
+        const inertia = 0.78;
+        p.vx = p.vx * inertia + dirX * (targetSp * (1 - inertia));
+        p.vy = p.vy * inertia + dirY * (targetSp * (1 - inertia));
 
         const sp = Math.hypot(p.vx, p.vy);
-        if (sp > 0.9) { p.vx *= 0.9 / sp; p.vy *= 0.9 / sp; }
+        const maxSp = targetSp * 1.15;
+        if (sp > maxSp) {
+          p.vx = (p.vx / sp) * maxSp;
+          p.vy = (p.vy / sp) * maxSp;
+        }
 
         s.flow[i] += p.v / cell;
         p.age++;
@@ -692,7 +660,7 @@
         const isDepression = cap > 1e-4;
         const isFull = isDepression && s.water[i] >= cap * 0.95;
 
-        if ((sp < 0.03 || slope < 2e-5) && p.age > 3) {
+        if ((sp < 0.08 || slope < 5e-4) && p.age > 2) {
           if (isDepression && !isFull) {
             const room = cap - s.water[i];
             const take = Math.min(p.v / cell, room);
@@ -709,8 +677,8 @@
           if (isFull) {
             const slf = Math.hypot(gx, gy);
             if (slf > 1e-7) {
-              p.vx = - (gx / slf) * 0.25;
-              p.vy = - (gy / slf) * 0.25;
+              p.vx = - (gx / slf) * 0.20;
+              p.vy = - (gy / slf) * 0.20;
             }
           }
         }
@@ -882,9 +850,9 @@
         const dpy = p.y * S;
         const sp = Math.hypot(p.vx, p.vy);
 
-        if (sp > 0.06) {
-          // Goutte en mouvement rapide : traînée blanche nette
-          const mult = this.trailMultiplier || 10;
+        if (sp > 0.05) {
+          // Goutte en mouvement : traînée blanche nette proportionnelle à la vitesse et à la pente
+          const mult = this.trailMultiplier || 3;
           const tailLen = Math.min(8 * S, sp * mult * S);
           const tx = dpx - (p.vx / sp) * tailLen;
           const ty = dpy - (p.vy / sp) * tailLen;
@@ -894,7 +862,7 @@
           c.lineTo(dpx, dpy);
           c.stroke();
         } else {
-          // Goutte lente ou nouvelle : blanc pur
+          // Goutte lente ou quasi-statique : blanc pur
           c.fillStyle = "rgba(255, 255, 255, 0.95)";
           c.beginPath();
           c.arc(dpx, dpy, dropRadius, 0, 6.2832);
