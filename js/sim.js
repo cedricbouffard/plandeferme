@@ -420,7 +420,7 @@
       this.currentParcel = null;
       this.currentGrid = null;
       this.intensity = 65; // mm/h (pluie soutenue favorisant le ruissellement visible)
-      this.speed = 1; // vitesse fixée à 1 (1 pas par frame)
+      this.speed = 0.5; // vitesse ralentie fixée à 0.5
       this.trailMultiplier = 3; // longueur des traînées fixée à 3
       this.flowThreshold = 0.08; // seuil de visibilité du ruissellement
       this.soilKey = "loam";
@@ -602,6 +602,7 @@
       const I = this.intensity;
       const soil = SOIL_TYPES[this.soilKey] || SOIL_TYPES.loam;
       const f = soil.f;
+      const speedScale = typeof this.speed === "number" ? this.speed : 0.5;
 
       const excess = Math.max(0, I - f) / 1000 / 3600;
       s.time += dt;
@@ -610,7 +611,7 @@
 
       if (excess > 0) {
         const vol = excess * dt * s.active * cell;
-        const n = Math.max(6, Math.round(Math.min(2600, s.active * 0.016)));
+        const n = Math.max(4, Math.round(Math.min(2600, s.active * 0.016 * Math.min(1, speedScale))));
         const v = vol / n;
         const maxDrops = Math.min(32000, Math.max(12000, Math.round(s.active * 0.26)));
         for (let k = 0; k < n; k++) {
@@ -636,10 +637,11 @@
         const dirX = slope > 1e-6 ? -gx / slope : 0;
         const dirY = slope > 1e-6 ? -gy / slope : 0;
 
-        // Vitesse des particules dépendant de la pente (loi hydraulique proportionnelle à la racine de la pente) :
+        // Vitesse des particules dépendant de la pente et de la vitesse globale (0.5) :
         // Pente abrupte -> les particules accélèrent nettement et vont vite
         // Terrain plat ou cuvette -> les particules ralentissent fortement et avancent au ralenti
-        const targetSp = slope > 1e-5 ? Math.min(1.25, 0.04 + 2.5 * Math.sqrt(slope)) : 0.02;
+        const baseTargetSp = slope > 1e-5 ? Math.min(1.25, 0.04 + 2.5 * Math.sqrt(slope)) : 0.02;
+        const targetSp = baseTargetSp * speedScale;
 
         // Inertie et force motrice
         const inertia = 0.78;
@@ -660,7 +662,8 @@
         const isDepression = cap > 1e-4;
         const isFull = isDepression && s.water[i] >= cap * 0.95;
 
-        if ((sp < 0.08 || slope < 5e-4) && p.age > 2) {
+        const settleThresh = 0.08 * speedScale;
+        if ((sp < settleThresh || slope < 5e-4) && p.age > 2) {
           if (isDepression && !isFull) {
             const room = cap - s.water[i];
             const take = Math.min(p.v / cell, room);
@@ -677,8 +680,8 @@
           if (isFull) {
             const slf = Math.hypot(gx, gy);
             if (slf > 1e-7) {
-              p.vx = - (gx / slf) * 0.20;
-              p.vy = - (gy / slf) * 0.20;
+              p.vx = - (gx / slf) * 0.20 * speedScale;
+              p.vy = - (gy / slf) * 0.20 * speedScale;
             }
           }
         }
@@ -844,15 +847,17 @@
       c.lineWidth = Math.max(1.2, S * 0.35);
       c.lineCap = "round";
 
+      const speedScale = typeof this.speed === "number" ? this.speed : 0.5;
+      const mult = (this.trailMultiplier || 3) / Math.max(0.1, speedScale);
+
       for (let k = 0; k < numDrops; k += step) {
         const p = s.drops[k];
         const dpx = p.x * S;
         const dpy = p.y * S;
         const sp = Math.hypot(p.vx, p.vy);
 
-        if (sp > 0.05) {
+        if (sp > 0.025) {
           // Goutte en mouvement : traînée blanche nette proportionnelle à la vitesse et à la pente
-          const mult = this.trailMultiplier || 3;
           const tailLen = Math.min(8 * S, sp * mult * S);
           const tx = dpx - (p.vx / sp) * tailLen;
           const ty = dpy - (p.vy / sp) * tailLen;
@@ -875,9 +880,16 @@
       this.rafId = 0;
       if (!this.sim || !this.sim.running) return;
 
-      const dt = Math.max(1, (this.sim.G.dx + this.sim.G.dy) / 2 / 0.6);
-      for (let k = 0; k < this.speed; k++) {
-        this.rainStep(this.sim, dt);
+      const speedVal = typeof this.speed === "number" ? this.speed : 0.5;
+      const baseDt = Math.max(1, (this.sim.G.dx + this.sim.G.dy) / 2 / 0.6);
+
+      if (speedVal >= 1) {
+        const count = Math.floor(speedVal);
+        for (let k = 0; k < count; k++) {
+          this.rainStep(this.sim, baseDt);
+        }
+      } else {
+        this.rainStep(this.sim, baseDt * speedVal);
       }
 
       this.drawRain(this.sim);
