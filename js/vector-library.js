@@ -524,7 +524,7 @@
     const shape = gt.includes("line") ? "line" : gt.includes("point") ? "point" : "poly";
     row.innerHTML = `
       <button type="button" class="pf-lib-btn pf-lib-vis${layer.visible ? "" : " muted"}" aria-pressed="${layer.visible ? "true" : "false"}" aria-label="${layer.visible ? "Masquer" : "Afficher"} ${esc(layer.name)}" title="${layer.visible ? "Masquer" : "Afficher"}">${layer.visible ? ICON.eye : ICON.eyeOff}</button>
-      <span class="pf-lib-swatch pf-lib-swatch-${shape}" style="--pf-sw:${color}" aria-hidden="true"></span>
+      <button type="button" class="pf-lib-swatch-btn" aria-label="Style de ${esc(layer.name)} (double-clic)" title="Double-cliquez pour modifier le style"><span class="pf-lib-swatch pf-lib-swatch-${shape}" style="--pf-sw:${color}"></span></button>
       <span class="pf-lib-name" title="${esc(layer.name)}">${esc(layer.name)}</span>
       <span class="pf-lib-count">${count}</span>
       <button type="button" class="pf-lib-btn pf-lib-draw" aria-label="Dessiner dans ${esc(layer.name)}" title="Dessiner une entité">${ICON.draw}</button>
@@ -544,6 +544,12 @@
     });
     row.querySelector(".pf-lib-zoom").addEventListener("click", (e) => { e.stopPropagation(); this.zoomToLayer(layer.id); });
     row.querySelector(".pf-lib-name").addEventListener("dblclick", (e) => { e.stopPropagation(); this.renameLayer(layer.id); });
+    // Double-clic sur le symbole : fenêtre de style (Entrée au clavier)
+    const swatchBtn = row.querySelector(".pf-lib-swatch-btn");
+    swatchBtn.addEventListener("dblclick", (e) => { e.stopPropagation(); this.openStyleModal(layer.id); });
+    swatchBtn.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); this.openStyleModal(layer.id); }
+    });
     row.querySelector(".pf-lib-more").addEventListener("click", (e) => {
       e.stopPropagation();
       const anchor = e.currentTarget;

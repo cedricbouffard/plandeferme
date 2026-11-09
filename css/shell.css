@@ -795,3 +795,13 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-lib-confirm-actions .pf-lib-spacer { display: none; }
 .pf-lib-confirm-actions .pf-lib-confirm-extra { flex-basis: 100%; order: -1; justify-content: flex-start; text-align: left; height: auto; padding: 0 0 6px; }
 .pf-lib-confirm-actions .pf-lib-confirm-extra:hover { background: transparent; text-decoration: underline; }
+
+/* Symbole de couche : double-clic pour le style */
+.pf-lib-swatch-btn {
+  flex-shrink: 0; width: 26px; height: 26px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 6px; background: transparent; cursor: pointer;
+}
+.pf-lib-swatch-btn:hover { background: rgba(23, 33, 27, 0.07); }
+.pf-lib-swatch-btn:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: -2px; }
+.pf-lib-swatch-btn .pf-lib-swatch { margin: 0; }
