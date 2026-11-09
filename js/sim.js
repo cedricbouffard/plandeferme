@@ -118,6 +118,55 @@
     return estimateRFactor(lat, lng);
   }
 
+  /**
+   * MNT LiDAR de la vue courante (avec marge) pour le RUSLE calculé à la volée,
+   * sur le même principe que la carte des pentes : une seule image pour la vue.
+   */
+  async function loadViewDem(bbox, targetSize, signal) {
+    let region = null;
+    const isCustomProject = window.topoManager && window.topoManager.selectedProjectId !== "default" && window.topoManager.selectedProjectUrl;
+    if (isCustomProject && typeof readSingleHrdemProjectRegion === "function") {
+      try {
+        region = await readSingleHrdemProjectRegion(window.topoManager.selectedProjectUrl, bbox, targetSize, signal, "bilinear");
+      } catch (e) { region = null; }
+      if (region && (!region.data || region.data.length === 0)) region = null;
+    }
+    if (!region && typeof readMultiHrdemRegion === "function") {
+      region = await readMultiHrdemRegion(bbox, targetSize, signal, "bilinear");
+    }
+    if (!region || !region.data || region.data.length === 0 || !region.sourceBBox) return null;
+
+    const W = region.width, H = region.height, sB = region.sourceBBox, N = W * H;
+    const dx = Math.max(0.5, Math.abs((sB[2] - sB[0]) / Math.max(1, W - 1)));
+    const dy = Math.max(0.5, Math.abs((sB[3] - sB[1]) / Math.max(1, H - 1)));
+    const p4 = (typeof proj4 === "function") ? proj4 : null;
+    const projDef = region.projection || (typeof EPSG_3979_DEF !== "undefined" ? EPSG_3979_DEF : "+proj=lcc +lat_1=49 +lat_2=77 +lat_0=49 +lon_0=-95 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+    const pos = (x, y) => {
+      const u = W > 1 ? x / (W - 1) : 0;
+      const v = H > 1 ? y / (H - 1) : 0;
+      if (p4) return p4(projDef, "EPSG:4326", [sB[0] + u * (sB[2] - sB[0]), sB[3] - v * (sB[3] - sB[1])]);
+      const [tl, tr, br, bl] = region.cornersWgs84;
+      const top = [tl[0] + u * (tr[0] - tl[0]), tl[1] + u * (tr[1] - tl[1])];
+      const bot = [bl[0] + u * (br[0] - bl[0]), bl[1] + u * (br[1] - bl[1])];
+      return [top[0] + v * (bot[0] - top[0]), top[1] + v * (bot[1] - top[1])];
+    };
+    // Coordonnée WGS84 -> pixel (pour retrouver une parcelle dans la grille)
+    const toPixel = p4 ? (lng, lat) => {
+      const [mX, mY] = p4("EPSG:4326", projDef, [lng, lat]);
+      return [(mX - sB[0]) / (sB[2] - sB[0]) * (W - 1), (sB[3] - mY) / (sB[3] - sB[1]) * (H - 1)];
+    } : null;
+
+    const zIn = new Float32Array(N);
+    let valid = 0;
+    for (let i = 0; i < N; i++) {
+      const v = region.data[i];
+      if (Number.isFinite(v) && v > -900 && v < 9000) { zIn[i] = v; valid++; } else zIn[i] = NaN;
+    }
+    if (valid < 50) return null;
+    const z = smoothGaussian(zIn, W, H, 2);
+    return { W, H, dx, dy, z, zf: fillDepressions(z, W, H, 1e-4), pos, toPixel, sourceBBox: sB, validCount: valid, key: `view-${Date.now()}` };
+  }
+
   // Cache mémoire des MNT par parcelle pour éviter les téléchargements redondants
   const DEM_CACHE = new Map();
 
@@ -1189,8 +1238,113 @@
       this.SRC_HL = "rusle-parcel-hl-source";
       this.LAYER_HL = "rusle-parcel-hl-layer";
 
+      // Calcul à la volée sur la vue (comme les pentes et les courbes de niveau)
+      this.MIN_ZOOM = 13;
+      this.viewTimer = null;
+      this.viewAbort = null;
+      this.rCache = new Map();
+      this.parcelMean = null;
+
       this.initDom();
       this.loadSeriesSummaries();
+      if (this.map && typeof this.map.on === "function") {
+        this.map.on("moveend", () => this.scheduleViewUpdate());
+      }
+    }
+
+    setStatus(html) {
+      const hint = document.getElementById("rusle-no-parcel-hint");
+      if (!hint) return;
+      hint.style.display = html ? "block" : "none";
+      hint.innerHTML = html || "";
+    }
+
+    scheduleViewUpdate(immediate) {
+      if (!this.isVisible) return;
+      if (this.viewTimer) clearTimeout(this.viewTimer);
+      this.viewTimer = setTimeout(() => this.updateViewport(), immediate ? 0 : 250);
+    }
+
+    /**
+     * Lit le MNT de la vue (+ marge pour l'amont des versants) et recalcule A = R·K·LS·C
+     */
+    async updateViewport() {
+      if (!this.isVisible || !this.map) return;
+      const zoom = this.map.getZoom();
+      if (zoom < this.MIN_ZOOM) {
+        this.setStatus(`Zoomez davantage (zoom ${this.MIN_ZOOM}+) pour calculer l'érosion sur la vue.`);
+        return;
+      }
+      const b = this.map.getBounds();
+      const w = b.getWest(), sth = b.getSouth(), e = b.getEast(), n = b.getNorth();
+      // Marge : ~300 m (longueur de pente plafonnée) ou 20 % de la vue
+      const padLat = Math.max(0.003, (n - sth) * 0.2);
+      const padLng = Math.max(0.004, (e - w) * 0.2);
+      const bbox = [w - padLng, sth - padLat, e + padLng, n + padLat];
+
+      if (this.viewAbort) this.viewAbort.abort();
+      this.viewAbort = new AbortController();
+      const signal = this.viewAbort.signal;
+      this.setStatus(`<span style="color:var(--pf-accent, #2e6a4c); font-weight:600;">Calcul de l'érosion sur la vue…</span>`);
+
+      try {
+        const grid = await loadViewDem(bbox, 720, signal);
+        if (signal.aborted) return;
+        if (!grid) {
+          this.setStatus("Aucune donnée LiDAR dans la vue.");
+          return;
+        }
+        // Facteur R au centre de la vue (raffiné par l'API climat, mis en cache par zone de ~0,25°)
+        const cLat = (sth + n) / 2, cLng = (w + e) / 2;
+        const rKey = `${Math.round(cLat * 4)}:${Math.round(cLng * 4)}`;
+        if (this.rCache.has(rKey)) {
+          this.rFactor = this.rCache.get(rKey);
+        } else {
+          this.rFactor = estimateRFactor(cLat, cLng);
+          this.rCache.set(rKey, this.rFactor);
+          fetchClimaticRFactor(cLat, cLng).then((r) => {
+            if (r && r !== this.rCache.get(rKey)) {
+              this.rCache.set(rKey, r);
+              this.rFactor = r;
+              this.updateRBadge(r, "API Climat");
+              if (this.currentGrid) this.compute();
+            }
+          }).catch(() => {});
+        }
+        this.updateRBadge(this.rFactor, "RUSLEFAC");
+        this.currentGrid = grid;
+        this.setStatus("");
+        this.compute();
+      } catch (err) {
+        if (signal.aborted || (err && err.name === "AbortError")) return;
+        console.warn("RUSLE (vue) :", err);
+        this.setStatus(`<span style="color:#b91c1c; font-weight:600;">${(err && err.message) || "Erreur de calcul d'érosion."}</span>`);
+      }
+    }
+
+    /**
+     * Moyenne des pertes de sol à l'intérieur de la parcelle active, si elle est dans la grille
+     */
+    computeParcelMean(A) {
+      const G = this.currentGrid;
+      const parcel = this.currentParcel;
+      if (!G || !G.toPixel || !parcel || !parcel.geometry) return null;
+      const gb = computeGeomBbox(parcel.geometry);
+      if (!gb) return null;
+      const corners = [[gb[0], gb[1]], [gb[2], gb[1]], [gb[2], gb[3]], [gb[0], gb[3]]].map(([x, y]) => G.toPixel(x, y));
+      const x0 = Math.max(0, Math.floor(Math.min(...corners.map((c) => c[0])))), x1 = Math.min(G.W - 1, Math.ceil(Math.max(...corners.map((c) => c[0]))));
+      const y0 = Math.max(0, Math.floor(Math.min(...corners.map((c) => c[1])))), y1 = Math.min(G.H - 1, Math.ceil(Math.max(...corners.map((c) => c[1]))));
+      if (x1 < x0 || y1 < y0) return null;
+      let sum = 0, cnt = 0;
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const v = A[y * G.W + x];
+          if (!Number.isFinite(v)) continue;
+          if (!isPointInGeom(G.pos(x, y), parcel.geometry)) continue;
+          sum += v; cnt++;
+        }
+      }
+      return cnt > 10 ? sum / cnt : null;
     }
 
     async loadSeriesSummaries() {
@@ -1216,10 +1370,11 @@
       if (toggle) {
         toggle.addEventListener("change", (e) => {
           this.isVisible = e.target.checked;
-          const p = this.currentParcel || (window.terrain3DManager && window.terrain3DManager.lastClickedParcel);
-          if (this.isVisible && !this.eroResult && p) {
-            this.calculateForParcel(p);
+          if (this.isVisible) {
+            this.scheduleViewUpdate(true);
           } else {
+            if (this.viewAbort) this.viewAbort.abort();
+            this.setStatus("");
             this.renderLayer();
           }
         });
@@ -1449,68 +1604,34 @@
       this.currentParcel = assembleParcel(parcelFeature);
       this.openLeftCard();
       this.highlightParcel(this.currentParcel.geometry);
+      this.updateCardHeader(this.currentParcel.properties);
 
-      // Calcul des coordonnées du centroïde de la parcelle
       const geomBbox = computeGeomBbox(this.currentParcel.geometry);
       const centerLng = (geomBbox[0] + geomBbox[2]) / 2;
       const centerLat = (geomBbox[1] + geomBbox[3]) / 2;
 
-      // Mise à jour de l'en-tête de parcelle dans la carte gauche
-      this.updateCardHeader(this.currentParcel.properties);
-
-      // 1. Facteur R (climatique)
-      this.rFactor = estimateRFactor(centerLat, centerLng);
-      this.updateRBadge(this.rFactor, "RUSLEFAC");
-      fetchClimaticRFactor(centerLat, centerLng).then((refinedR) => {
-        if (refinedR && refinedR !== this.rFactor) {
-          this.rFactor = refinedR;
-          this.updateRBadge(this.rFactor, "API Climat");
-          if (this.currentGrid) this.compute();
-        }
-      }).catch(() => {});
-
-      // 2. Facteur C : Détection automatique de la dernière culture
+      // Facteur C : dernière culture déclarée ; facteur K : texture du sol
       const detectedCrop = this.detectLatestCrop(this.currentParcel.properties);
       this.cropKey = detectedCrop.cropKey;
       const selCrop = document.getElementById("rusle-crop-select");
       if (selCrop) selCrop.value = this.cropKey;
 
-
-
-      // 3. Facteur K : Détection automatique de la texture du sol (Pédologie ou Soil World)
       const soilInfo = await this.detectSoilTexture(centerLat, centerLng, this.currentParcel.properties);
       this.soilKey = soilInfo.soilKey;
       const selSoil = document.getElementById("rusle-soil-select");
       if (selSoil) selSoil.value = this.soilKey;
 
-
-
-      // Cadrage carte
+      // Cadrage : le calcul à la volée se relance au « moveend »
       if (geomBbox && this.map) {
+        const before = this.map.getCenter().toArray().join(",") + this.map.getZoom();
         this.map.fitBounds(
           [[geomBbox[0], geomBbox[1]], [geomBbox[2], geomBbox[3]]],
-          { padding: { top: 60, bottom: 60, left: 340, right: 60 }, duration: 800 }
+          { padding: { top: 60, bottom: 60, left: 60, right: 60 }, duration: 800, maxZoom: 17 }
         );
-      }
-
-      // 4. Chargement MNT LiDAR 1m & Calcul RUSLE
-      try {
-        const hint = document.getElementById("rusle-no-parcel-hint");
-        if (hint) hint.innerHTML = `<span style="color:#0284c7; font-weight:600;">Chargement altimétrique LiDAR 1m et calcul de la surface contributive...</span>`;
-
-        this.currentGrid = await loadParcelDem(this.currentParcel);
-        if (hint) hint.style.display = "none";
-
-
-
-        this.compute();
-      } catch (err) {
-        console.error("Erreur calcul RUSLE :", err);
-        const hint = document.getElementById("rusle-no-parcel-hint");
-        if (hint) {
-          hint.style.display = "block";
-          hint.innerHTML = `<span style="color:#ef4444; font-weight:600;">⚠️ ${err.message || "Erreur de calcul d'érosion."}</span>`;
-        }
+        const after = this.map.getCenter().toArray().join(",") + this.map.getZoom();
+        if (before === after) this.scheduleViewUpdate(true);
+      } else {
+        this.scheduleViewUpdate(true);
       }
     }
 
@@ -1519,8 +1640,8 @@
      */
     compute() {
       if (!this.currentGrid) return;
-      // Léger lissage supplémentaire pour stabiliser le calcul RUSLE (LS-factor et gradients de pente)
-      const G = smooth3(this.currentGrid);
+      // Grille déjà lissée (2 passes) et à cuvettes comblées par loadViewDem
+      const G = this.currentGrid;
       const { W, H, dx, dy, z } = G;
       const N = W * H;
 
@@ -1603,6 +1724,7 @@
       const areaHa = (countA * cell) / 10000;
       const total = mean * areaHa;
 
+      this.parcelMean = this.computeParcelMean(A);
       this.eroResult = { A, mean, total, areaHa };
       this.updateStatsDisplay();
       this.renderLayer();
@@ -1694,16 +1816,19 @@
         nameEl.textContent = pid ? `Parcelle nº ${pid}${supStr}` : (lot ? `Lot nº ${lot}${supStr}` : `Parcelle agricole${supStr}`);
         nameEl.style.display = "block";
       }
-
-      const hint = document.getElementById("rusle-no-parcel-hint");
-      if (hint) hint.style.display = "none";
     }
 
     updateStatsDisplay() {
       if (!this.eroResult) return;
       const { mean } = this.eroResult;
+      const hasParcel = Number.isFinite(this.parcelMean);
       const elMean = document.getElementById("rusle-mean-val");
-      if (elMean) elMean.textContent = `${mean.toFixed(1)} t/ha/an`;
+      if (elMean) elMean.textContent = `${(hasParcel ? this.parcelMean : mean).toFixed(1)} t/ha/an`;
+      const elLabel = document.getElementById("rusle-mean-label");
+      if (elLabel) elLabel.textContent = hasParcel ? "Moyenne sur la parcelle :" : "Moyenne sur la vue :";
+      const nameEl = document.getElementById("rusle-parcel-name");
+      if (hasParcel && this.currentParcel) this.updateCardHeader(this.currentParcel.properties);
+      else if (nameEl) nameEl.style.display = "none";
     }
 
     updateRBadge(rVal, source = "RUSLEFAC") {

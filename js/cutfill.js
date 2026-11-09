@@ -278,9 +278,22 @@
         if (alertBox) {
           alertBox.style.display = 'block';
           alertBox.innerHTML = `
-            <strong>ℹ️ Campagne unique :</strong> Un seul levé altimétrique LiDAR couvre cette parcelle.
+            <strong>Campagne unique :</strong> Un seul levé altimétrique LiDAR couvre cette parcelle.
             La comparaison différentielle de déblais / remblais nécessite au moins 2 campagnes d'acquisition à des dates différentes.
           `;
+        }
+        if (contentWrap) contentWrap.style.display = 'none';
+        return;
+      }
+
+      // Par défaut : le levé le plus récent et le plus ancien qui ont réellement des données sur la parcelle
+      this.setLoading(true, "Vérification de la couverture de chaque levé sur la parcelle...");
+      const pair = await this.pickDefaultPair(geomBbox);
+      if (!pair) {
+        this.setLoading(false);
+        if (alertBox) {
+          alertBox.style.display = 'block';
+          alertBox.innerHTML = `<strong>Comparaison impossible :</strong> moins de deux campagnes LiDAR ont des données sur cette parcelle.`;
         }
         if (contentWrap) contentWrap.style.display = 'none';
         return;
@@ -289,9 +302,8 @@
       // Remplir les sélecteurs
       this.populateSurveySelectors();
 
-      // Par défaut : plus récent comme "Après" (index 0) et deuxième plus récent comme "Avant" (index 1)
-      this.selectedNewId = surveys[0].id;
-      this.selectedOldId = surveys[1].id;
+      this.selectedNewId = pair.newId;
+      this.selectedOldId = pair.oldId;
 
       const selNew = document.getElementById('cutfill-select-new');
       if (selNew) selNew.value = this.selectedNewId;
@@ -300,6 +312,99 @@
 
       // Lancer la comparaison
       await this.runComparison();
+    }
+
+    /**
+     * Échantillonne une région altimétrique (bilinéaire) à une coordonnée WGS84
+     */
+    sampleRegionAt(reg, lng, lat, p4) {
+      if (!reg || !reg.data || !reg.sourceBBox || !p4) return NaN;
+      const projDef = reg.projection || '+proj=lcc +lat_1=49 +lat_2=77 +lat_0=49 +lon_0=-95 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs';
+      const [mX, mY] = p4('EPSG:4326', projDef, [lng, lat]);
+      const sB = reg.sourceBBox;
+      const u = (mX - sB[0]) / (sB[2] - sB[0]);
+      const v = (sB[3] - mY) / (sB[3] - sB[1]);
+      if (u < 0 || u > 1 || v < 0 || v > 1) return NaN;
+      const col = u * (reg.width - 1);
+      const row = v * (reg.height - 1);
+      const c0 = Math.floor(col), c1 = Math.min(reg.width - 1, c0 + 1);
+      const r0 = Math.floor(row), r1 = Math.min(reg.height - 1, r0 + 1);
+      const fc = col - c0, fr = row - r0;
+      const v00 = reg.data[r0 * reg.width + c0], v10 = reg.data[r0 * reg.width + c1];
+      const v01 = reg.data[r1 * reg.width + c0], v11 = reg.data[r1 * reg.width + c1];
+      if (Number.isFinite(v00) && Number.isFinite(v10) && Number.isFinite(v01) && Number.isFinite(v11)) {
+        const z = (v00 * (1 - fc) + v10 * fc) * (1 - fr) + (v01 * (1 - fc) + v11 * fc) * fr;
+        if (Number.isFinite(z) && z > -900 && z < 9000) return z;
+      }
+      return NaN;
+    }
+
+    /**
+     * Mesure la part de la parcelle réellement couverte par un levé (0 à 1),
+     * sur une grille de sondage légère (les rectangles STAC débordent souvent des données réelles).
+     */
+    async measureCoverage(survey, geomBbox, signal) {
+      if (!survey || !this.currentParcel) return 0;
+      const p4 = this.getProj4();
+      if (!p4) return 0;
+      let reg = null;
+      try {
+        if (survey.isMosaic) {
+          reg = typeof readMultiHrdemRegion === 'function' ? await readMultiHrdemRegion(geomBbox, 64, signal, 'bilinear') : null;
+        } else if (survey.url && typeof readSingleHrdemProjectRegion === 'function') {
+          reg = await readSingleHrdemProjectRegion(survey.url, geomBbox, 64, signal, 'bilinear');
+        }
+      } catch (e) { return 0; }
+      if (!reg || !reg.data || !reg.data.length) return 0;
+      const geom = this.currentParcel.geometry;
+      const n = 20;
+      let inside = 0, ok = 0;
+      for (let r = 0; r < n; r++) {
+        const lat = geomBbox[3] - ((r + 0.5) / n) * (geomBbox[3] - geomBbox[1]);
+        for (let c = 0; c < n; c++) {
+          const lng = geomBbox[0] + ((c + 0.5) / n) * (geomBbox[2] - geomBbox[0]);
+          if (!this.isPointInGeom([lng, lat], geom)) continue;
+          inside++;
+          if (Number.isFinite(this.sampleRegionAt(reg, lng, lat, p4))) ok++;
+        }
+      }
+      return inside ? ok / inside : 0;
+    }
+
+    /**
+     * Choisit automatiquement le levé le plus récent (« Après ») et le plus ancien (« Avant »)
+     * parmi ceux qui couvrent au moins 60 % de la parcelle. La mosaïque nationale (date
+     * d'acquisition inconnue) ne sert qu'en dernier recours.
+     */
+    async pickDefaultPair(geomBbox) {
+      if (this.abortController) this.abortController.abort();
+      this.abortController = new AbortController();
+      const signal = this.abortController.signal;
+      const MIN_COVERAGE = 0.6;
+
+      const coverages = await Promise.all(this.availableSurveys.map((s) => this.measureCoverage(s, geomBbox, signal)));
+      if (signal.aborted) return null;
+      this.availableSurveys.forEach((s, i) => { s.coverage = coverages[i]; });
+
+      const withData = this.availableSurveys.filter((s) => s.coverage >= MIN_COVERAGE);
+      const real = withData.filter((s) => !s.isMosaic); // déjà triés du plus récent au plus ancien
+      let newest = null, oldest = null;
+      if (real.length >= 2) {
+        newest = real[0];
+        oldest = real[real.length - 1];
+      } else {
+        const mosaic = withData.find((s) => s.isMosaic);
+        if (real.length === 1 && mosaic) { newest = real[0]; oldest = mosaic; }
+      }
+
+      // Libellés : signaler les levés sans données sur la parcelle
+      this.availableSurveys.forEach((s) => {
+        s.label = s.label.replace(/ · sans données$/, '');
+        if (s.coverage < MIN_COVERAGE) s.label += ' · sans données';
+      });
+
+      if (!newest || !oldest || newest.id === oldest.id) return null;
+      return { newId: newest.id, oldId: oldest.id };
     }
 
     formatSurveyLabel(feature, year) {
@@ -384,7 +489,7 @@
         const alertBox = document.getElementById('cutfill-alert-box');
         if (alertBox) {
           alertBox.style.display = 'block';
-          alertBox.innerHTML = `<strong>⚠️ Attention :</strong> Vous avez sélectionné le même levé pour « Avant » et « Après ». Veuillez choisir deux levés distincts.`;
+          alertBox.innerHTML = `<strong>Attention :</strong> Vous avez sélectionné le même levé pour « Avant » et « Après ». Veuillez choisir deux levés distincts.`;
         }
         return;
       }
@@ -536,7 +641,7 @@
         const alertBox = document.getElementById('cutfill-alert-box');
         if (alertBox) {
           alertBox.style.display = 'block';
-          alertBox.innerHTML = `<strong>⚠️ Erreur :</strong> ${err.message || "Impossible de comparer ces deux levés."}`;
+          alertBox.innerHTML = `<strong>Erreur :</strong> ${err.message || "Impossible de comparer ces deux levés."}`;
         }
       }
     }
@@ -557,8 +662,8 @@
         const cmVal = (effectiveOffset * 100.0).toFixed(1);
         const sign = effectiveOffset >= 0 ? '+' : '';
         offsetBadge.textContent = `Biais corrigé : ${sign}${cmVal} cm`;
-        offsetBadge.style.color = this.autoCalibrate ? '#059669' : '#64748b';
-        offsetBadge.style.background = this.autoCalibrate ? '#ecfdf5' : '#f1f5f9';
+        offsetBadge.style.color = this.autoCalibrate ? '#1f4d37' : '#5b6660';
+        offsetBadge.style.background = this.autoCalibrate ? '#e6f0ea' : '#f4f5f2';
       }
 
       let totalCutM3 = 0.0;
@@ -861,9 +966,9 @@
       const labelOld = selOld ? selOld.options[selOld.selectedIndex]?.text.split('—')[0].trim() : 'Ancien';
 
       if (d < -0.025) {
-        readout.innerHTML = `<span style="color:#b91c1c; font-weight:800;">✂️ Déblai : −${cmVal} cm</span> &nbsp;|&nbsp; ${labelNew}: ${zNew.toFixed(2)}m &nbsp;|&nbsp; ${labelOld}: ${zOld.toFixed(2)}m`;
+        readout.innerHTML = `<span style="color:#b91c1c; font-weight:700;">Déblai : −${cmVal} cm</span> &nbsp;|&nbsp; ${labelNew}: ${zNew.toFixed(2)}m &nbsp;|&nbsp; ${labelOld}: ${zOld.toFixed(2)}m`;
       } else if (d > 0.025) {
-        readout.innerHTML = `<span style="color:#1d4ed8; font-weight:800;">⬆️ Remblai : +${cmVal} cm</span> &nbsp;|&nbsp; ${labelNew}: ${zNew.toFixed(2)}m &nbsp;|&nbsp; ${labelOld}: ${zOld.toFixed(2)}m`;
+        readout.innerHTML = `<span style="color:#1d4ed8; font-weight:700;">Remblai : +${cmVal} cm</span> &nbsp;|&nbsp; ${labelNew}: ${zNew.toFixed(2)}m &nbsp;|&nbsp; ${labelOld}: ${zOld.toFixed(2)}m`;
       } else {
         readout.innerHTML = `<span style="color:#15803d; font-weight:800;">⚖️ Neutre : 0 cm (±2,5 cm)</span> &nbsp;|&nbsp; ${labelNew}: ${zNew.toFixed(2)}m &nbsp;|&nbsp; ${labelOld}: ${zOld.toFixed(2)}m`;
       }

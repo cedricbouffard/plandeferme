@@ -626,6 +626,14 @@
             title: "Écoulement & dépressions non affichés à ce niveau de zoom (visibles dès le zoom 13)"
           },
           {
+            id: "card-rusle",
+            checkboxId: "toggle-rusle",
+            minZoom: 13,
+            maxZoom: Infinity,
+            badgeText: "z ≥ 13",
+            title: "Érosion (RUSLE) calculée à la volée dès le zoom 13"
+          },
+          {
             id: "card-pedo",
             checkboxId: "toggle-pedo",
             minZoom: 3,
