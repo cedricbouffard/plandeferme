@@ -15,7 +15,8 @@ class Terrain3DManager {
   constructor(mapInstance) {
     this.map = mapInstance;
     this.is3DActive = false;
-    this.exaggeration = 30.0; // 30X par défaut
+    this.exaggeration = 20.0; // 20X par défaut (comme Ektare)
+    this._pixelRatio3D = null;
     this.activeTerrain = null;
     this.activeParcel = null;
     this.activeParcelGeom = null;
@@ -58,10 +59,10 @@ class Terrain3DManager {
   }
 
   async init() {
-    // Débloquer l'inclinaison maximale jusqu'à 85°
+    // Débloquer l'inclinaison jusqu'à 75° (comme Ektare, évite l'explosion des tuiles d'horizon)
     if (this.map) {
       if (typeof this.map.setMaxPitch === 'function') {
-        this.map.setMaxPitch(85);
+        this.map.setMaxPitch(75);
       }
       if (this.map.touchPitch && typeof this.map.touchPitch.enable === 'function') {
         this.map.touchPitch.enable();
@@ -389,45 +390,49 @@ class Terrain3DManager {
       const rightX = (1 - v_tile) * pNE[0] + v_tile * pSE[0];
       const rightY = (1 - v_tile) * pNE[1] + v_tile * pSE[1];
 
-      // Coordonnée géographique pour le test de polygone
-      const pLat = tMaxLat - v_tile * (tMaxLat - tMinLat);
-
       for (let px = 0; px < 256; px++) {
         const u_tile = px / 255.0;
-        const pLng = tMinLng + u_tile * (tMaxLng - tMinLng);
-
         let z_rel = 0.0;
 
-        // Vérifier si le point est à l'intérieur du polygone de la parcelle
-        if (!geom || this.isPointInGeom([pLng, pLat], geom)) {
-          // Coordonnées projetées exactes (mX, mY) dans le système de référence du LiDAR
-          const mX = leftX + u_tile * (rightX - leftX);
-          const mY = leftY + u_tile * (rightY - leftY);
+        // Coordonnées projetées exactes (mX, mY) dans le système de référence du LiDAR
+        const mX = leftX + u_tile * (rightX - leftX);
+        const mY = leftY + u_tile * (rightY - leftY);
 
-          const u = (mX - sB[0]) / spanX;
-          const v = (sB[3] - mY) / spanY;
+        const u = (mX - sB[0]) / spanX;
+        const v = (sB[3] - mY) / spanY;
 
-          if (u >= 0 && u <= 1 && v >= 0 && v <= 1) {
-            const col = u * (gridW - 1);
-            const row = v * (gridH - 1);
+        if (u >= 0 && u <= 1 && v >= 0 && v <= 1) {
+          const col = u * (gridW - 1);
+          const row = v * (gridH - 1);
 
-            const c0 = Math.floor(col);
-            const c1 = Math.min(gridW - 1, c0 + 1);
-            const r0 = Math.floor(row);
-            const r1 = Math.min(gridH - 1, r0 + 1);
+          const c0 = Math.floor(col);
+          const c1 = Math.min(gridW - 1, c0 + 1);
+          const r0 = Math.floor(row);
+          const r1 = Math.min(gridH - 1, r0 + 1);
 
-            const fc = col - c0;
-            const fr = row - r0;
+          const fc = col - c0;
+          const fr = row - r0;
 
-            const v00 = grid[r0 * gridW + c0];
-            const v10 = grid[r0 * gridW + c1];
-            const v01 = grid[r1 * gridW + c0];
-            const v11 = grid[r1 * gridW + c1];
+          const v00 = grid[r0 * gridW + c0];
+          const v10 = grid[r0 * gridW + c1];
+          const v01 = grid[r1 * gridW + c0];
+          const v11 = grid[r1 * gridW + c1];
 
+          if (Number.isFinite(v00) && Number.isFinite(v10) && Number.isFinite(v01) && Number.isFinite(v11)) {
             const elev = (v00 * (1 - fc) + v10 * fc) * (1 - fr) + (v01 * (1 - fc) + v11 * fc) * fr;
-
             if (Number.isFinite(elev) && elev > -900 && elev < 9000) {
               z_rel = Math.max(0.0, elev - minElev);
+            }
+          } else {
+            // Adoucissement doux (feathering) en bordure de parcelle : évite les falaises et étirements verticaux
+            let sum = 0, count = 0;
+            if (Number.isFinite(v00) && v00 > -900) { sum += v00; count++; }
+            if (Number.isFinite(v10) && v10 > -900) { sum += v10; count++; }
+            if (Number.isFinite(v01) && v01 > -900) { sum += v01; count++; }
+            if (Number.isFinite(v11) && v11 > -900) { sum += v11; count++; }
+            if (count > 0) {
+              const elev = sum / count;
+              z_rel = Math.max(0.0, elev - minElev) * (count / 4.0);
             }
           }
         }
@@ -605,8 +610,9 @@ class Terrain3DManager {
     const spanX = sB[2] - sB[0];
     const spanY = sB[3] - sB[1];
 
-    // Calcul du plancher altimétrique (2e percentile) STRICTEMENT à l'intérieur du polygone de la parcelle
+    // Calcul du plancher altimétrique (2e percentile) et pré-masquage STRICTEMENT à l'intérieur de la parcelle
     const parcelVals = [];
+    const maskedGrid = new Float32Array(gridW * gridH).fill(NaN);
     for (let r = 0; r < gridH; r++) {
       const mY = sB[3] - (r / (gridH - 1)) * spanY;
       for (let c = 0; c < gridW; c++) {
@@ -617,6 +623,7 @@ class Terrain3DManager {
           const v = region.data[r * gridW + c];
           if (Number.isFinite(v) && v > -900 && v < 9000) {
             parcelVals.push(v);
+            maskedGrid[r * gridW + c] = v;
           }
         }
       }
@@ -641,7 +648,7 @@ class Terrain3DManager {
     const elevSpan = Math.max(0.2, maxElev - minElev);
 
     this.activeTerrain = {
-      data: region.data,
+      data: maskedGrid,
       width: gridW,
       height: gridH,
       sourceBBox: region.sourceBBox,
@@ -744,14 +751,16 @@ class Terrain3DManager {
             paint: {
               'hillshade-shadow-color': '#0f172a',
               'hillshade-illumination-direction': 315,
-              'hillshade-exaggeration': 0.65
+              'hillshade-exaggeration': 0.55
             }
           }, beforeLayer);
         } else {
           this.map.setLayoutProperty(this.hillshadeLayerId, 'visibility', 'visible');
         }
 
-        // Relief 3D actif (30X par défaut)
+        this.set3DLightMode(true);
+
+        // Relief 3D actif (20X par défaut, comme Ektare)
         this.map.setTerrain({
           source: this.sourceId,
           exaggeration: this.exaggeration
@@ -760,10 +769,10 @@ class Terrain3DManager {
         this.enableSky();
 
         const currentPitch = this.map.getPitch();
-        if (currentPitch < 20) {
+        if (currentPitch < 15) {
           this.map.easeTo({
-            pitch: 60,
-            bearing: -20,
+            pitch: 58,
+            bearing: -15,
             duration: 900
           });
         }
@@ -782,6 +791,7 @@ class Terrain3DManager {
       this.clearHighlight();
 
       this.map.setTerrain(null);
+      this.set3DLightMode(false);
 
       if (this.map.getLayer(this.hillshadeLayerId)) {
         this.map.setLayoutProperty(this.hillshadeLayerId, 'visibility', 'none');
@@ -797,8 +807,39 @@ class Terrain3DManager {
     this.syncUI();
   }
 
+
+  /**
+   * Allègement du rendu pendant le relief 3D (comme Ektare) :
+   *  - Densité de pixels plafonnée à 1.5 sur les écrans haute résolution (évite de saturer le GPU) ;
+   *  - Étiquettes de courbes et parcelles masquées temporairement (évite le recalcul des collisions à chaque trame) ;
+   */
+  set3DLightMode(on) {
+    const m = this.map;
+    if (!m) return;
+    try {
+      if (on) {
+        if (this._pixelRatio3D == null) this._pixelRatio3D = m.getPixelRatio();
+        const cap = Math.min(this._pixelRatio3D, 1.5);
+        if (m.getPixelRatio() !== cap) m.setPixelRatio(cap);
+      } else if (this._pixelRatio3D != null) {
+        m.setPixelRatio(this._pixelRatio3D);
+        this._pixelRatio3D = null;
+      }
+    } catch (e) { /* ancienne version de MapLibre */ }
+
+    const heavyLayers = [
+      'parcelles-label', 'pedologie-label', 'courbes-labels', 'iso-labels',
+      'parcelles-hit-layer', 'pedologie-hit-layer'
+    ];
+    for (const id of heavyLayers) {
+      if (m.getLayer(id)) {
+        try { m.setLayerZoomRange(id, on ? 24 : 0, 24); } catch (e) {}
+      }
+    }
+  }
+
   setExaggeration(val) {
-    const num = Math.max(1.0, Math.min(100.0, parseFloat(val) || 30.0));
+    const num = Math.max(1.0, Math.min(100.0, parseFloat(val) || 20.0));
     this.exaggeration = num;
 
     if (this.is3DActive && this.map) {
@@ -813,7 +854,7 @@ class Terrain3DManager {
 
   setPitch(val, smooth = true) {
     if (!this.map) return;
-    const p = Math.max(0, Math.min(85, parseFloat(val) || 0));
+    const p = Math.max(0, Math.min(75, parseFloat(val) || 0));
     if (smooth) {
       this.map.easeTo({ pitch: p, duration: 450 });
     } else {
@@ -1323,7 +1364,7 @@ class Terrain3DManager {
       if (labelParcelName) labelParcelName.textContent = info.name || 'Parcelle sélectionnée';
       if (metaParcelArea) metaParcelArea.textContent = info.supStr || 'Superficie parcelle';
       if (metaParcelSpan) metaParcelSpan.textContent = `Dénivelé : ${info.spanStr}`;
-      if (scopeLabel) scopeLabel.textContent = 'Micro-relief découpé et amplifié 30X';
+      if (scopeLabel) scopeLabel.textContent = `Micro-relief découpé et amplifié ${this.exaggeration.toFixed(0)}X`;
     } else {
       if (cardParcel) cardParcel.style.display = 'none';
       if (scopeLabel) scopeLabel.textContent = 'Amplifie le micro-relief des pentes agricoles';
