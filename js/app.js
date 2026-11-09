@@ -500,6 +500,7 @@
 
       // Instantiate Soil AI Assistant
       soilAiAssistant = new SoilAiAssistant(map);
+      window.soilAiAssistant = soilAiAssistant;
 
       // Instantiate WMS Layer Manager (Info-Sols & Québec services)
       wmsManager = new WmsLayerManager(map);

@@ -1,0 +1,447 @@
+/* ==========================================================================
+   Plan de Ferme — coquille d'interface (refonte, branche experimental)
+   Barre du haut + barre de sections + panneau unique + légende + tiroir
+   des résultats + fiche parcelle. Aucun ID existant n'est modifié : ce
+   fichier ne fait que réorganiser visuellement les éléments existants.
+   ========================================================================== */
+
+:root {
+  --pf-accent: #2e6a4c;
+  --pf-accent-strong: #1f4d37;
+  --pf-accent-soft: #e6f0ea;
+  --pf-ink: #17211b;
+  --pf-muted: #5b6660;
+  --pf-line: #e3e6e1;
+  --pf-line-soft: #eef0ec;
+  --pf-ground: #f4f5f2;
+  --pf-hover: #f7f8f5;
+  --pf-top: 56px;
+  --pf-rail: 64px;
+  --pf-panel: 340px;
+  --pf-left: calc(var(--pf-rail) + var(--pf-panel));
+  --pf-fiche: 360px;
+  --pf-shadow: 0 4px 14px rgba(23, 33, 27, 0.1);
+  --pf-shadow-lg: 0 8px 24px rgba(23, 33, 27, 0.14);
+}
+body.pf-collapsed { --pf-left: var(--pf-rail); }
+
+/* ---------- Couleur d'accent unique (bureau et mobile) ---------- */
+input:checked + .switch-slider { background-color: var(--pf-accent); }
+.seg-btn.active { color: var(--pf-ink); }
+.pill-btn.active {
+  background: var(--pf-accent-soft) !important;
+  border-color: var(--pf-accent) !important;
+  color: var(--pf-accent-strong) !important;
+}
+.slider, input[type="range"] { accent-color: var(--pf-accent); }
+
+/* ---------- Lignes de couche : interrupteur · nom · réglages ---------- */
+.pf-layer,
+.tool-card.pf-layer,
+.topo-sub-accordion.pf-layer {
+  display: block;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  padding: 0;
+  margin: 1px 0;
+  box-shadow: none;
+}
+.pf-layer[open] { background: var(--pf-hover); }
+.pf-layer > summary {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 4px 0 8px !important;
+  margin: 0 !important;
+  list-style: none;
+  cursor: pointer;
+  border-radius: 10px;
+  background: transparent !important;
+  border: none !important;
+}
+.pf-layer > summary::-webkit-details-marker { display: none; }
+.pf-layer > summary:hover { background: var(--pf-hover) !important; }
+.pf-layer > summary .switch-label { order: -1; flex-shrink: 0; }
+.pf-layer > summary .tool-card-title,
+.pf-layer > summary .topo-sub-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pf-ink);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.pf-layer > summary .tool-card-title span,
+.pf-layer > summary .topo-sub-title span { color: var(--pf-ink) !important; font-weight: 500 !important; }
+.pf-layer > summary svg { display: none; }
+.pf-layer > summary::after {
+  content: "";
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235b6660' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12'/%3E%3Ccircle cx='16' cy='6' r='2'/%3E%3Ccircle cx='10' cy='12' r='2'/%3E%3Ccircle cx='18' cy='18' r='2'/%3E%3C/svg%3E") center / 16px no-repeat;
+}
+.pf-layer[open] > summary::after { background-color: var(--pf-accent-soft); }
+.pf-layer > .pf-layer-body,
+.pf-layer > .topo-sub-content,
+.pf-layer > .topo-master-body {
+  padding: 4px 12px 12px 52px !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pf-flat-group { gap: 0 !important; padding: 0 !important; background: transparent !important; border: none !important; }
+
+/* ---------- Sections du panneau ---------- */
+.pf-section-head { padding: 18px 18px 6px; }
+.pf-section-head h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--pf-ink); }
+.pf-section-head p { margin: 4px 0 0; font-size: 12px; color: var(--pf-muted); }
+.pf-group { padding: 12px 10px 8px; border-top: 1px solid var(--pf-line-soft); display: flex; flex-direction: column; gap: 2px; }
+.pf-section-head + .pf-group { border-top: none; }
+.pf-group-title {
+  font-size: 11px; font-weight: 600; color: var(--pf-muted);
+  text-transform: uppercase; letter-spacing: 0.06em; margin: 0 8px 6px;
+}
+.pf-hint { margin: 0 8px 10px; font-size: 12px; line-height: 1.5; color: var(--pf-muted); }
+.pf-list-btn {
+  width: 100%;
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px !important;
+  border-radius: 9px;
+  text-align: left;
+  color: var(--pf-ink);
+}
+.pf-list-btn:hover { background: var(--pf-hover) !important; }
+.pf-list-name { font-size: 13px; font-weight: 600; }
+.pf-list-desc { font-size: 12px; color: var(--pf-muted); }
+body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !important; }
+.pf-hidden-shim { display: none !important; }
+
+/* Fond de carte */
+.pf-group-fond > .tool-card { background: transparent; border: none; padding: 0 8px; box-shadow: none; }
+.pf-group-fond > .tool-card > .tool-card-title { display: none; }
+.pf-group-fond .segmented-control { background: #f0f2ee; border-radius: 9px; padding: 3px; gap: 4px; }
+.pf-group-fond .seg-btn { height: 32px; font-size: 12.5px; border-radius: 7px; }
+
+/* Cartes neutres (WMS, couche perso, Agri-Réseau, diagnostic, LiDAR) */
+.pf-section .tool-card:not(.pf-layer):not(.pf-group-fond > .tool-card),
+.pf-section #card-custom-vectors,
+.pf-tool-card {
+  background: #ffffff !important;
+  border: 1px solid var(--pf-line) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  margin: 2px 0 6px;
+}
+.pf-section #card-custom-vectors .tool-card-title span { color: var(--pf-ink) !important; }
+.pf-section #btn-add-personal-layer { background: var(--pf-accent) !important; box-shadow: none !important; }
+.pf-tool-card > summary { list-style: none; }
+.pf-tool-card > summary::-webkit-details-marker { display: none; }
+.pf-tool-card .topo-sub-chevron { display: none; }
+.pf-section .profile-dock-btn { color: var(--pf-ink) !important; background: #fff !important; border-color: #d5d9d3 !important; }
+#btn-trigger-cutfill-active { background: var(--pf-accent) !important; box-shadow: none !important; }
+.pf-contact { padding: 8px 8px 0; font-size: 12px; }
+.pf-contact a { color: var(--pf-accent); font-weight: 600; }
+
+/* ==========================================================================
+   BUREAU
+   ========================================================================== */
+@media (min-width: 769px) {
+  body { background: var(--pf-ground); }
+
+  /* Barre du haut */
+  .pf-topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: var(--pf-top);
+    z-index: 1200;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 16px;
+    background: #ffffff;
+    border-bottom: 1px solid var(--pf-line);
+  }
+  .pf-brand {
+    width: calc(var(--pf-rail) + var(--pf-panel) - 32px);
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 10px;
+    color: var(--pf-ink); text-decoration: none;
+    font-weight: 700; font-size: 15px; letter-spacing: -0.01em;
+  }
+  .pf-brand img { border-radius: 7px; }
+  .pf-top-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .pf-btn {
+    height: 36px; padding: 0 14px !important;
+    display: inline-flex !important; align-items: center; gap: 7px;
+    background: #fff !important; border: 1px solid #d5d9d3 !important; border-radius: 9px;
+    font-size: 13px; font-weight: 600; color: var(--pf-ink);
+  }
+  .pf-btn:hover { background: var(--pf-hover) !important; }
+  .pf-btn-primary { background: var(--pf-accent) !important; border-color: var(--pf-accent) !important; color: #fff; }
+  .pf-btn-primary:hover { background: var(--pf-accent-strong) !important; }
+
+  /* Recherche toujours visible dans la barre du haut */
+  .pf-topbar .map-search-panel {
+    display: block !important;
+    position: relative; top: auto; right: auto; left: auto;
+    flex: 1; width: auto; max-width: 520px;
+    padding: 0; background: transparent; border: none; box-shadow: none;
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+  }
+  .pf-topbar .map-search-panel .search-input {
+    height: 38px; border-radius: 10px; background: var(--pf-ground); border-color: var(--pf-line);
+  }
+  .pf-topbar .map-search-panel .search-input:focus { border-color: var(--pf-accent); }
+  .pf-topbar .map-search-panel .search-suggestions {
+    position: absolute; top: 44px; left: 0; right: 0; margin: 0;
+    background: #fff; border: 1px solid var(--pf-line); border-radius: 10px;
+    box-shadow: var(--pf-shadow-lg); z-index: 1300;
+  }
+  #btn-toggle-search, #btn-quick-export, #btn-quick-rag { display: none !important; }
+
+  /* Barre de sections */
+  .pf-rail {
+    position: fixed; top: var(--pf-top); left: 0; bottom: 0; width: var(--pf-rail);
+    z-index: 1100;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 0;
+    background: #fff; border-right: 1px solid var(--pf-line);
+  }
+  .pf-rail-btn {
+    width: 56px !important; min-height: 58px;
+    display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    border-radius: 10px;
+    font-size: 10.5px; font-weight: 600; color: var(--pf-muted);
+  }
+  .pf-rail-btn:hover { background: var(--pf-hover) !important; color: var(--pf-ink); }
+  .pf-rail-btn[aria-pressed="true"] { background: var(--pf-accent-soft) !important; color: var(--pf-accent-strong); }
+
+  /* Panneau latéral unique */
+  .map-controls-panel {
+    position: fixed;
+    top: var(--pf-top); left: var(--pf-rail); bottom: 0;
+    width: var(--pf-panel); max-width: none; max-height: none;
+    padding: 0; gap: 0;
+    border-radius: 0; border: none; border-right: 1px solid var(--pf-line);
+    background: #fff; box-shadow: none;
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    z-index: 1000;
+  }
+  body.pf-collapsed .map-controls-panel { display: none; }
+  .panel-tools { display: block !important; padding-bottom: 24px; }
+  .pf-section { display: none; }
+  .pf-section.pf-active { display: block; }
+  .pf-inline-legend { display: none !important; }
+  .pf-actions-group #btn-panel-composer,
+  .pf-actions-group #btn-panel-share { display: none !important; }
+  #tools-backdrop, .mobile-tools-sheet, .mobile-tools-backdrop { display: none !important; }
+
+  /* Carte : occupe l'espace restant */
+  #map {
+    top: var(--pf-top) !important;
+    left: var(--pf-left) !important;
+    right: 0; bottom: 0;
+    width: auto !important; height: auto !important;
+  }
+  .site-footer { display: none; }
+  .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 0 !important; }
+  body.pf-fiche-open .maplibregl-ctrl-top-right { right: calc(var(--pf-fiche) + 12px); }
+
+  /* Palette d'outils verticale */
+  .map-profile-toolbar {
+    top: calc(var(--pf-top) + 10px) !important;
+    right: 52px !important;
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px !important;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid var(--pf-line);
+    border-radius: 12px;
+    box-shadow: var(--pf-shadow);
+    animation: none !important;
+  }
+  body.pf-fiche-open .map-profile-toolbar { right: calc(var(--pf-fiche) + 54px) !important; }
+  .map-profile-toolbar > div { display: none !important; }
+  .map-profile-toolbar .floating-profile-btn {
+    width: 40px; height: 40px; padding: 0 !important;
+    justify-content: center;
+    border: none !important; box-shadow: none !important;
+    border-radius: 8px !important;
+    background: #fff;
+    color: var(--pf-ink);
+  }
+  .map-profile-toolbar .floating-profile-btn:hover { background: var(--pf-hover) !important; }
+  .map-profile-toolbar .floating-profile-btn > span { display: none; }
+  .map-profile-toolbar .floating-profile-btn svg { width: 18px; height: 18px; stroke: currentColor !important; }
+  .map-profile-toolbar .floating-profile-btn.active,
+  .map-profile-toolbar .floating-profile-btn.btn-ndvi-mode.active,
+  .map-profile-toolbar .floating-profile-btn.btn-3d-mode.active {
+    background: var(--pf-accent-soft) !important;
+    color: var(--pf-accent-strong) !important;
+  }
+  .map-profile-toolbar .floating-profile-btn.active svg { stroke: var(--pf-accent-strong) !important; }
+  .map-profile-toolbar .floating-profile-btn.action-calc,
+  .map-profile-toolbar .floating-profile-btn.action-clear { width: auto; padding: 0 12px !important; }
+  .map-profile-toolbar .floating-profile-btn.action-calc { background: var(--pf-accent) !important; color: #fff !important; }
+  .map-profile-toolbar .floating-profile-btn.action-calc > span { display: inline; }
+
+  /* Légende unique */
+  .pf-legend {
+    position: fixed;
+    left: calc(var(--pf-left) + 12px);
+    top: calc(var(--pf-top) + 12px);
+    z-index: 110;
+    width: 250px;
+    max-height: calc(100vh - var(--pf-top) - 24px);
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid var(--pf-line);
+    border-radius: 12px;
+    box-shadow: var(--pf-shadow);
+    font-size: 11.5px;
+    color: var(--pf-ink);
+  }
+  .pf-legend[hidden] { display: none; }
+
+  /* Tiroir des résultats : tous les docks au même endroit */
+  .elevation-profile-dock {
+    left: calc(var(--pf-left) + 12px) !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    border-top-width: 1px !important;
+    border-color: var(--pf-line) !important;
+    box-shadow: var(--pf-shadow-lg) !important;
+  }
+  body.pf-fiche-open .elevation-profile-dock { right: calc(var(--pf-fiche) + 24px) !important; }
+  .pf-tray-hidden { display: none !important; }
+
+  /* Fiche parcelle : la popup des parcelles devient un panneau ancré à droite */
+  .maplibregl-popup:has(.popup-tabs-header) {
+    position: fixed !important;
+    top: calc(var(--pf-top) + 12px) !important;
+    right: 12px !important;
+    left: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: var(--pf-fiche);
+    max-width: var(--pf-fiche) !important;
+    z-index: 1050;
+  }
+  .maplibregl-popup:has(.popup-tabs-header) .maplibregl-popup-tip { display: none; }
+  .maplibregl-popup:has(.popup-tabs-header) .maplibregl-popup-content {
+    max-height: calc(100vh - var(--pf-top) - 24px);
+    overflow-y: auto;
+    border: 1px solid var(--pf-line);
+    box-shadow: var(--pf-shadow-lg);
+  }
+
+  /* Panneaux flottants des outils (mesure, relief 3D) : à gauche de la palette */
+  .measure-panel,
+  .floating-3d-panel {
+    top: calc(var(--pf-top) + 10px) !important;
+    right: 104px !important;
+    max-height: calc(100vh - var(--pf-top) - 24px);
+    overflow-y: auto;
+  }
+  body.pf-fiche-open .measure-panel,
+  body.pf-fiche-open .floating-3d-panel { right: calc(var(--pf-fiche) + 106px) !important; }
+  .banner-3d-prompt { top: calc(var(--pf-top) + 12px) !important; left: calc(var(--pf-left) + (100vw - var(--pf-left)) / 2) !important; }
+
+  /* Panneaux latéraux existants : sous la barre du haut */
+  .rag-dock { top: calc(var(--pf-top) + 12px); }
+  .share-toast { top: calc(var(--pf-top) + 12px); }
+}
+
+/* Éléments de la légende */
+.pf-legend-head {
+  width: 100%; height: 38px;
+  display: flex !important; align-items: center; justify-content: space-between;
+  padding: 0 12px !important;
+  font-size: 12px; font-weight: 700; color: var(--pf-ink);
+}
+.pf-legend-head span:last-child { font-weight: 500; color: var(--pf-muted); }
+.pf-legend-body { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.pf-legend.pf-legend-min .pf-legend-body { display: none; }
+.pf-legend-item { display: flex; align-items: center; gap: 8px; line-height: 1.3; }
+.pf-legend-item[hidden] { display: none; }
+.pf-legend-col { flex-direction: column; align-items: stretch; gap: 4px; }
+.pf-sw-row { display: inline-flex; gap: 2px; }
+.pf-sw-row i, .pf-inline i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.pf-inline { display: inline-flex; align-items: center; gap: 6px; }
+.pf-line-dash { width: 30px; border-top: 2px dashed var(--pf-ink); }
+.pf-line-solid { width: 30px; border-top: 1.5px solid #6b5434; }
+.pf-ramp { height: 8px; border-radius: 4px; }
+.pf-classes { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
+.pf-classes i { height: 8px; display: block; }
+.pf-ticks { display: flex; justify-content: space-between; color: var(--pf-muted); font-size: 10.5px; }
+
+/* Onglets du tiroir (créés par shell.js quand plusieurs résultats sont ouverts) */
+.pf-tray-tabs {
+  display: flex; align-items: center; gap: 2px;
+  margin: -4px -6px 4px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--pf-line-soft);
+  overflow-x: auto;
+}
+.pf-tray-tab {
+  display: inline-flex; align-items: center;
+  border-radius: 8px;
+  color: var(--pf-muted);
+  white-space: nowrap;
+}
+.pf-tray-tab.pf-on { background: var(--pf-accent-soft); color: var(--pf-accent-strong); }
+.pf-tray-tab > button:first-child { height: 30px; padding: 0 4px 0 10px !important; font-size: 12px; font-weight: 600; color: inherit; }
+.pf-tray-tab > button:last-child { width: 24px; height: 24px; font-size: 15px; color: var(--pf-muted); border-radius: 6px; }
+.pf-tray-tab > button:last-child:hover { background: rgba(0, 0, 0, 0.06) !important; }
+
+/* Fiche parcelle : actions homogènes (bureau et mobile) */
+.btn-popup-parcel-action {
+  background: #fafbf9 !important;
+  color: var(--pf-ink) !important;
+  border: 1px solid var(--pf-line) !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+}
+.btn-popup-parcel-action:hover { background: var(--pf-accent-soft) !important; border-color: var(--pf-accent) !important; }
+.btn-popup-parcel-action svg { stroke: currentColor; }
+#btn-popup-trigger-3d { color: var(--pf-accent-strong) !important; background: var(--pf-accent-soft) !important; }
+.popup-tab-btn.active { color: var(--pf-ink); border-bottom-color: var(--pf-accent) !important; }
+
+/* ==========================================================================
+   MOBILE : on garde la navigation mobile existante, sans les éléments bureau
+   ========================================================================== */
+@media (max-width: 768px) {
+  .pf-rail, .pf-legend, .pf-brand, .pf-top-actions { display: none !important; }
+  .pf-topbar { display: contents; }
+  .pf-section { display: block; }
+  .pf-section[data-section="analyses"] { display: none; }
+  .pf-section-head { padding: 14px 4px 2px; }
+  .pf-group { padding: 10px 0 6px; }
+}
+
+/* Cases à cocher à la couleur d'accent */
+.map-controls-panel input[type="checkbox"],
+.elevation-profile-dock input[type="checkbox"],
+.maplibregl-popup input[type="checkbox"] { accent-color: var(--pf-accent); }
+
+/* Données externes : même hiérarchie que les autres groupes */
+.pf-section #card-wms { border: none !important; padding: 4px 8px 0 !important; margin: 0 !important; }
+.pf-section #card-wms > .tool-card-header .tool-card-title { font-size: 11px; font-weight: 600; color: var(--pf-muted); letter-spacing: 0.06em; }
+.pf-section #card-wms > .tool-card-header .tool-card-title svg { display: none; }
+.pf-section #card-wms .wms-group-badge { background: var(--pf-accent-soft); color: var(--pf-accent-strong); }
+.pf-section #btn-toggle-all-groups { color: var(--pf-accent); }
+
+/* Mobile : boutons d'action alignés sur l'accent unique */
+@media (max-width: 768px) {
+  .pf-section[data-section="couches"] > .pf-section-head h2 { display: none; }
+  #btn-panel-composer { background: var(--pf-accent) !important; border-color: var(--pf-accent) !important; }
+  #btn-panel-share { background: #fff !important; border-color: #d5d9d3 !important; color: var(--pf-ink) !important; }
+}

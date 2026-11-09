@@ -1,4 +1,4 @@
-const CACHE_NAME = "plandeferme-v6";
+const CACHE_NAME = "plandeferme-v7";
 
 const ASSETS = [
   "/",
@@ -6,6 +6,7 @@ const ASSETS = [
   "/style.css",
   "/geolibre-contour.css",
   "/css/composer.css",
+  "/css/shell.css",
   "/geolibre-contour.js",
   "/flatgeobuf-geojson.min.js",
   "/marked.min.js",
@@ -23,7 +24,8 @@ const ASSETS = [
   "/js/soil-ai.js",
   "/js/wms.js",
   "/js/composer.js",
-  "/js/app.js"
+  "/js/app.js",
+  "/js/shell.js"
 ];
 
 // Installation : pré-caching robuste des actifs essentiels et activation immédiate

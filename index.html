@@ -125,6 +125,7 @@
   <link rel="stylesheet" href="css/vectors.css"/>
   <link rel="stylesheet" href="css/measure.css"/>
   <link rel="stylesheet" href="css/terrain3d.css"/>
+  <link rel="stylesheet" href="css/shell.css"/>
 
   <!-- MapLibre GL JS & PMTiles -->
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
@@ -138,6 +139,62 @@
 
 </head>
 <body>
+
+
+  <!-- Barre du haut (refonte) -->
+  <header class="pf-topbar">
+    <a class="pf-brand" href="./" aria-label="Plan de Ferme, accueil">
+      <img src="favicon/favicon-64.png" alt="" width="28" height="28"/>
+      <span>Plan de Ferme</span>
+    </a>
+    <!-- Floating Search Panel on Map -->
+  <div id="map-search-panel" class="map-search-panel" style="display: none;">
+    <div class="search-input-wrapper">
+      <svg class="search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="address-input" class="search-input" placeholder="Rechercher une adresse, ville..." autocomplete="off" />
+      <button id="clear-search" class="clear-btn" style="display:none;" title="Effacer">&times;</button>
+    </div>
+    <div id="search-suggestions" class="search-suggestions" style="display:none;"></div>
+  </div>
+
+  
+    <div class="pf-top-actions">
+      <button type="button" class="pf-btn" data-pf-click="btn-panel-share">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+        <span>Partager la vue</span>
+      </button>
+      <button type="button" class="pf-btn pf-btn-primary" data-pf-click="btn-panel-composer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>
+        <span>Mise en page PDF</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Barre latérale de sections (refonte) -->
+  <nav class="pf-rail" aria-label="Sections">
+    <button type="button" class="pf-rail-btn" data-pf-section="couches" aria-pressed="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg><span>Couches</span></button>
+    <button type="button" class="pf-rail-btn" data-pf-section="analyses" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17 9 11l4 4 8-8"/><path d="M15 7h6v6"/></svg><span>Analyses</span></button>
+    <button type="button" class="pf-rail-btn" data-pf-section="donnees" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>Mes données</span></button>
+    <button type="button" class="pf-rail-btn" data-pf-section="ressources" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h14v16H6.5A2.5 2.5 0 0 0 4 21.5"/><path d="M9 7h7M9 11h5"/></svg><span>Ressources</span></button>
+  </nav>
+
+  <!-- Légende unique (refonte) : n'affiche que les couches actives -->
+  <div id="pf-legend" class="pf-legend" hidden>
+    <button type="button" id="pf-legend-toggle" class="pf-legend-head" aria-expanded="true"><span>Légende</span><span id="pf-legend-hint">Réduire</span></button>
+    <div class="pf-legend-body" id="pf-legend-body">
+      <div class="pf-legend-item" data-pf-legend="toggle-pedo"><span class="pf-sw-row"><i style="background:#cdbb8e"></i><i style="background:#afbf7e"></i><i style="background:#9eb173"></i></span>Carte des sols · cliquez pour la série</div>
+      <div class="pf-legend-item" data-pf-legend="toggle-parcelles"><span class="pf-line-dash"></span>Parcelles agricoles (BDPPAD)</div>
+      <div class="pf-legend-item" data-pf-legend="toggle-contours"><span class="pf-line-solid"></span>Courbes de niveau</div>
+      <div class="pf-legend-item pf-legend-col" data-pf-legend="toggle-topo"><span>Altitude</span><span class="pf-ramp" style="background:linear-gradient(90deg,#6d28d9,#2563eb,#16a34a,#eab308,#dc2626)"></span><span class="pf-ticks"><span>Bas</span><span>Haut</span></span></div>
+      <div class="pf-legend-item pf-legend-col" data-pf-legend="toggle-pentes"><span>Pente (%)</span><span class="pf-classes"><i style="background:#0284c7"></i><i style="background:#22c55e"></i><i style="background:#84cc16"></i><i style="background:#eab308"></i><i style="background:#ea580c"></i><i style="background:#b91c1c"></i></span><span class="pf-ticks"><span>0</span><span>0,3</span><span>1</span><span>3</span><span>10</span><span>30+</span></span></div>
+      <div class="pf-legend-item pf-legend-col" data-pf-legend="toggle-hydro-parcelle"><span>Écoulement (pente du ruissellement)</span><span class="pf-classes"><i style="background:#38bdf8"></i><i style="background:#0284c7"></i><i style="background:#1d4ed8"></i><i style="background:#6d28d9"></i></span><span class="pf-ticks"><span>&lt;2,5</span><span>5</span><span>10</span><span>&gt;10 %</span></span><span class="pf-inline"><i style="background:rgba(2,132,199,.85)"></i>Zones plates (pente &lt; 0,1 %)</span></div>
+      <div class="pf-legend-item pf-legend-col" data-pf-legend="toggle-canopee"><span>Hauteur de canopée (m)</span><span class="pf-classes"><i style="background:#bef264"></i><i style="background:#4ade80"></i><i style="background:#16a34a"></i><i style="background:#15803d"></i><i style="background:#166534"></i><i style="background:#064e3b"></i></span><span class="pf-ticks"><span>0,5</span><span>2</span><span>5</span><span>12</span><span>20</span><span>30+</span></span></div>
+      <div class="pf-legend-item pf-legend-col" data-pf-legend="toggle-rusle"><span>Pertes de sol (t/ha/an)</span><span class="pf-classes"><i style="background:rgb(34,197,94)"></i><i style="background:rgb(163,230,53)"></i><i style="background:rgb(250,204,21)"></i><i style="background:rgb(251,146,60)"></i><i style="background:rgb(239,68,68)"></i><i style="background:rgb(168,32,90)"></i></span><span class="pf-ticks"><span>&lt;1</span><span>3</span><span>6</span><span>11</span><span>22</span><span>&gt;22</span></span></div>
+    </div>
+  </div>
 
   <!-- Floating Control Panel -->
   <div class="map-controls-panel">
@@ -153,50 +210,12 @@
         </div>
       </div>
 
-      <!-- Couche personnelle (Dessin, Import SHP, FGB, GeoJSON, KML, QML) -->
-      <div class="tool-card" id="card-custom-vectors" style="border: 1.5px solid #93c5fd; background: #f0f9ff; padding: 10px;">
-        <div class="tool-card-header" style="margin-bottom: 6px;">
-          <div class="tool-card-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-            <span style="color: #0369a1; font-weight: 700;">Couche personnelle</span>
-          </div>
-          <div style="position: relative; display: flex; align-items: center; gap: 4px;">
-            <button id="btn-add-personal-layer" type="button" title="Ajouter une couche (dessin ou import)" style="width: 24px; height: 24px; border-radius: 50%; background: #0284c7; color: #ffffff; border: none; font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(2,132,199,0.3); transition: all 0.15s ease;">+</button>
-            <div id="personal-add-dropdown" class="personal-add-dropdown" style="display: none;">
-              <button type="button" class="personal-dropdown-item" id="btn-quick-new-poly">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon></svg>
-                <span>Nouveau polygone</span>
-              </button>
-              <button type="button" class="personal-dropdown-item" id="btn-quick-new-line">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><path d="M4 20L20 4"></path></svg>
-                <span>Nouvelle ligne</span>
-              </button>
-              <button type="button" class="personal-dropdown-item" id="btn-quick-new-point">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.5"><circle cx="12" cy="12" r="4"></circle></svg>
-                <span>Nouveau point</span>
-              </button>
-              <div style="height: 1px; background: #e2e8f0; margin: 3px 0;"></div>
-              <label class="personal-dropdown-item" style="margin: 0; cursor: pointer;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span>Importer un fichier...</span>
-                <input type="file" id="vector-input-quick-file" accept=".geojson,.json,.kml,.fgb,.zip,.qml" multiple style="display: none;" />
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <!-- Liste dynamique des couches avec boutons [Visibilité/Cacher] [Nom] [Zoom] [Éditer] [Delete] -->
-        <div id="panel-vector-layers-list" class="personal-layers-inline-list">
-          <!-- Rempli dynamiquement -->
-        </div>
-
-        <div style="font-size: 10px; color: #64748b; margin-top: 6px; line-height: 1.3; font-style: italic; display: flex; align-items: center; gap: 4px;">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-          <span>Glissez un fichier (.zip, .fgb, .geojson, .qml) sur l'écran pour l'ajouter directement.</span>
-        </div>
-      </div>
-
-      <!-- 1. Fond de carte -->
+      
+      <section class="pf-section" data-section="couches" aria-label="Couches">
+        <div class="pf-section-head"><h2>Couches</h2><p id="pf-active-count">&nbsp;</p></div>
+        <div class="pf-group pf-group-fond">
+          <div class="pf-group-title">Fond de carte</div>
+          <!-- 1. Fond de carte -->
       <div class="tool-card">
         <div class="tool-card-title">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18"></path><path d="M9 21V9"></path></svg>
@@ -208,37 +227,45 @@
         </div>
       </div>
 
-      <!-- 2. Carte pédologique -->
-      <div class="tool-card" id="card-pedo">
-        <div class="tool-card-header">
+      
+        </div>
+        <div class="pf-group">
+          <div class="pf-group-title">Sols et parcelles</div>
+          <!-- 2. Carte pédologique -->
+      <details class="tool-card pf-layer" id="card-pedo">
+        <summary class="tool-card-header pf-layer-summary">
           <div class="tool-card-title">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
             <span>Carte des sols</span>
           </div>
-          <label class="switch-label" title="Afficher/Masquer la carte des sols">
+          <label class="switch-label" onclick="event.stopPropagation()" title="Afficher/Masquer la carte des sols">
             <input type="checkbox" id="toggle-pedo" />
             <span class="switch-slider"></span>
           </label>
-        </div>
+        </summary>
+        <div class="pf-layer-body">
         <div class="tool-label-row">
           <span class="tool-sublabel">Opacité des sols</span>
           <span id="opacity-val" class="val-badge">Masqué</span>
         </div>
         <input type="range" id="pedo-opacity" min="0" max="100" value="80" class="slider" />
       </div>
+      </details>
 
-      <!-- 2b. Parcelles agricoles BDPPAD -->
-      <div class="tool-card" id="card-parcelles">
-        <div class="tool-card-header">
+      
+          <!-- 2b. Parcelles agricoles BDPPAD -->
+      <details class="tool-card pf-layer" id="card-parcelles">
+        <summary class="tool-card-header pf-layer-summary">
           <div class="tool-card-title">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line></svg>
             <span>Parcelles agricoles (BDPPAD)</span>
           </div>
-          <label class="switch-label" title="Afficher/Masquer les contours des parcelles">
+          <label class="switch-label" onclick="event.stopPropagation()" title="Afficher/Masquer les contours des parcelles">
             <input type="checkbox" id="toggle-parcelles" />
             <span class="switch-slider"></span>
           </label>
-        </div>
+        </summary>
+        <div class="pf-layer-body">
         <div class="tool-label-row">
           <span class="tool-sublabel">Style : Limites hachurées N&amp;B</span>
           <span class="parcel-badge-sample" style="display:inline-block; width:34px; height:7px; background:repeating-linear-gradient(90deg, #000 0, #000 5px, #fff 5px, #fff 10px); border:1px solid #94a3b8; border-radius:2px;" title="Ligne hachurée noir et blanc"></span>
@@ -249,25 +276,16 @@
         </div>
         <input type="range" id="parcelles-opacity" min="0" max="100" value="95" class="slider" />
       </div>
+      </details>
 
-      <!-- 3. Topographie, Relief & Hydrologie - Accordéon groupé -->
-      <details class="tool-card topo-master-card" id="card-topo-master">
-        <summary class="tool-card-header" style="cursor: pointer; margin-bottom: 0;">
-          <div class="tool-card-title">
-            <svg class="topo-master-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 2 22 22 22 12 2"></polygon></svg>
-            <span>Topographie &amp; Relief</span>
-          </div>
-        </summary>
-
-        <div class="topo-master-body" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
-          <div class="tool-sublabel" style="margin-bottom: 2px;">
-            Relief, ombrage 3D, courbes, pentes, canopée &amp; écoulement
-          </div>
-
-          <div class="topo-accordion-group">
-            <!-- 1. Relief & Ombrage 3D -->
-            <details class="topo-sub-accordion" id="card-topo">
+      
+        </div>
+        <div class="pf-group">
+          <div class="pf-group-title">Relief et eau</div>
+          <details id="card-topo-master" class="pf-hidden-shim" hidden></details>
+          <div class="topo-accordion-group pf-flat-group">
+          <!-- 1. Relief & Ombrage 3D -->
+            <details class="topo-sub-accordion pf-layer" id="card-topo">
               <summary class="topo-sub-header">
                 <div class="topo-sub-title">
                   <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -298,8 +316,8 @@
                     <button id="btn-refresh-lidar-projects" type="button" style="background: none; border: none; padding: 0; margin: 0; font-size: 9.5px; color: #2563eb; cursor: pointer; text-decoration: underline;" title="Rafraîchir les projets disponibles dans la vue">Actualiser</button>
                   </div>
                 </div>
-                <div class="topo-gradient-bar" title="Dégradé d'altitude dynamique : mauve au plus bas, rouge au plus haut"></div>
-                <div class="topo-gradient-labels">
+                <div class="topo-gradient-bar pf-inline-legend" title="Dégradé d'altitude dynamique : mauve au plus bas, rouge au plus haut"></div>
+                <div class="topo-gradient-labels pf-inline-legend">
                   <span>Bas (mauve)</span>
                   <span>Haut (rouge)</span>
                 </div>
@@ -359,8 +377,9 @@
               </div>
             </details>
 
-            <!-- 2. Courbes de niveau -->
-            <details class="topo-sub-accordion" id="card-contours">
+            
+          <!-- 2. Courbes de niveau -->
+            <details class="topo-sub-accordion pf-layer" id="card-contours">
               <summary class="topo-sub-header">
                 <div class="topo-sub-title">
                   <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -396,8 +415,9 @@
               </div>
             </details>
 
-            <!-- 3. Carte des Pentes (%) -->
-            <details class="topo-sub-accordion" id="card-pentes">
+            
+          <!-- 3. Carte des Pentes (%) -->
+            <details class="topo-sub-accordion pf-layer" id="card-pentes">
               <summary class="topo-sub-header">
                 <div class="topo-sub-title">
                   <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -421,7 +441,7 @@
                 <input type="range" id="pentes-opacity" min="0" max="100" value="75" class="slider" />
 
                 <!-- Légende des 6 catégories de pente -->
-                <div style="margin-top: 4px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                <div class="pf-inline-legend" style="margin-top: 4px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
                   <div style="font-size: 10px; font-weight: 700; color: #475569; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;">Classes de pente</div>
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 10.5px; font-weight: 600; color: #334155;">
                     <div style="display: flex; align-items: center; gap: 5px;" title="Pente quasi-nulle : zones de stagnation hydrique et de drainage critique">
@@ -453,8 +473,9 @@
               </div>
             </details>
 
-            <!-- 4. Écoulement & Dépressions -->
-            <details class="topo-sub-accordion" id="card-hydro-parcelle">
+            
+          <!-- 4. Écoulement & Dépressions -->
+            <details class="topo-sub-accordion pf-layer" id="card-hydro-parcelle">
               <summary class="topo-sub-header">
                 <div class="topo-sub-title">
                   <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -472,7 +493,7 @@
                 </div>
 
                 <!-- Légende des flèches par pente -->
-                <div style="margin-bottom: 4px;">
+                <div class="pf-inline-legend" style="margin-bottom: 4px;">
                   <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 3px;">Pente du ruissellement :</div>
                   <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: #64748b; background: #f8fafc; padding: 4px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
                     <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#38bdf8;"></span> &lt; 2.5%</span>
@@ -483,7 +504,7 @@
                 </div>
 
                 <!-- Légende des dépressions par pente -->
-                <div style="margin-bottom: 4px;">
+                <div class="pf-inline-legend" style="margin-bottom: 4px;">
                   <div style="font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 3px;">Dépressions / zones plates :</div>
                   <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: #64748b; background: #f8fafc; padding: 4px 6px; border-radius: 4px; border: 1px solid #e2e8f0;">
                     <span style="display:inline-flex; align-items:center; gap:3px;"><span style="display:inline-block; width:9px; height:7px; border-radius:2px; background:rgba(2,132,199,0.85);"></span> Pente &lt; 0.1%</span>
@@ -496,8 +517,9 @@
               </div>
             </details>
 
-            <!-- 5. Hauteur de canopée (m) -->
-            <details class="topo-sub-accordion" id="card-canopee">
+            
+          <!-- 5. Hauteur de canopée (m) -->
+            <details class="topo-sub-accordion pf-layer" id="card-canopee">
               <summary class="topo-sub-header">
                 <div class="topo-sub-title">
                   <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -521,7 +543,7 @@
                 <input type="range" id="canopee-opacity" min="0" max="100" value="75" class="slider" />
 
                 <!-- Légende des 6 classes de hauteur -->
-                <div style="margin-top: 4px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                <div class="pf-inline-legend" style="margin-top: 4px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
                   <div style="font-size: 10px; font-weight: 700; color: #475569; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;">Hauteur de végétation (m)</div>
                   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 10.5px; font-weight: 600; color: #334155;">
                     <div style="display: flex; align-items: center; gap: 5px;" title="0.5 à 2 m : Haies basses, arbustes, régénération">
@@ -556,34 +578,13 @@
               </div>
             </details>
 
-            <!-- Comparaison LiDAR multidates & Déblais/Remblais (m³/ha) -->
-            <details class="topo-sub-accordion" id="card-cutfill-tool">
-              <summary class="topo-sub-header">
-                <div class="topo-sub-title">
-                  <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
-                  <span>Comparaison LiDAR (D/R)</span>
-                </div>
-                <button type="button" id="btn-open-cutfill-from-panel" class="profile-dock-btn" style="padding: 2px 8px; font-size: 10px; font-weight: 700; color: #7c3aed; background: #f5f3ff; border-color: #ddd6fe;" title="Ouvrir l'outil de comparaison multidate LiDAR sur la parcelle">
-                  Ouvrir
-                </button>
-              </summary>
-              <div class="topo-sub-content">
-                <div style="font-size: 10.5px; color: #475569; line-height: 1.4; margin-bottom: 7px;">
-                  Comparez 2 campagnes LiDAR historiques (ex. 2014 vs 2024), calibrez les altitudes de référence et visualisez la carte de <strong>déblais / remblais</strong> avec métriques en <strong>m³/ha cut</strong>.
-                </div>
-                <button type="button" id="btn-trigger-cutfill-active" class="btn-popup-parcel-action" style="width: 100%; padding: 7px 10px; background: #7c3aed; color: #fff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
-                  <span>Lancer sur la parcelle active</span>
-                </button>
-              </div>
-            </details>
+            
           </div>
         </div>
-      </details>
-
-      <!-- 4. Érosion des sols (RUSLE) -->
-      <details class="tool-card topo-master-card" id="card-rusle">
+        <div class="pf-group">
+          <div class="pf-group-title">Érosion</div>
+          <!-- 4. Érosion des sols (RUSLE) -->
+      <details class="tool-card topo-master-card pf-layer" id="card-rusle">
         <summary class="tool-card-header" style="cursor: pointer; margin-bottom: 0;">
           <div class="tool-card-title">
             <svg class="topo-master-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -658,7 +659,7 @@
             <input type="range" id="rusle-opacity" min="0" max="100" value="85" class="slider" />
 
             <!-- Légende des classes de perte de sol -->
-            <div style="padding: 5px 7px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+            <div class="pf-inline-legend" style="padding: 5px 7px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
               <div style="font-size: 9.5px; font-weight: 700; color: #475569; margin-bottom: 4px; display: flex; justify-content: space-between;">
                 <span>Classes de pertes de sol</span>
                 <span style="color: #64748b; font-weight: normal;">t/ha/an</span>
@@ -679,7 +680,10 @@
           </div>
         </div>
       </details>
-      <div class="tool-card" id="card-wms">
+      
+        </div>
+        <div class="pf-group">
+          <div class="tool-card" id="card-wms">
         <div class="tool-card-header">
           <div class="tool-card-title">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
@@ -712,7 +716,101 @@
         </div>
       </div>
 
-      <!-- 6. Documentation Agri-Réseau (RAG) -->
+      
+        </div>
+      </section>
+
+      <section class="pf-section" data-section="analyses" aria-label="Analyses">
+        <div class="pf-section-head"><h2>Analyses</h2><p>Les résultats s'ouvrent dans le tiroir en bas de la carte.</p></div>
+        <div class="pf-group">
+          <div class="pf-group-title">Sur la carte</div>
+          <button type="button" class="pf-list-btn" data-pf-click="btn-quick-measure"><span class="pf-list-name">Mesurer</span><span class="pf-list-desc">Distances et superficies, métrique ou impérial</span></button>
+          <button type="button" class="pf-list-btn" data-pf-click="btn-quick-profile"><span class="pf-list-name">Coupe topographique</span><span class="pf-list-desc">Tracez une ligne : profil altimétrique LiDAR 1 m</span></button>
+          <button type="button" class="pf-list-btn" data-pf-click="btn-quick-ndvi"><span class="pf-list-name">NDVI Sentinel-2</span><span class="pf-list-desc">Vigueur de la végétation, date par date</span></button>
+          <button type="button" class="pf-list-btn" data-pf-click="btn-quick-3d"><span class="pf-list-name">Relief 3D</span><span class="pf-list-desc">Perspective et exagération verticale sur une parcelle</span></button>
+        </div>
+        <div class="pf-group">
+          <div class="pf-group-title">Sur une parcelle</div>
+          <p class="pf-hint">Cliquez une parcelle sur la carte : sa fiche s'ouvre à droite avec toutes les analyses (vue 3D, simulation de pluie, érosion RUSLE, comparaison LiDAR, export du MNT).</p>
+          <!-- Comparaison LiDAR multidates & Déblais/Remblais (m³/ha) -->
+            <details class="topo-sub-accordion pf-tool-card" id="card-cutfill-tool" open>
+              <summary class="topo-sub-header">
+                <div class="topo-sub-title">
+                  <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+                  <span>Comparaison LiDAR (D/R)</span>
+                </div>
+                <button type="button" id="btn-open-cutfill-from-panel" class="profile-dock-btn" style="padding: 2px 8px; font-size: 10px; font-weight: 700; color: #7c3aed; background: #f5f3ff; border-color: #ddd6fe;" title="Ouvrir l'outil de comparaison multidate LiDAR sur la parcelle">
+                  Ouvrir
+                </button>
+              </summary>
+              <div class="topo-sub-content">
+                <div style="font-size: 10.5px; color: #475569; line-height: 1.4; margin-bottom: 7px;">
+                  Comparez 2 campagnes LiDAR historiques (ex. 2014 vs 2024), calibrez les altitudes de référence et visualisez la carte de <strong>déblais / remblais</strong> avec métriques en <strong>m³/ha cut</strong>.
+                </div>
+                <button type="button" id="btn-trigger-cutfill-active" class="btn-popup-parcel-action" style="width: 100%; padding: 7px 10px; background: #7c3aed; color: #fff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+                  <span>Lancer sur la parcelle active</span>
+                </button>
+              </div>
+            </details>
+        </div>
+      </section>
+
+      <section class="pf-section" data-section="donnees" aria-label="Mes données">
+        <div class="pf-section-head"><h2>Mes données</h2><p>Vos dessins et fichiers importés.</p></div>
+        <div class="pf-group">
+          <!-- Couche personnelle (Dessin, Import SHP, FGB, GeoJSON, KML, QML) -->
+      <div class="tool-card" id="card-custom-vectors" style="border: 1.5px solid #93c5fd; background: #f0f9ff; padding: 10px;">
+        <div class="tool-card-header" style="margin-bottom: 6px;">
+          <div class="tool-card-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            <span style="color: #0369a1; font-weight: 700;">Couche personnelle</span>
+          </div>
+          <div style="position: relative; display: flex; align-items: center; gap: 4px;">
+            <button id="btn-add-personal-layer" type="button" title="Ajouter une couche (dessin ou import)" style="width: 24px; height: 24px; border-radius: 50%; background: #0284c7; color: #ffffff; border: none; font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(2,132,199,0.3); transition: all 0.15s ease;">+</button>
+            <div id="personal-add-dropdown" class="personal-add-dropdown" style="display: none;">
+              <button type="button" class="personal-dropdown-item" id="btn-quick-new-poly">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon></svg>
+                <span>Nouveau polygone</span>
+              </button>
+              <button type="button" class="personal-dropdown-item" id="btn-quick-new-line">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5"><path d="M4 20L20 4"></path></svg>
+                <span>Nouvelle ligne</span>
+              </button>
+              <button type="button" class="personal-dropdown-item" id="btn-quick-new-point">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.5"><circle cx="12" cy="12" r="4"></circle></svg>
+                <span>Nouveau point</span>
+              </button>
+              <div style="height: 1px; background: #e2e8f0; margin: 3px 0;"></div>
+              <label class="personal-dropdown-item" style="margin: 0; cursor: pointer;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span>Importer un fichier...</span>
+                <input type="file" id="vector-input-quick-file" accept=".geojson,.json,.kml,.fgb,.zip,.qml" multiple style="display: none;" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Liste dynamique des couches avec boutons [Visibilité/Cacher] [Nom] [Zoom] [Éditer] [Delete] -->
+        <div id="panel-vector-layers-list" class="personal-layers-inline-list">
+          <!-- Rempli dynamiquement -->
+        </div>
+
+        <div style="font-size: 10px; color: #64748b; margin-top: 6px; line-height: 1.3; font-style: italic; display: flex; align-items: center; gap: 4px;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <span>Glissez un fichier (.zip, .fgb, .geojson, .qml) sur l'écran pour l'ajouter directement.</span>
+        </div>
+      </div>
+
+      
+        </div>
+      </section>
+
+      <section class="pf-section" data-section="ressources" aria-label="Ressources">
+        <div class="pf-section-head"><h2>Ressources</h2></div>
+        <div class="pf-group">
+          <!-- 6. Documentation Agri-Réseau (RAG) -->
       <div class="tool-card">
         <div class="tool-card-header">
           <div class="tool-card-title">
@@ -726,7 +824,18 @@
         </div>
       </div>
 
-      <!-- Boutons d'action : Mise en page PDF, Partager la vue & GitHub -->
+      
+          <div class="tool-card" id="card-soil-ai-entry">
+            <div class="tool-card-header">
+              <div class="tool-card-title"><span>Diagnostic des sols</span></div>
+              <button id="pf-open-soil-ai" class="profile-dock-btn" type="button">Ouvrir</button>
+            </div>
+            <div class="tool-sublabel" style="line-height: 1.4;">Clé d'identification de terrain, conversationnelle. Pour un diagnostic localisé, utilisez le bouton de l'onglet Sols d'une parcelle.</div>
+          </div>
+          <button type="button" class="pf-list-btn" id="pf-install-entry" data-pf-click="pwa-install-btn"><span class="pf-list-name">Installer l'application</span><span class="pf-list-desc">Plan de Ferme sur votre appareil</span></button>
+        </div>
+        <div class="pf-group pf-actions-group">
+          <!-- Boutons d'action : Mise en page PDF, Partager la vue & GitHub -->
       <div style="padding-top: 2px; display: flex; flex-direction: column; gap: 6px;">
         <button id="btn-panel-composer" type="button" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 12px; background: #0f172a; border: 1.5px solid #0f172a; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: #ffffff; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 2px 4px rgba(15,23,42,0.15);">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
@@ -742,10 +851,18 @@
         </a>
       </div>
 
-      <!-- Source information -->
+      
+        </div>
+        <div class="pf-group">
+          <!-- Source information -->
       <div class="source-info-line">
         <strong>Mosaïque VRT HRDEM Canada 1 m</strong> (56 tuiles) • Sols IRDA 2026 • Parcelles BDPPAD 2026 • <a href="https://github.com/cedricbouffard/plandeferme" target="_blank" rel="noopener noreferrer" style="color: #475569; text-decoration: underline; font-weight: 600;">GitHub</a>
       </div>
+          <div class="pf-contact"><a href="mailto:info@cedricbouffard.com">Nous joindre</a></div>
+        </div>
+      </section>
+
+      
     </div>
   </div>
 
@@ -1167,7 +1284,7 @@
   <!-- Floating Quick Profile Toolbar on Map -->
   <div id="map-profile-toolbar" class="map-profile-toolbar">
     <button id="btn-quick-profile" class="floating-profile-btn" type="button" title="Tracer une coupe topographique (cliquez sur la carte, double-clic ou clic droit pour calculer)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18"></path><path d="m3 16 5-7 4 4 3-3 6 6"></path></svg>
       <span id="profile-btn-text">Tracer coupe MNT</span>
     </button>
     <button id="btn-quick-calc" class="floating-profile-btn action-calc" type="button" title="Calculer le profil altimétrique (ou double-clic sur la carte)" style="display: none;">
@@ -1189,7 +1306,7 @@
     </button>
     <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
     <button id="btn-quick-vectors" class="floating-profile-btn" type="button" title="Couche personnelle (Dessin, SHP, FGB, GeoJSON, KML, QML)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
       <span>Couche perso</span>
     </button>
     <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
@@ -1199,11 +1316,7 @@
     </button>
     <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
     <button id="btn-quick-3d" class="floating-profile-btn btn-3d-mode" type="button" title="Activer / désactiver le Relief 3D du terrain (Vue en perspective 30X)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-        <polyline points="2 17 12 22 22 17"></polyline>
-        <polyline points="2 12 12 17 22 12"></polyline>
-      </svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7Z"></path><path d="m3 7 9 5 9-5"></path><path d="M12 12v10"></path></svg>
       <span id="btn-3d-text">Relief 3D</span>
     </button>
     <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
@@ -1339,19 +1452,6 @@
         <span>Glissez avec le clic-droit ou activez <strong>Clic = Vue libre</strong> pour pivoter et incliner à 360°.</span>
       </div>
     </div>
-  </div>
-
-  <!-- Floating Search Panel on Map -->
-  <div id="map-search-panel" class="map-search-panel" style="display: none;">
-    <div class="search-input-wrapper">
-      <svg class="search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"></circle>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-      </svg>
-      <input type="text" id="address-input" class="search-input" placeholder="Rechercher une adresse, ville..." autocomplete="off" />
-      <button id="clear-search" class="clear-btn" style="display:none;" title="Effacer">&times;</button>
-    </div>
-    <div id="search-suggestions" class="search-suggestions" style="display:none;"></div>
   </div>
 
   <!-- Mobile Profile Floating Action Pill -->
@@ -1522,5 +1622,6 @@
     <script src="js/sim.js"></script>
     <script src="js/cutfill.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/shell.js"></script>
 </body>
 </html>
