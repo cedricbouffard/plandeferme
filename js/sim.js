@@ -193,13 +193,18 @@
 
     const N = W * H;
     const zRaw = region.data;
+
+    // 1. Léger pré-lissage gaussien séparable sur la zone étendue (avec marge tampon)
+    // pour filtrer les micro-bruits laser/labour tout en conservant les vraies pentes et thalwegs
+    const zPre = smoothGaussian(zRaw, W, H, 2);
+
     const zMasked = new Float32Array(N).fill(NaN);
     let validInside = 0;
 
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const i = y * W + x;
-        const v = zRaw[i];
+        const v = zPre[i];
         if (!Number.isFinite(v) || v <= -900 || v >= 9000) continue;
 
         const pt = pos(x, y);
@@ -230,8 +235,8 @@
       key: `dem-${Date.now()}`
     };
 
-    // Double lissage 3x3 pour supprimer le micro-bruit LiDAR
-    const smoothed = smooth3(smooth3(gridObj));
+    // 2. Léger lissage final sur la géométrie découpée
+    const smoothed = smooth3(gridObj);
     // Calcul hydrologique de remplissage des cuvettes (Priority Flood)
     smoothed.zf = fillDepressions(smoothed.z, smoothed.W, smoothed.H, 1e-4);
 
@@ -239,32 +244,58 @@
     return smoothed;
   }
 
-  function smooth3(G) {
-    const { W, H, z } = G;
-    const out = new Float32Array(z.length).fill(NaN);
-    for (let y = 0; y < H; y++) {
-      const yW = y * W;
-      const yMin = Math.max(0, y - 1);
-      const yMax = Math.min(H - 1, y + 1);
-      for (let x = 0; x < W; x++) {
-        const i = yW + x;
-        if (Number.isNaN(z[i])) continue;
-        let sum = 0, count = 0;
-        const xMin = Math.max(0, x - 1);
-        const xMax = Math.min(W - 1, x + 1);
-        for (let yy = yMin; yy <= yMax; yy++) {
-          const yyW = yy * W;
-          for (let xx = xMin; xx <= xMax; xx++) {
-            const val = z[yyW + xx];
-            if (!Number.isNaN(val)) {
-              sum += val;
-              count++;
-            }
-          }
+  /**
+   * Lissage gaussien séparable [1, 2, 1] / 4 respectant les cellules NaN
+   * Permet d'atténuer le micro-bruit LiDAR sans altérer les lignes de crête et thalwegs.
+   */
+  function smoothGaussian(data, W, H, passes = 1) {
+    let cur = new Float32Array(data);
+    const tmp = new Float32Array(data.length);
+
+    for (let p = 0; p < passes; p++) {
+      // Passe horizontale
+      for (let y = 0; y < H; y++) {
+        const yW = y * W;
+        for (let x = 0; x < W; x++) {
+          const i = yW + x;
+          const v = cur[i];
+          if (!Number.isFinite(v)) { tmp[i] = NaN; continue; }
+
+          const l = x > 0 ? cur[i - 1] : NaN;
+          const r = x < W - 1 ? cur[i + 1] : NaN;
+
+          let sum = v * 2, count = 2;
+          if (Number.isFinite(l)) { sum += l; count++; }
+          if (Number.isFinite(r)) { sum += r; count++; }
+          tmp[i] = sum / count;
         }
-        out[i] = count > 0 ? sum / count : NaN;
+      }
+
+      // Passe verticale
+      for (let y = 0; y < H; y++) {
+        const yW = y * W;
+        for (let x = 0; x < W; x++) {
+          const i = yW + x;
+          const v = tmp[i];
+          if (!Number.isFinite(v)) { cur[i] = NaN; continue; }
+
+          const u = y > 0 ? tmp[i - W] : NaN;
+          const d = y < H - 1 ? tmp[i + W] : NaN;
+
+          let sum = v * 2, count = 2;
+          if (Number.isFinite(u)) { sum += u; count++; }
+          if (Number.isFinite(d)) { sum += d; count++; }
+          cur[i] = sum / count;
+        }
       }
     }
+    return cur;
+  }
+
+  function smooth3(G) {
+    if (!G || !G.z) return G;
+    const { W, H, z } = G;
+    const out = smoothGaussian(z, W, H, 1);
     return Object.assign({}, G, { z: out });
   }
 
@@ -1460,7 +1491,8 @@
      */
     compute() {
       if (!this.currentGrid) return;
-      const G = this.currentGrid;
+      // Léger lissage supplémentaire pour stabiliser le calcul RUSLE (LS-factor et gradients de pente)
+      const G = smooth3(this.currentGrid);
       const { W, H, dx, dy, z } = G;
       const N = W * H;
 
