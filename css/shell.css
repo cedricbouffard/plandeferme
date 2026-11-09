@@ -252,7 +252,7 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
   }
   .site-footer { display: none; }
   .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { bottom: 0 !important; }
-  body.pf-fiche-open .maplibregl-ctrl-top-right { right: calc(var(--pf-fiche) + 12px); }
+  body.pf-fiche-open .maplibregl-ctrl-top-right { right: var(--pf-fiche); }
 
   /* Palette d'outils verticale */
   .map-profile-toolbar {
@@ -269,7 +269,7 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
     box-shadow: var(--pf-shadow);
     animation: none !important;
   }
-  body.pf-fiche-open .map-profile-toolbar { right: calc(var(--pf-fiche) + 54px) !important; }
+  body.pf-fiche-open .map-profile-toolbar { right: calc(var(--pf-fiche) + 52px) !important; }
   .map-profile-toolbar > div { display: none !important; }
   .map-profile-toolbar .floating-profile-btn {
     width: 40px; height: 40px; padding: 0 !important;
@@ -321,28 +321,8 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
     border-color: var(--pf-line) !important;
     box-shadow: var(--pf-shadow-lg) !important;
   }
-  body.pf-fiche-open .elevation-profile-dock { right: calc(var(--pf-fiche) + 24px) !important; }
+  body.pf-fiche-open .elevation-profile-dock { right: calc(var(--pf-fiche) + 12px) !important; }
   .pf-tray-hidden { display: none !important; }
-
-  /* Fiche parcelle : la popup des parcelles devient un panneau ancré à droite */
-  .maplibregl-popup:has(.popup-tabs-header) {
-    position: fixed !important;
-    top: calc(var(--pf-top) + 12px) !important;
-    right: 12px !important;
-    left: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    width: var(--pf-fiche);
-    max-width: var(--pf-fiche) !important;
-    z-index: 1050;
-  }
-  .maplibregl-popup:has(.popup-tabs-header) .maplibregl-popup-tip { display: none; }
-  .maplibregl-popup:has(.popup-tabs-header) .maplibregl-popup-content {
-    max-height: calc(100vh - var(--pf-top) - 24px);
-    overflow-y: auto;
-    border: 1px solid var(--pf-line);
-    box-shadow: var(--pf-shadow-lg);
-  }
 
   /* Panneaux flottants des outils (mesure, relief 3D) : à gauche de la palette */
   .measure-panel,
@@ -353,7 +333,7 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
     overflow-y: auto;
   }
   body.pf-fiche-open .measure-panel,
-  body.pf-fiche-open .floating-3d-panel { right: calc(var(--pf-fiche) + 106px) !important; }
+  body.pf-fiche-open .floating-3d-panel { right: calc(var(--pf-fiche) + 104px) !important; }
   .banner-3d-prompt { top: calc(var(--pf-top) + 12px) !important; left: calc(var(--pf-left) + (100vw - var(--pf-left)) / 2) !important; }
 
   /* Panneaux latéraux existants : sous la barre du haut */
@@ -401,19 +381,6 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-tray-tab > button:first-child { height: 30px; padding: 0 4px 0 10px !important; font-size: 12px; font-weight: 600; color: inherit; }
 .pf-tray-tab > button:last-child { width: 24px; height: 24px; font-size: 15px; color: var(--pf-muted); border-radius: 6px; }
 .pf-tray-tab > button:last-child:hover { background: rgba(0, 0, 0, 0.06) !important; }
-
-/* Fiche parcelle : actions homogènes (bureau et mobile) */
-.btn-popup-parcel-action {
-  background: #fafbf9 !important;
-  color: var(--pf-ink) !important;
-  border: 1px solid var(--pf-line) !important;
-  box-shadow: none !important;
-  font-weight: 600 !important;
-}
-.btn-popup-parcel-action:hover { background: var(--pf-accent-soft) !important; border-color: var(--pf-accent) !important; }
-.btn-popup-parcel-action svg { stroke: currentColor; }
-#btn-popup-trigger-3d { color: var(--pf-accent-strong) !important; background: var(--pf-accent-soft) !important; }
-.popup-tab-btn.active { color: var(--pf-ink); border-bottom-color: var(--pf-accent) !important; }
 
 /* ==========================================================================
    MOBILE : on garde la navigation mobile existante, sans les éléments bureau
@@ -527,4 +494,166 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
   .pf-cf-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pf-cf-field select { max-width: 180px; }
   .pf-cf-sep { display: none; }
+}
+
+
+/* ==========================================================================
+   Fiche parcelle : panneau ancré sur toute la hauteur à droite
+   ========================================================================== */
+.pf-fiche { display: flex; flex-direction: column; min-height: 0; background: #fff; color: var(--pf-ink); font-size: 12.5px; }
+.pf-fiche-head { padding: 16px 52px 12px 18px; border-bottom: 1px solid var(--pf-line-soft); }
+.pf-fiche-kicker { font-size: 11px; font-weight: 600; color: var(--pf-accent); text-transform: uppercase; letter-spacing: 0.06em; }
+.pf-fiche-title { margin-top: 3px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25; color: var(--pf-ink); word-break: break-word; }
+.pf-fiche-meta { margin-top: 4px; font-size: 12px; color: var(--pf-muted); }
+.pf-fiche-muted { color: var(--pf-muted); font-weight: 400; }
+
+/* Onglets */
+.pf-fiche .popup-tabs-header {
+  display: flex; gap: 2px; padding: 0 12px;
+  background: #fff; border-bottom: 1px solid var(--pf-line-soft);
+}
+.pf-fiche .popup-tab-btn {
+  flex: 0 0 auto; height: 40px; padding: 0 10px; gap: 6px;
+  border: none; border-bottom: 2px solid transparent; border-radius: 0; margin-bottom: -1px;
+  background: transparent; color: var(--pf-muted); font-size: 12.5px; font-weight: 500;
+}
+.pf-fiche .popup-tab-btn svg { display: none; }
+.pf-fiche .popup-tab-btn:hover { background: transparent; color: var(--pf-ink); }
+.pf-fiche .popup-tab-btn.active { background: transparent; color: var(--pf-ink); font-weight: 700; border-bottom: 2px solid var(--pf-accent); }
+.pf-fiche .popup-tab-btn:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: -2px; }
+.pf-fiche .popup-tab-dot { background: var(--pf-accent) !important; }
+
+/* Corps défilant */
+.pf-fiche-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.pf-fiche .popup-tab-pane { padding: 14px 18px 18px; max-height: none; overflow: visible; font-size: 12.5px; gap: 12px; }
+
+/* Faits clés (onglet Cultures) */
+.pf-fiche-facts { margin: 0; display: grid; grid-template-columns: 110px 1fr; row-gap: 8px; column-gap: 10px; }
+.pf-fiche-facts dt { color: var(--pf-muted); }
+.pf-fiche-facts dd { margin: 0; font-weight: 600; }
+
+/* Onglet Sols : contenu existant, styles harmonisés */
+.pf-fiche .pedo-study-meta { gap: 8px; }
+.pf-fiche .pedo-study-badge { background: var(--pf-accent-soft); color: var(--pf-accent-strong); font-weight: 600; border-radius: 10px; padding: 2px 8px; }
+.pf-fiche .pedo-study-year { color: var(--pf-muted); }
+.pf-fiche .pedo-popup-title { font-size: 14px; font-weight: 700; color: var(--pf-ink); }
+.pf-fiche .pedo-appellation { font-family: inherit; font-size: 12px; font-weight: 600; background: var(--pf-ground); border: none; border-radius: 6px; padding: 3px 8px; color: var(--pf-ink); }
+.pf-fiche .pedo-links-row { gap: 6px; }
+.pf-fiche .pedo-study-link,
+.pf-fiche .pedo-pdf-link {
+  height: 30px; padding: 0 10px; border-radius: 8px;
+  background: #fff; border: 1px solid #d5d9d3; color: var(--pf-ink); font-weight: 600;
+}
+.pf-fiche .pedo-study-link:hover,
+.pf-fiche .pedo-pdf-link:hover { border-color: var(--pf-accent); color: var(--pf-accent-strong); background: var(--pf-hover); }
+.pf-fiche .pedo-series-heading { font-size: 11px; font-weight: 600; color: var(--pf-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.pf-fiche .pedo-series-card { background: var(--pf-ground); border: none; border-radius: 10px; padding: 10px 12px; box-shadow: none; }
+.pf-fiche .pedo-series-card:hover { background: #eef1ec; box-shadow: none; transform: none; }
+.pf-fiche .pedo-series-name { font-weight: 600; color: var(--pf-ink); }
+.pf-fiche .pedo-series-pct { color: var(--pf-ink); background: transparent; font-variant-numeric: tabular-nums; }
+.pf-fiche .pedo-progress-track { background: #e3e6e1; height: 5px; }
+.pf-fiche .pedo-progress-fill { background: var(--pf-accent); }
+.pf-fiche .pedo-series-link { color: var(--pf-accent); }
+
+/* Boutons secondaires de la fiche (diagnostic, Agri-Réseau, NDVI, plans) */
+.pf-fiche .btn-popup-ai,
+.pf-fiche .btn-popup-rag,
+.pf-fiche .btn-popup-ndvi {
+  width: 100%; height: 36px; margin: 0; padding: 0 12px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  background: #fff; border: 1px solid #d5d9d3; border-radius: 9px;
+  color: var(--pf-ink); font-size: 12.5px; font-weight: 600; box-shadow: none;
+}
+.pf-fiche .btn-popup-ai:hover,
+.pf-fiche .btn-popup-rag:hover,
+.pf-fiche .btn-popup-ndvi:hover { background: var(--pf-hover); border-color: var(--pf-accent); color: var(--pf-accent-strong); }
+.pf-fiche .btn-popup-ndvi { background: var(--pf-accent-soft); border-color: var(--pf-accent); color: var(--pf-accent-strong); }
+.pf-fiche .btn-popup-ai + .btn-popup-rag { margin-top: -4px; }
+.pf-fiche .popup-tab-pane[data-tab="drainage"] a.pedo-study-link { background: var(--pf-accent) !important; color: #fff !important; border: none; height: 36px; }
+.pf-fiche .popup-tab-pane[data-tab="drainage"] .parcel-info-badge { background: var(--pf-ground) !important; border: none !important; border-radius: 10px !important; }
+.pf-fiche .popup-tab-pane[data-tab="drainage"] .parcel-info-badge * { color: var(--pf-ink) !important; }
+.pf-fiche .popup-tab-pane[data-tab="drainage"] a[style*="#0284c7"] { background: var(--pf-accent) !important; }
+
+/* Historique des rotations */
+.pf-fiche .popup-crop-history { margin: 0; padding: 0; background: transparent; border: none; }
+.pf-fiche .crop-history-header { margin-bottom: 6px; }
+.pf-fiche .crop-history-title { font-size: 11px; font-weight: 600; color: var(--pf-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.pf-fiche .crop-history-badge { background: var(--pf-ground); color: var(--pf-muted); border-radius: 10px; padding: 2px 8px; }
+.pf-fiche .crop-history-list { max-height: none; }
+.pf-fiche .crop-history-item { border-bottom: 1px solid var(--pf-line-soft); padding: 5px 2px; font-size: 12px; }
+
+/* Actions : bloc fixe en bas de la fiche */
+.pf-fiche-actions { flex-shrink: 0; padding: 12px 18px 16px; border-top: 1px solid var(--pf-line); background: #fff; }
+.pf-fiche-actions-title { font-size: 11px; font-weight: 600; color: var(--pf-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.pf-fiche-actions-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.pf-fiche .btn-popup-parcel-action {
+  min-height: 52px; padding: 7px 10px;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px;
+  background: var(--pf-hover); border: 1px solid var(--pf-line); border-radius: 10px;
+  color: var(--pf-ink); text-align: left; cursor: pointer; box-shadow: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pf-fiche .btn-popup-parcel-action:hover { background: var(--pf-accent-soft); border-color: var(--pf-accent); }
+.pf-fiche .btn-popup-parcel-action:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: 1px; }
+.pf-act-name { font-size: 12.5px; font-weight: 600; }
+.pf-act-desc { font-size: 11px; color: var(--pf-muted); }
+
+/* Bouton de fermeture */
+.maplibregl-popup:has(.pf-fiche) .maplibregl-popup-close-button {
+  top: 12px; right: 12px; width: 32px; height: 32px; padding: 0;
+  border-radius: 8px; background: var(--pf-ground); color: var(--pf-muted);
+  font-size: 18px; line-height: 32px; z-index: 2; transform: none;
+}
+.maplibregl-popup:has(.pf-fiche) .maplibregl-popup-close-button:hover { background: #e9ece7; color: var(--pf-ink); transform: none; }
+.maplibregl-popup:has(.pf-fiche) .maplibregl-popup-tip { display: none; }
+
+@media (min-width: 769px) {
+  .maplibregl-popup:has(.pf-fiche) {
+    position: fixed !important;
+    top: var(--pf-top) !important; right: 0 !important; bottom: 0 !important; left: auto !important;
+    transform: none !important;
+    width: var(--pf-fiche); max-width: var(--pf-fiche) !important;
+    display: flex; flex-direction: column;
+    z-index: 1050;
+    animation: pf-fiche-in 0.18s ease-out;
+  }
+  .maplibregl-popup:has(.pf-fiche) .maplibregl-popup-content {
+    flex: 1 1 auto; min-height: 0; height: 100%; max-height: none;
+    display: flex; flex-direction: column;
+    padding: 0; border: none; border-left: 1px solid var(--pf-line); border-radius: 0;
+    box-shadow: -10px 0 24px rgba(23, 33, 27, 0.08);
+    overflow: hidden;
+  }
+  .maplibregl-popup:has(.pf-fiche) .pf-fiche { flex: 1 1 auto; height: 100%; }
+}
+@keyframes pf-fiche-in { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 768px) {
+  .maplibregl-popup:has(.pf-fiche) {
+    position: fixed !important;
+    left: 0 !important; right: 0 !important; top: auto !important; bottom: 56px !important;
+    transform: none !important;
+    max-width: none !important; width: auto;
+    z-index: 1500;
+  }
+  .maplibregl-popup:has(.pf-fiche) .maplibregl-popup-content {
+    max-height: 62vh; display: flex; flex-direction: column; padding: 0;
+    border: none; border-radius: 18px 18px 0 0; box-shadow: 0 -8px 24px rgba(23, 33, 27, 0.14); overflow: hidden;
+  }
+  .maplibregl-popup:has(.pf-fiche) .pf-fiche { max-height: 62vh; }
+  .pf-fiche .popup-tabs-header { overflow-x: auto; }
+  .pf-fiche .popup-tab-btn { flex: 1 0 auto; height: 44px; }
+  .pf-fiche .btn-popup-parcel-action { min-height: 48px; }
+}
+
+/* Correctifs fiche : rien ne rétrécit sauf le corps défilant */
+.pf-fiche-head, .pf-fiche .popup-tabs-header, .pf-fiche-actions { flex-shrink: 0; }
+.pf-fiche .popup-tabs-header { min-height: 40px; align-items: stretch; }
+.pf-fiche .popup-tab-btn { display: inline-flex; align-items: center; }
+.pf-fiche .popup-tab-btn:focus { outline: none; }
+.pf-fiche .popup-tab-btn:focus-visible { outline: none; background: var(--pf-hover); }
+.pf-fiche .crop-history-header { flex-wrap: wrap; gap: 4px 8px; }
+.pf-fiche .crop-history-badge { white-space: nowrap; }
+@media (max-width: 768px) {
+  .pf-fiche .popup-tabs-header { min-height: 44px; }
 }

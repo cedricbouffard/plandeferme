@@ -1077,52 +1077,15 @@
           const supStr = !isNaN(supNum) ? supNum.toFixed(1) + " ha" : (sup ? sup + " ha" : "");
 
           culturesTabHtml = `
-            <div class="parcel-info-badge" style="padding: 9px 11px; background: #f8fafc; border: 1px solid #cbd5e1; border-left: 3.5px solid #0f172a; border-radius: 6px; font-size: 0.8rem;">
-              <div style="font-weight: 700; color: #0f172a; display: flex; justify-content: space-between; align-items: center;">
-                <span>Parcelle BDPPAD ${pid ? `nº ${pid}` : ''}</span>
-                ${supStr ? `<span style="font-weight: 700; color: #1e293b;">${supStr}</span>` : ''}
-              </div>
-              ${crop ? `<div style="color: #334155; margin-top: 4px;">Culture 2026 : <strong>${crop}</strong>${group ? ` <span style="color:#64748b;">(${group})</span>` : ''}</div>` : ''}
-              ${cadastreProps && cadastreProps.NO_LOT ? `<div style="color: #475569; margin-top: 3px; font-size: 11px;">Lot cadastre rénové : <strong>nº ${cadastreProps.NO_LOT}</strong></div>` : ''}
-              <button type="button" class="btn-popup-rag" data-query="${crop ? `Pratiques agronomiques pour la culture : ${crop}` : 'Rotation et santé des sols agricoles'}" title="Consulter la base documentaire Agri-Réseau pour cette culture" style="margin-top: 6px;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-                <span>Consulter Agri-Réseau pour cette culture</span>
-              </button>
+            <dl class="pf-fiche-facts">
+              <dt>Culture 2026</dt><dd>${crop ? `${crop}${group ? ` <span class="pf-fiche-muted">(${group})</span>` : ''}` : '<span class="pf-fiche-muted">Non déclarée</span>'}</dd>
+              ${supStr ? `<dt>Superficie</dt><dd>${supStr}</dd>` : ''}
+              ${cadastreProps && cadastreProps.NO_LOT ? `<dt>Lot (cadastre)</dt><dd>nº ${cadastreProps.NO_LOT}</dd>` : ''}
+            </dl>
 
-              <div style="display: flex; gap: 6px; margin-top: 8px;">
-                <button type="button" class="btn-popup-parcel-action btn-popup-action-3d" style="flex: 1; padding: 7px 8px; background: #4f46e5; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-                  <span>Voir en 3D (30X)</span>
-                </button>
-                <button type="button" class="btn-popup-parcel-action btn-popup-action-tif" style="flex: 1; padding: 7px 8px; background: #0284c7; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                  <span>Exporter MNT (TIF)</span>
-                </button>
-              </div>
-
-              <div style="display: flex; gap: 6px; margin-top: 6px;">
-                <button type="button" class="btn-popup-parcel-action btn-popup-action-rain" style="flex: 1; padding: 7px 8px; background: #0284c7; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);" title="Simuler l'écoulement gravitationnel de la pluie sur cette parcelle">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path><line x1="8" y1="19" x2="8" y2="21"></line><line x1="8" y1="13" x2="8" y2="15"></line><line x1="16" y1="19" x2="16" y2="21"></line><line x1="16" y1="13" x2="16" y2="15"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="12" y1="15" x2="12" y2="17"></line></svg>
-                  <span>Simuler Pluie</span>
-                </button>
-                <button type="button" class="btn-popup-parcel-action btn-popup-action-erosion" style="flex: 1; padding: 7px 8px; background: #ea580c; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);" title="Calculer les pertes de sol selon le modèle RUSLE">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path></svg>
-                  <span>Érosion (RUSLE)</span>
-                </button>
-              </div>
-
-              <div style="display: flex; gap: 6px; margin-top: 6px;">
-                <button type="button" class="btn-popup-parcel-action btn-popup-action-cutfill" style="flex: 1; padding: 7px 8px; background: #7c3aed; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);" title="Comparer 2 campagnes LiDAR multidates et évaluer les déblais / remblais (m³/ha)">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
-                  <span>Comparer LiDAR (D/R m³/ha)</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="popup-crop-history" style="margin-top: 8px;">
+            <div class="popup-crop-history">
               <div class="crop-history-header">
                 <span class="crop-history-title">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                   <span>Historique des rotations (2003–2026)</span>
                 </span>
                 <span class="crop-history-badge">Chargement...</span>
@@ -1180,13 +1143,6 @@
 
                 <span>Lancer la simulation de pluie animée</span>
 
-              </button>
-
-              <button id="btn-popup-start-erosion" type="button" class="btn-popup-parcel-action" style="padding: 8px 10px; background: #ea580c; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);">
-
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path></svg>
-
-                <span>Calculer l'érosion des sols (RUSLE)</span>
               </button>
 
               <button id="btn-popup-start-cutfill" type="button" class="btn-popup-parcel-action" style="padding: 8px 10px; background: #7c3aed; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);" title="Comparer 2 campagnes LiDAR multidates et évaluer les déblais / remblais (m³/ha)">
@@ -1309,8 +1265,46 @@
           `;
         }
 
+        // En-tête de la fiche
+        const fichePid = parcelProps ? (parcelProps.IDPAR || parcelProps.idpar || "") : "";
+        const ficheSup = parcelProps ? parseFloat(parcelProps.SUPHEC || parcelProps.suphec || "") : NaN;
+        const ficheCrop = parcelProps ? (parcelProps.DESCODPR1 || parcelProps.descodpr1 || "") : "";
+        const ficheKicker = parcelProps ? "Parcelle agricole" : (pedoProps ? "Sol cartographié" : "Point sélectionné");
+        const ficheTitle = parcelProps
+          ? (fichePid ? `Parcelle nº ${fichePid}` : "Parcelle BDPPAD")
+          : ((pedoProps && (pedoProps.Appellation_cartographique || "").trim()) || (cadastreProps && cadastreProps.NO_LOT ? `Lot nº ${cadastreProps.NO_LOT}` : "Informations du secteur"));
+        const ficheMeta = [
+          !isNaN(ficheSup) ? `${ficheSup.toFixed(1)} ha` : "",
+          ficheCrop,
+          cadastreProps && cadastreProps.NO_LOT && parcelProps ? `Lot ${cadastreProps.NO_LOT}` : ""
+        ].filter(Boolean).join(" · ");
+
+        const ficheActionsHtml = parcelProps ? `
+            <div class="pf-fiche-actions">
+              <div class="pf-fiche-actions-title">Analyser cette parcelle</div>
+              <div class="pf-fiche-actions-grid">
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-3d">
+                  <span class="pf-act-name">Vue 3D</span><span class="pf-act-desc">Relief découpé, 30×</span>
+                </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-rain" title="Simuler l'écoulement gravitationnel de la pluie sur cette parcelle">
+                  <span class="pf-act-name">Simuler la pluie</span><span class="pf-act-desc">Ruissellement</span>
+                </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-cutfill" title="Comparer 2 campagnes LiDAR et évaluer les déblais / remblais (m³/ha)">
+                  <span class="pf-act-name">Comparer LiDAR</span><span class="pf-act-desc">Déblais / remblais</span>
+                </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-tif">
+                  <span class="pf-act-name">Exporter le MNT</span><span class="pf-act-desc">GeoTIFF découpé</span>
+                </button>
+              </div>
+            </div>` : "";
+
         const popupHtml = `
-          <div class="pedo-popup">
+          <div class="pedo-popup pf-fiche">
+            <div class="pf-fiche-head">
+              <div class="pf-fiche-kicker">${ficheKicker}</div>
+              <div class="pf-fiche-title">${ficheTitle}</div>
+              ${ficheMeta ? `<div class="pf-fiche-meta">${ficheMeta}</div>` : ""}
+            </div>
             <div class="popup-tabs-header">
               <button type="button" class="popup-tab-btn ${activeTab === 'sols' ? 'active' : ''}" data-tab="sols">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
@@ -1331,11 +1325,8 @@
                 <span>Drainage${drainagePlans.length > 1 ? ` (${drainagePlans.length})` : ''}</span>
                 <span class="popup-tab-dot" title="${drainagePlans.length} plan(s) de drainage disponible(s)" style="background: #0284c7;"></span>
               </button>` : ''}
-              <button type="button" class="popup-tab-btn" id="btn-popup-trigger-3d" title="Visualiser cette parcelle en perspective 3D (30X)" style="margin-left: auto; color: #4f46e5; font-weight: 700; background: #eef2ff;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-                <span>3D (30X)</span>
-              </button>
             </div>
+            <div class="pf-fiche-body">
             <div class="popup-tab-pane ${activeTab === 'sols' ? 'active' : ''}" data-tab="sols">
               ${solsTabHtml}
             </div>
@@ -1349,6 +1340,8 @@
             <div class="popup-tab-pane ${activeTab === 'drainage' ? 'active' : ''}" data-tab="drainage">
               ${drainageTabHtml}
             </div>` : ''}
+            </div>
+            ${ficheActionsHtml}
           </div>
         `;
 
