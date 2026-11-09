@@ -268,6 +268,38 @@ class Terrain3DManager {
       return feature;
     }
 
+    // 3b. Chaque tranche déborde de sa tuile (marge « buffer » des tuiles vectorielles).
+    // On ne garde que les tranches du zoom le plus fin (les tuiles parentes conservées en cache
+    // donnent des contours grossiers qui se superposent) et on découpe chaque tranche exactement
+    // aux limites de sa tuile : les coutures tombent alors sur la même ligne et s'annulent.
+    const tileOf = (f) => {
+      const vt = f && f._vectorTileFeature;
+      return vt && Number.isInteger(vt._z) && Number.isInteger(vt._x) && Number.isInteger(vt._y)
+        ? { z: vt._z, x: vt._x, y: vt._y } : null;
+    };
+    const tiled = matching.map(f => ({ f, t: tileOf(f) }));
+    const maxZ = tiled.reduce((m, s) => (s.t && s.t.z > m ? s.t.z : m), -1);
+    const clippedSlices = [];
+    for (const { f, t } of tiled) {
+      if (t && t.z !== maxZ) continue;
+      if (!t) { clippedSlices.push(f); continue; }
+      const box = this.getTileBbox(t.z, t.x, t.y);
+      const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates]
+        : (f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates : []);
+      const out = [];
+      for (const poly of polys) {
+        const rings = poly.map(r => this.clipRingToBox(r, box)).filter(r => r && r.length >= 4);
+        if (rings.length && rings[0]) out.push(rings);
+      }
+      if (out.length) {
+        clippedSlices.push({ properties: f.properties, id: f.id, geometry: { type: 'MultiPolygon', coordinates: out } });
+      }
+    }
+    if (clippedSlices.length >= 1) {
+      matching.length = 0;
+      for (const f of clippedSlices) matching.push(f);
+    }
+
     // 4. Déduplication par signature géométrique de l'anneau extérieur
     const getRingSignature = (ring) => {
       if (!ring || ring.length === 0) return '';
@@ -306,7 +338,7 @@ class Terrain3DManager {
 
     // Extraction des anneaux extérieurs pour dissolution propre et instantanée des coutures de tuiles
     const outerRings = uniquePolygons.map(p => p[0]).filter(r => r && r.length >= 4);
-    const exteriorLines = this.buildExteriorLines(outerRings);
+    const exteriorLines = this.buildExteriorLines(this.splitRingsAtSharedVertices(outerRings));
 
     let resultGeom;
     if (exteriorLines.length === 1 && exteriorLines[0].length >= 4) {
@@ -334,6 +366,69 @@ class Terrain3DManager {
       }),
       geometry: resultGeom
     };
+  }
+
+  /**
+   * Découpe d'un anneau par un rectangle lon/lat (Sutherland–Hodgman).
+   * Les bords des tuiles Web Mercator sont des lignes de longitude / latitude constantes.
+   */
+  clipRingToBox(ring, box) {
+    if (!ring || ring.length < 4) return null;
+    const [x0, y0, x1, y1] = box;
+    let pts = ring.slice(0, -1);
+    const clip = (inside, cross) => {
+      const out = [];
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length];
+        const ina = inside(a), inb = inside(b);
+        if (ina) out.push(a);
+        if (ina !== inb) out.push(cross(a, b));
+      }
+      pts = out;
+    };
+    const atX = (x) => (a, b) => [x, a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0])];
+    const atY = (y) => (a, b) => [a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]), y];
+    clip(p => p[0] >= x0, atX(x0)); if (pts.length < 3) return null;
+    clip(p => p[0] <= x1, atX(x1)); if (pts.length < 3) return null;
+    clip(p => p[1] >= y0, atY(y0)); if (pts.length < 3) return null;
+    clip(p => p[1] <= y1, atY(y1)); if (pts.length < 3) return null;
+    pts.push([pts[0][0], pts[0][1]]);
+    return pts;
+  }
+
+  /**
+   * Insère dans chaque segment les sommets des autres anneaux qui tombent dessus
+   * (jonctions en T le long d'une limite de tuile), pour que les coutures s'annulent.
+   */
+  splitRingsAtSharedVertices(rings) {
+    if (!rings || rings.length <= 1) return rings || [];
+    const EPS = 2e-7; // ~2 cm
+    const allPts = [];
+    for (const r of rings) for (let i = 0; i < r.length - 1; i++) allPts.push(r[i]);
+    return rings.map(ring => {
+      const out = [];
+      for (let i = 0; i < ring.length - 1; i++) {
+        const p1 = ring[i], p2 = ring[i + 1];
+        out.push(p1);
+        const dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+        const len2 = dx * dx + dy * dy;
+        if (len2 < 1e-16) continue;
+        const len = Math.sqrt(len2);
+        const minX = Math.min(p1[0], p2[0]) - EPS, maxX = Math.max(p1[0], p2[0]) + EPS;
+        const minY = Math.min(p1[1], p2[1]) - EPS, maxY = Math.max(p1[1], p2[1]) + EPS;
+        const splits = [];
+        for (const p of allPts) {
+          if (p[0] < minX || p[0] > maxX || p[1] < minY || p[1] > maxY) continue;
+          if (Math.abs((p[1] - p1[1]) * dx - (p[0] - p1[0]) * dy) / len > EPS) continue;
+          const t = ((p[0] - p1[0]) * dx + (p[1] - p1[1]) * dy) / len2;
+          if (t > 1e-6 && t < 1 - 1e-6) splits.push([t, p]);
+        }
+        splits.sort((a, b) => a[0] - b[0]);
+        for (const [, p] of splits) out.push(p);
+      }
+      out.push(ring[ring.length - 1]);
+      return out;
+    });
   }
 
   buildExteriorLines(rings) {

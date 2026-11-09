@@ -292,6 +292,24 @@
         }
       });
 
+      // 6b. Plans de drainage : couche de détection invisible permanente, pour que l'onglet
+      // Drainage de la fiche apparaisse même quand la couche « Plans de drainage » est masquée
+      if (!map.getSource("drainage-source")) {
+        map.addSource("drainage-source", {
+          type: "vector",
+          url: "pmtiles://https://storage.googleapis.com/geoqc/drainage/plans_drainage.pmtiles"
+        });
+      }
+      if (!map.getLayer("drainage-hit-layer")) {
+        map.addLayer({
+          id: "drainage-hit-layer",
+          type: "fill",
+          source: "drainage-source",
+          "source-layer": "plans_drainage",
+          paint: { "fill-opacity": 0 }
+        });
+      }
+
       // 7. Parcelles Fill Layer (transparent background)
       map.addLayer({
         id: "parcelles-fill",
@@ -816,9 +834,10 @@
           [e.point.x - 5, e.point.y - 5],
           [e.point.x + 5, e.point.y + 5]
         ];
-        const drainageHits = map.queryRenderedFeatures(drainageBbox, {
-          layers: ["drainage-fill"].filter(l => map.getLayer(l))
-        });
+        const drainageQueryLayers = ["drainage-fill", "drainage-hit-layer"].filter(l => map.getLayer(l));
+        const drainageHits = drainageQueryLayers.length ? map.queryRenderedFeatures(drainageBbox, {
+          layers: drainageQueryLayers
+        }) : [];
 
         const activeDrainageLots = new Set();
         if (cadastreProps && cadastreProps.NO_LOT) {
@@ -838,8 +857,8 @@
         }
 
         // If a lot number is known and drainage layer is rendered, also check any sister plans rendered for that exact same lot
-        if (activeDrainageLots.size > 0 && map.getLayer("drainage-fill")) {
-          const sisterHits = map.queryRenderedFeatures({ layers: ["drainage-fill"] });
+        if (activeDrainageLots.size > 0 && drainageQueryLayers.length) {
+          const sisterHits = map.queryRenderedFeatures({ layers: drainageQueryLayers });
           sisterHits.forEach(h => {
             const p = h.properties || {};
             const lot = String(p.no_lot || "").trim();
@@ -1032,7 +1051,7 @@
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
                 </svg>
-                <span>Mémoire sur le portail &rarr;</span>
+                <span>Lire l'étude</span>
               </a>
               ${etudeUrl ? `
                 <a href="${etudeUrl}" target="_blank" rel="noopener noreferrer" class="pedo-pdf-link">
@@ -1051,10 +1070,6 @@
             <button id="btn-tab-ai-identify" type="button" class="btn-popup-ai" style="margin-top: 6px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
               <span>Identifier la série de sol (Diagnostic terrain)</span>
-            </button>
-            <button type="button" class="btn-popup-rag" data-query="${appellation ? `Gestion agronomique des sols : ${appellation}` : 'Gestion des sols agricoles au Québec'}" title="Consulter la base documentaire Agri-Réseau">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-              <span>Consulter Agri-Réseau pour ce sol</span>
             </button>
           `;
         } else {
