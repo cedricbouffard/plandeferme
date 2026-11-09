@@ -555,6 +555,29 @@
                 </div>
               </div>
             </details>
+
+            <!-- Comparaison LiDAR multidates & Déblais/Remblais (m³/ha) -->
+            <details class="topo-sub-accordion" id="card-cutfill-tool">
+              <summary class="topo-sub-header">
+                <div class="topo-sub-title">
+                  <svg class="topo-sub-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+                  <span>Comparaison LiDAR (D/R)</span>
+                </div>
+                <button type="button" id="btn-open-cutfill-from-panel" class="profile-dock-btn" style="padding: 2px 8px; font-size: 10px; font-weight: 700; color: #7c3aed; background: #f5f3ff; border-color: #ddd6fe;" title="Ouvrir l'outil de comparaison multidate LiDAR sur la parcelle">
+                  Ouvrir
+                </button>
+              </summary>
+              <div class="topo-sub-content">
+                <div style="font-size: 10.5px; color: #475569; line-height: 1.4; margin-bottom: 7px;">
+                  Comparez 2 campagnes LiDAR historiques (ex. 2014 vs 2024), calibrez les altitudes de référence et visualisez la carte de <strong>déblais / remblais</strong> avec métriques en <strong>m³/ha cut</strong>.
+                </div>
+                <button type="button" id="btn-trigger-cutfill-active" class="btn-popup-parcel-action" style="width: 100%; padding: 7px 10px; background: #7c3aed; color: #fff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+                  <span>Lancer sur la parcelle active</span>
+                </button>
+              </div>
+            </details>
           </div>
         </div>
       </details>
@@ -885,6 +908,163 @@
       Chargement du relief LiDAR 1m...
     </div>
     <div id="sim-rain-hint" style="display: none; font-size: 10.5px; color: #ef4444; font-weight: 600; margin-top: 4px;"></div>
+  </div>
+
+  <!-- Floating LiDAR Comparison & Cut/Fill Bottom Dock -->
+  <div id="cutfill-dock" class="elevation-profile-dock cutfill-dock" role="region" aria-label="Comparaison LiDAR et Déblais / Remblais" style="display: none;">
+    <div class="profile-dock-header">
+      <div class="profile-dock-title" style="display: flex; align-items: center; gap: 8px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path>
+        </svg>
+        <span style="font-weight: 700; color: #0f172a;">Comparaison LiDAR — Déblais / Remblais</span>
+        <span id="cutfill-parcel-name" style="font-size: 11px; font-weight: 600; color: #64748b; background: #f1f5f9; padding: 2px 7px; border-radius: 4px; border: 1px solid #e2e8f0;"></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button type="button" id="btn-cutfill-export-tif" class="profile-dock-btn" style="background: #7c3aed; color: #fff; font-weight: 600; padding: 4px 10px; border: none; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 5px;" title="Exporter la carte différentielle en GeoTIFF métrique">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Exporter TIF (D/R)</span>
+        </button>
+        <button id="btn-close-cutfill-dock" class="profile-dock-close" type="button" aria-label="Fermer la comparaison">&times;</button>
+      </div>
+    </div>
+
+    <!-- Loading Bar -->
+    <div id="cutfill-loading-bar" style="display: none; padding: 6px 10px; text-align: center; color: #6d28d9; font-size: 11px; font-weight: 600; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 5px; margin: 6px 0;">
+      <span class="sim-spinner" style="display: inline-block; width: 11px; height: 11px; border: 2px solid #ddd6fe; border-top-color: #7c3aed; border-radius: 50%; animation: sim-spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px;"></span>
+      <span id="cutfill-loading-text">Recherche et alignement des levés LiDAR...</span>
+    </div>
+
+    <!-- Alert Message if < 2 LiDARs -->
+    <div id="cutfill-alert-box" style="display: none; padding: 8px 12px; font-size: 11px; color: #9a3412; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; margin: 6px 0;"></div>
+
+    <!-- Content Container -->
+    <div id="cutfill-content-wrap">
+      <!-- Controls Bar: Survey selectors, Invert button, Auto-calibration toggle, Opacity slider -->
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; padding: 6px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 11px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-weight: 600; color: #475569;">Après (Récent) :</span>
+          <select id="cutfill-select-new" style="font-size: 11px; padding: 3px 6px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff;"></select>
+        </div>
+
+        <button id="btn-cutfill-swap" type="button" class="profile-dock-btn" style="padding: 2px 7px; font-size: 12px; cursor: pointer;" title="Inverser les deux levés">⇄</button>
+
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-weight: 600; color: #475569;">Avant (Ancien) :</span>
+          <select id="cutfill-select-old" style="font-size: 11px; padding: 3px 6px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff;"></select>
+        </div>
+
+        <div style="height: 16px; width: 1px; background: #cbd5e1; margin: 0 4px;"></div>
+
+        <!-- Height correction / Vertical datum calibration -->
+        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: 600; color: #334155;" title="Compense automatiquement l'écart médian de référence altimétrique (datum géodésique / CGVD) pour centrer le sol stable à 0 cm">
+          <input type="checkbox" id="cutfill-check-autocalib" checked />
+          <span>Calibrage altimétrique (médiane = 0)</span>
+        </label>
+        <span id="cutfill-offset-badge" style="font-size: 10px; font-weight: 600; color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 1px 6px; border-radius: 4px;">Biais : 0.0 cm</span>
+
+        <div style="height: 16px; width: 1px; background: #cbd5e1; margin: 0 4px;"></div>
+
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="color: #64748b;">Opacité :</span>
+          <input type="range" id="cutfill-opacity-slider" min="10" max="100" value="85" style="width: 70px; height: 4px;" />
+          <span id="cutfill-opacity-val" style="font-size: 10px; color: #64748b;">85%</span>
+        </div>
+      </div>
+
+      <!-- Scorecards (Grand format comme dans Ektare) -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 6px;">
+        <!-- Déblai ramené à la surface (m³/ha) - Maîtresse -->
+        <div style="background: #fdf2f8; border: 1px solid #fbcfe8; border-left: 3.5px solid #be185d; border-radius: 6px; padding: 6px 10px;">
+          <div style="font-size: 10px; font-weight: 700; color: #be185d; text-transform: uppercase;">Déblais / hectare</div>
+          <div style="display: flex; align-items: baseline; gap: 4px; margin-top: 2px;">
+            <span id="cutfill-stat-cut-per-ha" style="font-size: 18px; font-weight: 800; color: #9d174d;">0</span>
+            <span style="font-size: 10px; font-weight: 700; color: #be185d;">m³/ha</span>
+          </div>
+          <div style="font-size: 9.5px; color: #9d174d; margin-top: 1px;">volume moyen de coupe</div>
+        </div>
+
+        <!-- Déblai total -->
+        <div style="background: #fef2f2; border: 1px solid #fecaca; border-left: 3.5px solid #dc2626; border-radius: 6px; padding: 6px 10px;">
+          <div style="font-size: 10px; font-weight: 700; color: #dc2626; text-transform: uppercase;">Déblais (Coupe)</div>
+          <div style="display: flex; align-items: baseline; gap: 4px; margin-top: 2px;">
+            <span id="cutfill-stat-cut-vol" style="font-size: 18px; font-weight: 800; color: #b91c1c;">0</span>
+            <span style="font-size: 10px; font-weight: 700; color: #dc2626;">m³</span>
+          </div>
+          <div id="cutfill-stat-cut-max" style="font-size: 9.5px; color: #7f1d1d; margin-top: 1px;">Max : 0 cm</div>
+        </div>
+
+        <!-- Remblai total -->
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-left: 3.5px solid #2563eb; border-radius: 6px; padding: 6px 10px;">
+          <div style="font-size: 10px; font-weight: 700; color: #2563eb; text-transform: uppercase;">Remblais</div>
+          <div style="display: flex; align-items: baseline; gap: 4px; margin-top: 2px;">
+            <span id="cutfill-stat-fill-vol" style="font-size: 18px; font-weight: 800; color: #1d4ed8;">0</span>
+            <span style="font-size: 10px; font-weight: 700; color: #2563eb;">m³</span>
+          </div>
+          <div id="cutfill-stat-fill-max" style="font-size: 9.5px; color: #1e3a8a; margin-top: 1px;">Max : 0 cm</div>
+        </div>
+
+        <!-- Bilan net -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3.5px solid #475569; border-radius: 6px; padding: 6px 10px;">
+          <div style="font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase;">Bilan Net (R − D)</div>
+          <div style="display: flex; align-items: baseline; gap: 4px; margin-top: 2px;">
+            <span id="cutfill-stat-net-bal" style="font-size: 18px; font-weight: 800; color: #334155;">0</span>
+            <span style="font-size: 10px; font-weight: 700; color: #475569;">m³</span>
+          </div>
+          <div id="cutfill-stat-area" style="font-size: 9.5px; color: #64748b; margin-top: 1px;">Surface : 0.0 ha</div>
+        </div>
+      </div>
+
+      <!-- Ektare 9-class Color Ramp & Hover Inspector -->
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 2px; padding: 4px 0;">
+        <div style="flex: 1; min-width: 260px; max-width: 520px;">
+          <div style="height: 10px; border-radius: 3px; display: flex; overflow: hidden; border: 1px solid rgba(0,0,0,0.15);" id="cutfill-gradient-bar">
+            <div style="flex: 1; background: #B40000;" title="Déblai > 20 cm"></div>
+            <div style="flex: 1; background: #FF0000;" title="Déblai 15 à 20 cm"></div>
+            <div style="flex: 1; background: #FF8000;" title="Déblai 10 à 15 cm"></div>
+            <div style="flex: 1; background: #FFFF00;" title="Déblai 2.5 à 10 cm"></div>
+            <div style="flex: 1; background: #00CD00;" title="Neutre ±2.5 cm (ni déblai ni remblai)"></div>
+            <div style="flex: 1; background: #1BF7C9;" title="Remblai 2.5 à 10 cm"></div>
+            <div style="flex: 1; background: #0066FF;" title="Remblai 10 à 15 cm"></div>
+            <div style="flex: 1; background: #9A31FF;" title="Remblai 15 à 20 cm"></div>
+            <div style="flex: 1; background: #800080;" title="Remblai > 20 cm"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 9.5px; font-weight: 600; color: #64748b; margin-top: 2px;">
+            <span style="color: #b91c1c;">Déblai &gt; 20 cm</span>
+            <span style="color: #ea580c;">−10 cm</span>
+            <span style="color: #15803d; font-weight: 700;">0 (Neutre)</span>
+            <span style="color: #2563eb;">+10 cm</span>
+            <span style="color: #6b21a8;">Remblai &gt; 20 cm</span>
+          </div>
+        </div>
+
+        <!-- Hover readout badge -->
+        <div id="cutfill-hover-readout" style="font-size: 11px; font-weight: 600; color: #475569; background: #f8fafc; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 5px;">
+          Survolez la parcelle pour inspecter les déblais/remblais
+        </div>
+
+        <!-- Toggle Detailed Table -->
+        <button id="btn-toggle-cutfill-table" type="button" class="profile-dock-btn" style="font-size: 10px; padding: 3px 8px; color: #475569;">
+          Détail par classe ▾
+        </button>
+      </div>
+
+      <!-- Collapsible 9-Class Table -->
+      <div id="cutfill-details-table" style="display: none; margin-top: 6px; max-height: 120px; overflow-y: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 10px; text-align: left;">
+          <thead>
+            <tr style="background: #f1f5f9; border-bottom: 1px solid #cbd5e1; color: #475569;">
+              <th style="padding: 3px 6px;">Classe</th>
+              <th style="padding: 3px 6px;">Épaisseur</th>
+              <th style="padding: 3px 6px;">Surface (ha)</th>
+              <th style="padding: 3px 6px;">Surface (%)</th>
+              <th style="padding: 3px 6px;">Volume (m³)</th>
+            </tr>
+          </thead>
+          <tbody id="cutfill-tbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- Slide-Over Drawer for Agri-Réseau RAG -->
@@ -1340,6 +1520,7 @@
     <script src="js/composer.js"></script>
     <script src="js/terrain3d.js"></script>
     <script src="js/sim.js"></script>
+    <script src="js/cutfill.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

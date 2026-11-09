@@ -166,6 +166,7 @@
     let wmsManager = null;
     let parcelHydrologyManager = null;
     let terrain3DManager = null;
+    let cutFillManager = null;
 
     let simManager = null;
 
@@ -456,6 +457,9 @@
         if (window.terrain3DManager && typeof window.terrain3DManager.bringToFront === "function") {
           window.terrain3DManager.bringToFront();
         }
+        if (window.cutFillManager && typeof window.cutFillManager.bringToFront === "function") {
+          window.cutFillManager.bringToFront();
+        }
       }
       window.bringParcellesToFront = bringTopLayersToFront;
       window.bringTopLayersToFront = bringTopLayersToFront;
@@ -478,6 +482,12 @@
         simManager = new window.ParcelSimulationManager(map);
 
         window.simManager = simManager;
+      }
+
+      // Instantiate Parcel Cut/Fill LiDAR Comparison Manager
+      if (window.LidarCutFillManager) {
+        cutFillManager = new window.LidarCutFillManager(map);
+        window.cutFillManager = cutFillManager;
 
       }
 
@@ -777,6 +787,9 @@
           window.terrain3DManager.lastClickedParcel = currentTargetP;
           if (window.erosionManager) {
             window.erosionManager.currentParcel = currentTargetP;
+          }
+          if (window.cutFillManager) {
+            window.cutFillManager.lastClickedParcel = currentTargetP;
           }
 
           // Si l'utilisateur était en mode sélection de parcelle pour la 3D
@@ -1088,6 +1101,13 @@
                   <span>Érosion (RUSLE)</span>
                 </button>
               </div>
+
+              <div style="display: flex; gap: 6px; margin-top: 6px;">
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-cutfill" style="flex: 1; padding: 7px 8px; background: #7c3aed; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);" title="Comparer 2 campagnes LiDAR multidates et évaluer les déblais / remblais (m³/ha)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+                  <span>Comparer LiDAR (D/R m³/ha)</span>
+                </button>
+              </div>
             </div>
 
             <div class="popup-crop-history" style="margin-top: 8px;">
@@ -1158,6 +1178,11 @@
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path></svg>
 
                 <span>Calculer l'érosion des sols (RUSLE)</span>
+              </button>
+
+              <button id="btn-popup-start-cutfill" type="button" class="btn-popup-parcel-action" style="padding: 8px 10px; background: #7c3aed; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);" title="Comparer 2 campagnes LiDAR multidates et évaluer les déblais / remblais (m³/ha)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+                <span>Comparer LiDAR (Déblais / Remblais)</span>
 
               </button>
 
@@ -1392,6 +1417,17 @@
                 window.erosionManager.calculateForParcel(targetP);
               } else if (window.simManager) {
                 window.simManager.startSimulation(targetP, "erosion");
+              }
+            });
+          });
+
+          // Comparaison LiDAR (Déblais / Remblais)
+          const btnCutFillActions = popupDom.querySelectorAll(".btn-popup-action-cutfill, #btn-popup-start-cutfill");
+          btnCutFillActions.forEach(btn => {
+            btn.addEventListener("click", () => {
+              popup.remove();
+              if (window.cutFillManager) {
+                window.cutFillManager.openForParcel(targetP);
               }
             });
           });
@@ -1752,6 +1788,29 @@
         if (canopeeOpacityVal) canopeeOpacityVal.textContent = pct + "%";
         if (canopeeManager) canopeeManager.setOpacity(pct / 100);
       });
+    }
+
+    // LiDAR Cut/Fill Multidates Comparison Panel Controls
+    const btnOpenCutFillPanel = document.getElementById("btn-open-cutfill-from-panel");
+    const btnTriggerCutFillActive = document.getElementById("btn-trigger-cutfill-active");
+    const handleOpenCutFillFromPanel = () => {
+      const target = (window.cutFillManager && window.cutFillManager.lastClickedParcel) ||
+                     (window.terrain3DManager && window.terrain3DManager.lastClickedParcel) ||
+                     (window.erosionManager && window.erosionManager.currentParcel);
+      if (target && window.cutFillManager) {
+        window.cutFillManager.openForParcel(target);
+      } else {
+        alert("Veuillez d'abord cliquer sur une parcelle agricole sur la carte pour comparer ses vols LiDAR.");
+      }
+    };
+    if (btnOpenCutFillPanel) {
+      btnOpenCutFillPanel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleOpenCutFillFromPanel();
+      });
+    }
+    if (btnTriggerCutFillActive) {
+      btnTriggerCutFillActive.addEventListener("click", handleOpenCutFillFromPanel);
     }
 
     // Dynamic Contours Controls

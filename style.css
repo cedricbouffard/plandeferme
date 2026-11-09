@@ -1265,6 +1265,15 @@
       gap: 6px;
       width: 100%;
     }
+    .cutfill-dock {
+      max-height: 310px;
+      border-top: 3px solid #7c3aed;
+      padding: 10px 16px;
+      overflow-y: auto;
+    }
+    .cutfill-dock.collapsed .btn-dock-collapse svg {
+      transform: rotate(180deg);
+    }
     @keyframes sim-spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }

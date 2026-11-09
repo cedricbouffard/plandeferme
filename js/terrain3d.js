@@ -1587,3 +1587,4 @@ class Terrain3DManager {
 }
 
 window.Terrain3DManager = Terrain3DManager;
+window.buildUtmGeoTiffBuffer = Terrain3DManager.prototype.buildUtmGeoTiffBuffer;
