@@ -304,20 +304,20 @@ class Terrain3DManager {
       return feature;
     }
 
-    // Dissolution des coutures internes entre tuiles
+    // Extraction des anneaux extérieurs pour dissolution propre et instantanée des coutures de tuiles
     const outerRings = uniquePolygons.map(p => p[0]).filter(r => r && r.length >= 4);
-    const dissolvedRings = this.dissolveParcelRings(outerRings);
+    const exteriorLines = this.buildExteriorLines(outerRings);
 
     let resultGeom;
-    if (dissolvedRings.length === 1) {
+    if (exteriorLines.length === 1 && exteriorLines[0].length >= 4) {
       resultGeom = {
         type: 'Polygon',
-        coordinates: [dissolvedRings[0]]
+        coordinates: [exteriorLines[0]]
       };
-    } else if (dissolvedRings.length > 1) {
+    } else if (exteriorLines.length > 1) {
       resultGeom = {
         type: 'MultiPolygon',
-        coordinates: dissolvedRings.map(r => [r])
+        coordinates: exteriorLines.map(r => [r])
       };
     } else {
       resultGeom = {
@@ -336,106 +336,71 @@ class Terrain3DManager {
     };
   }
 
-  dissolveParcelRings(rings) {
+  buildExteriorLines(rings) {
     if (!rings || rings.length <= 1) return rings || [];
-    const EPS = 1e-6; // ~10cm de précision en degrés WGS84
-    const allPts = [];
-    for (const ring of rings) {
-      if (!ring || ring.length < 3) continue;
-      for (const p of ring) allPts.push(p);
-    }
 
-    // 1. Division des segments aux sommets en contact le long des bords de tuiles
-    const splitRings = [];
-    for (const ring of rings) {
-      if (!ring || ring.length < 3) continue;
-      const newRing = [];
-      for (let i = 0; i < ring.length - 1; i++) {
-        const p1 = ring[i];
-        const p2 = ring[i + 1];
-        newRing.push(p1);
-
-        const splits = [];
-        const dx = p2[0] - p1[0];
-        const dy = p2[1] - p1[1];
-        const lenSq = dx * dx + dy * dy;
-        if (lenSq > 1e-12) {
-          for (const p of allPts) {
-            const cross = Math.abs((p[1] - p1[1]) * dx - (p[0] - p1[0]) * dy);
-            if (cross / Math.sqrt(lenSq) < EPS) {
-              const dot = (p[0] - p1[0]) * dx + (p[1] - p1[1]) * dy;
-              const t = dot / lenSq;
-              if (t > 1e-5 && t < 1 - 1e-5) {
-                splits.push({ p, t });
-              }
-            }
-          }
-        }
-        splits.sort((a, b) => a.t - b.t);
-        for (const s of splits) newRing.push(s.p);
-      }
-      newRing.push(ring[ring.length - 1]);
-      splitRings.push(newRing);
-    }
-
-    // 2. Annulation des segments internes partagés en sens inverse
-    const PRECISION = 1e5; // ~1m
+    const PRECISION = 1e5; // ~1m de précision WGS84
     const keyPt = p => `${Math.round(p[0] * PRECISION)},${Math.round(p[1] * PRECISION)}`;
-    const keySeg = (p1, p2) => `${keyPt(p1)}->${keyPt(p2)}`;
-    const segMap = new Map();
 
-    for (const ring of splitRings) {
+    // Compter et filtrer les segments orientés (les segments internes partagés en sens inverse s'annulent)
+    const segMap = new Map();
+    for (const ring of rings) {
+      if (!ring || ring.length < 3) continue;
       for (let i = 0; i < ring.length - 1; i++) {
         const p1 = ring[i];
         const p2 = ring[i + 1];
-        if (keyPt(p1) === keyPt(p2)) continue;
-        const kFwd = keySeg(p1, p2);
-        const kRev = keySeg(p2, p1);
+        const k1 = keyPt(p1);
+        const k2 = keyPt(p2);
+        if (k1 === k2) continue;
+        const kFwd = `${k1}->${k2}`;
+        const kRev = `${k2}->${k1}`;
+
         if (segMap.has(kRev)) {
-          segMap.delete(kRev); // bord interne partagé entre 2 tuiles
+          segMap.delete(kRev); // bordure interne entre 2 tuiles
         } else {
           segMap.set(kFwd, [p1, p2]);
         }
       }
     }
 
-    // 3. Reconstitution des boucles extérieures
-    const adj = new Map();
-    for (const [p1, p2] of segMap.values()) {
+    if (segMap.size === 0) return rings;
+
+    // Chaînage instantané des segments extérieurs en polylignes / anneaux fermés
+    const outgoing = new Map();
+    for (const [kFwd, [p1, p2]] of segMap.entries()) {
       const k1 = keyPt(p1);
-      if (!adj.has(k1)) adj.set(k1, []);
-      adj.get(k1).push(p2);
+      if (!outgoing.has(k1)) outgoing.set(k1, []);
+      outgoing.get(k1).push([p1, p2, kFwd]);
     }
 
+    const visited = new Set();
     const outRings = [];
-    const visitedSegs = new Set();
 
-    for (const [p1, p2] of segMap.values()) {
-      const startKey = keyPt(p1);
-      const segKey = keySeg(p1, p2);
-      if (visitedSegs.has(segKey)) continue;
+    for (const [kFwd, [p1, p2]] of segMap.entries()) {
+      if (visited.has(kFwd)) continue;
+      visited.add(kFwd);
 
-      const ring = [p1];
+      const ring = [p1, p2];
       let currPt = p2;
-      visitedSegs.add(segKey);
+      let currKey = keyPt(currPt);
+      const startKey = keyPt(p1);
 
       let safety = 0;
-      while (currPt && safety++ < 10000) {
-        ring.push(currPt);
-        const currKey = keyPt(currPt);
-        if (currKey === startKey) break;
-
-        const nextList = adj.get(currKey) || [];
-        let found = null;
-        for (const nextPt of nextList) {
-          const nextSegKey = keySeg(currPt, nextPt);
-          if (!visitedSegs.has(nextSegKey)) {
-            visitedSegs.add(nextSegKey);
-            found = nextPt;
+      while (currKey !== startKey && safety++ < 2000) {
+        const candidates = outgoing.get(currKey);
+        if (!candidates || candidates.length === 0) break;
+        let nextSeg = null;
+        for (const cand of candidates) {
+          if (!visited.has(cand[2])) {
+            nextSeg = cand;
             break;
           }
         }
-        currPt = found;
+        if (!nextSeg) break;
+        visited.add(nextSeg[2]);
+        ring.push(nextSeg[1]);
+        currPt = nextSeg[1];
+        currKey = keyPt(currPt);
       }
 
       if (ring.length >= 4) {
@@ -962,13 +927,19 @@ class Terrain3DManager {
     } catch (e) { /* ancienne version de MapLibre */ }
 
     const heavyLayers = [
-      'parcelles-label', 'pedologie-label', 'courbes-labels', 'iso-labels',
-      'parcelles-hit-layer', 'pedologie-hit-layer'
+      'parcelles-label', 'pedologie-label', 'gc-contour-labels', 'courbes-labels', 'iso-labels'
     ];
     for (const id of heavyLayers) {
       if (m.getLayer(id)) {
-        try { m.setLayerZoomRange(id, on ? 24 : 0, 24); } catch (e) {}
+        try { m.setLayoutProperty(id, 'visibility', on ? 'none' : 'visible'); } catch (e) {}
       }
+    }
+  }
+
+  bringToFront() {
+    if (!this.map || !this.is3DActive) return;
+    if (this.map.getLayer(this.highlightLayerId)) {
+      this.map.moveLayer(this.highlightLayerId);
     }
   }
 

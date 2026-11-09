@@ -1082,15 +1082,33 @@
       if (!this.map || !parcel) return;
       const props = parcel.properties || {};
       const pid = props.IDPAR || props.idpar || props.IDANPAR || props.idanpar;
-      if (!pid) return;
+      const polyId = props.POLY_ID || props.poly_id;
+      const noLot = props.NO_LOT || props.no_lot;
+      const fid = parcel.id;
 
-      // Masquer le contour de cette parcelle provenant des tuiles vectorielles pour éviter les lignes de découpe multi-tuiles
-      const filter = ["!=", ["to-string", ["get", "IDPAR"]], String(pid)];
-      if (this.map.getLayer("parcelles-line-bg")) {
-        this.map.setFilter("parcelles-line-bg", filter);
+      // Masquer le contour et les découpes internes de cette parcelle provenant des tuiles vectorielles BDPPAD
+      const conds = ["all"];
+      if (pid) {
+        conds.push(["!=", ["to-string", ["coalesce", ["get", "IDPAR"], ["get", "idpar"], ["get", "IDANPAR"], ["get", "idanpar"], ""]], String(pid)]);
       }
-      if (this.map.getLayer("parcelles-line-fg")) {
-        this.map.setFilter("parcelles-line-fg", filter);
+      if (polyId) {
+        conds.push(["!=", ["to-string", ["coalesce", ["get", "POLY_ID"], ["get", "poly_id"], ""]], String(polyId)]);
+      }
+      if (noLot) {
+        conds.push(["!=", ["to-string", ["coalesce", ["get", "NO_LOT"], ["get", "no_lot"], ""]], String(noLot)]);
+      }
+      if (fid !== undefined && fid !== null) {
+        conds.push(["!=", ["id"], fid]);
+      }
+
+      if (conds.length > 1) {
+        const filter = conds.length === 2 ? conds[1] : conds;
+        if (this.map.getLayer("parcelles-line-bg")) {
+          this.map.setFilter("parcelles-line-bg", filter);
+        }
+        if (this.map.getLayer("parcelles-line-fg")) {
+          this.map.setFilter("parcelles-line-fg", filter);
+        }
       }
     }
 
@@ -1101,6 +1119,16 @@
       }
       if (this.map.getLayer("parcelles-line-fg")) {
         this.map.setFilter("parcelles-line-fg", null);
+      }
+    }
+
+    bringToFront() {
+      if (!this.map || !this.isOpen) return;
+      if (this.map.getLayer(this.LAYER_RAIN)) {
+        this.map.moveLayer(this.LAYER_RAIN);
+      }
+      if (this.map.getLayer(this.LAYER_HL)) {
+        this.map.moveLayer(this.LAYER_HL);
       }
     }
 
@@ -1741,6 +1769,12 @@
 
     closeDock() {
       this.rainManager.closeDock();
+    }
+
+    bringToFront() {
+      if (this.rainManager && typeof this.rainManager.bringToFront === "function") {
+        this.rainManager.bringToFront();
+      }
     }
   }
 

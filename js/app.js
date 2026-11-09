@@ -448,6 +448,14 @@
         if (window.measureManager && typeof window.measureManager.bringToFront === "function") {
           window.measureManager.bringToFront();
         }
+
+        // 5. Simulation de pluie & découpe 3D au sommet
+        if (window.simManager && typeof window.simManager.bringToFront === "function") {
+          window.simManager.bringToFront();
+        }
+        if (window.terrain3DManager && typeof window.terrain3DManager.bringToFront === "function") {
+          window.terrain3DManager.bringToFront();
+        }
       }
       window.bringParcellesToFront = bringTopLayersToFront;
       window.bringTopLayersToFront = bringTopLayersToFront;
