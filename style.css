@@ -1,4 +1,14 @@
     * { box-sizing: border-box; }
+    button {
+      font-family: inherit;
+      border: none;
+      background: transparent;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+    }
     html, body {
       margin: 0;
       padding: 0;
@@ -1245,20 +1255,20 @@
       border-top: 2.5px solid #0284c7;
       padding: 10px 16px;
       overflow: hidden;
-    }
-    .sim-dock.collapsed .btn-dock-collapse svg {
-      transform: rotate(180deg);
-    }
-    .sim-dock-body {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      width: 100%;
-    }
-    @keyframes sim-spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+    }
+    .sim-dock.collapsed .btn-dock-collapse svg {
+      transform: rotate(180deg);
+    }
+    .sim-dock-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+    @keyframes sim-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
     .profile-dock-header {
       display: flex;
       justify-content: space-between;
