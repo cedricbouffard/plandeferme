@@ -411,6 +411,8 @@
     return feature;
   }
 
+  const GRAD_BUF = [0, 0];
+
   // ===========================================================================
   // 1. MODULE DE SIMULATION DE PLUIE & RUISSELLEMENT (ParcelRainManager)
   // ===========================================================================
@@ -580,20 +582,17 @@
     }
 
     gradient(s, x, y) {
-      const c = this.surf(s, x, y);
-      if (Number.isNaN(c)) return [0, 0];
+      const c = this.surf(s, x, y), dx = s.G.dx, dy = s.G.dy;
+      GRAD_BUF[0] = 0;
+      GRAD_BUF[1] = 0;
+      if (Number.isNaN(c)) return GRAD_BUF;
       const l = this.surf(s, x - 1, y), r = this.surf(s, x + 1, y);
       const u = this.surf(s, x, y - 1), d = this.surf(s, x, y + 1);
 
-      const gx = !Number.isNaN(r) && !Number.isNaN(l) ? (r - l) / (2 * s.G.dx)
-               : !Number.isNaN(r) ? (r - c) / s.G.dx
-               : !Number.isNaN(l) ? (c - l) / s.G.dx : 0;
+      GRAD_BUF[0] = r === r && l === l ? (r - l) / (2 * dx) : r === r ? (r - c) / dx : l === l ? (c - l) / dx : 0;
+      GRAD_BUF[1] = d === d && u === u ? (d - u) / (2 * dy) : d === d ? (d - c) / dy : u === u ? (c - u) / dy : 0;
 
-      const gy = !Number.isNaN(d) && !Number.isNaN(u) ? (d - u) / (2 * s.G.dy)
-               : !Number.isNaN(d) ? (d - c) / s.G.dy
-               : !Number.isNaN(u) ? (c - u) / s.G.dy : 0;
-
-      return [gx, gy];
+      return GRAD_BUF;
     }
 
     rainStep(s, dt) {
@@ -609,11 +608,11 @@
       s.rain += (I / 1000 / 3600) * dt * s.active * cell;
       s.inf += (Math.min(I, f) / 1000 / 3600) * dt * s.active * cell;
 
+      const maxDrops = Math.min(20000, Math.max(8000, Math.round(s.active * 0.2)));
       if (excess > 0) {
         const vol = excess * dt * s.active * cell;
         const n = Math.max(4, Math.round(Math.min(2600, s.active * 0.016 * Math.min(1, speedScale))));
         const v = vol / n;
-        const maxDrops = Math.min(32000, Math.max(12000, Math.round(s.active * 0.26)));
         for (let k = 0; k < n; k++) {
           if (s.drops.length >= maxDrops) {
             s.drops[(Math.random() * s.drops.length) | 0].v += v;
@@ -630,7 +629,8 @@
       for (const p of s.drops) {
         const cx = p.x | 0, cy = p.y | 0;
         const i = cy * W + cx;
-        const [gx, gy] = this.gradient(s, cx, cy);
+        const gg = this.gradient(s, cx, cy);
+        const gx = gg[0], gy = gg[1];
         const slope = Math.hypot(gx, gy);
 
         // Direction d'écoulement vers l'aval (opposée au gradient d'altitude)
@@ -677,12 +677,9 @@
             continue;
           }
 
-          if (isFull) {
-            const slf = Math.hypot(gx, gy);
-            if (slf > 1e-7) {
-              p.vx = - (gx / slf) * 0.20 * speedScale;
-              p.vy = - (gy / slf) * 0.20 * speedScale;
-            }
+          if (isFull && slope > 1e-7) {
+            p.vx = - (gx / slope) * 0.20 * speedScale;
+            p.vy = - (gy / slope) * 0.20 * speedScale;
           }
         }
 
@@ -840,63 +837,58 @@
       }
 
       // Rendu dynamique des gouttes en mouvement avec traînées d'écoulement
+      const cw = s.canvas.width, ch = s.canvas.height;
+      const sx = cw / W, sy = ch / H;
       const numDrops = s.drops.length;
       const step = numDrops > 18000 ? 2 : 1;
       const dropRadius = Math.max(1.1, S * 0.35);
 
+      const SPEED = typeof this.speed === "number" ? this.speed : 0.5;
+      const mult = (this.trailMultiplier || 3) / Math.max(0.1, SPEED);
+
       c.lineWidth = Math.max(1.2, S * 0.35);
       c.lineCap = "round";
 
-      const speedScale = typeof this.speed === "number" ? this.speed : 0.5;
-      const mult = (this.trailMultiplier || 3) / Math.max(0.1, speedScale);
-
+      // 1. Un seul beginPath() et un seul stroke() pour TOUTES les traînées en mouvement (batching haute performance comme dans Ektare)
+      c.strokeStyle = "rgba(255, 255, 255, 0.90)";
+      c.beginPath();
       for (let k = 0; k < numDrops; k += step) {
         const p = s.drops[k];
-        const dpx = p.x * S;
-        const dpy = p.y * S;
         const sp = Math.hypot(p.vx, p.vy);
-
-        if (sp > 0.025) {
-          // Goutte en mouvement : traînée blanche nette proportionnelle à la vitesse et à la pente
-          const tailLen = Math.min(8 * S, sp * mult * S);
-          const tx = dpx - (p.vx / sp) * tailLen;
-          const ty = dpy - (p.vy / sp) * tailLen;
-          c.strokeStyle = "rgba(255, 255, 255, 0.90)";
-          c.beginPath();
-          c.moveTo(tx, ty);
-          c.lineTo(dpx, dpy);
-          c.stroke();
-        } else {
-          // Goutte lente ou quasi-statique : blanc pur
-          c.fillStyle = "rgba(255, 255, 255, 0.95)";
-          c.beginPath();
-          c.arc(dpx, dpy, dropRadius, 0, 6.2832);
-          c.fill();
-        }
+        if (sp <= 0.025) continue;
+        const dpx = p.x * sx, dpy = p.y * sy;
+        const tailLen = Math.min(8 * S, sp * mult * S);
+        c.moveTo(dpx - (p.vx / sp) * tailLen, dpy - (p.vy / sp) * tailLen);
+        c.lineTo(dpx, dpy);
       }
+      c.stroke();
+
+      // 2. Un seul beginPath() et un seul fill() pour TOUTES les gouttes stationnaires
+      c.fillStyle = "rgba(255, 255, 255, 0.95)";
+      c.beginPath();
+      for (let k = 0; k < numDrops; k += step) {
+        const p = s.drops[k];
+        if (Math.hypot(p.vx, p.vy) > 0.025) continue;
+        const dpx = p.x * sx, dpy = p.y * sy;
+        c.moveTo(dpx + dropRadius, dpy);
+        c.arc(dpx, dpy, dropRadius, 0, 6.2832);
+      }
+      c.fill();
     }
 
     loop() {
       this.rafId = 0;
       if (!this.sim || !this.sim.running) return;
 
-      const speedVal = typeof this.speed === "number" ? this.speed : 0.5;
-      const baseDt = Math.max(1, (this.sim.G.dx + this.sim.G.dy) / 2 / 0.6);
+      const SPEED = typeof this.speed === "number" ? this.speed : 0.5;
+      const dt = Math.max(1, (this.sim.G.dx + this.sim.G.dy) / 2 / 0.6) * SPEED;
 
-      if (speedVal >= 1) {
-        const count = Math.floor(speedVal);
-        for (let k = 0; k < count; k++) {
-          this.rainStep(this.sim, baseDt);
-        }
-      } else {
-        this.rainStep(this.sim, baseDt * speedVal);
-      }
-
+      this.rainStep(this.sim, dt);
       this.drawRain(this.sim);
 
       const src = this.map && this.map.getSource(this.SRC_RAIN);
       if (src && typeof src.play === "function") src.play();
-      if (this.map && typeof this.map.triggerRepaint === "function") this.map.triggerRepaint();
+
       this.rafId = requestAnimationFrame(() => this.loop());
     }
 
