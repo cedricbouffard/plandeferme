@@ -474,6 +474,7 @@
       this.openDock();
       this.updateParcelHeader();
       this.highlightParcel(this.currentParcel.geometry);
+      this.filterActiveParcelLine(this.currentParcel);
 
       // Cadrage sur la parcelle
       const bbox = computeGeomBbox(this.currentParcel.geometry);
@@ -956,9 +957,8 @@
         animate: true
       });
 
-      const beforeLayer = this.map.getLayer("parcelles-line")
-        ? "parcelles-line"
-        : (this.map.getLayer("parcelles-line-bg") ? "parcelles-line-bg" : undefined);
+      // Placer la couche de pluie au-dessus des couches parcelles et sous le contour de sélection
+      const beforeLayer = this.map.getLayer(this.LAYER_HL) ? this.LAYER_HL : undefined;
 
       this.map.addLayer({
         id: this.LAYER_RAIN,
@@ -1035,6 +1035,7 @@
       this.pauseRain();
       this.removeRainLayer();
       this.clearHighlight();
+      this.clearActiveParcelLineFilter();
 
       const resEl = document.getElementById("sim-res-badge");
       if (resEl) resEl.style.display = "none";
@@ -1044,6 +1045,32 @@
       this.isOpen = false;
       this.currentParcel = null;
       this.currentGrid = null;
+    }
+
+    filterActiveParcelLine(parcel) {
+      if (!this.map || !parcel) return;
+      const props = parcel.properties || {};
+      const pid = props.IDPAR || props.idpar || props.IDANPAR || props.idanpar;
+      if (!pid) return;
+
+      // Masquer le contour de cette parcelle provenant des tuiles vectorielles pour éviter les lignes de découpe multi-tuiles
+      const filter = ["!=", ["to-string", ["get", "IDPAR"]], String(pid)];
+      if (this.map.getLayer("parcelles-line-bg")) {
+        this.map.setFilter("parcelles-line-bg", filter);
+      }
+      if (this.map.getLayer("parcelles-line-fg")) {
+        this.map.setFilter("parcelles-line-fg", filter);
+      }
+    }
+
+    clearActiveParcelLineFilter() {
+      if (!this.map) return;
+      if (this.map.getLayer("parcelles-line-bg")) {
+        this.map.setFilter("parcelles-line-bg", null);
+      }
+      if (this.map.getLayer("parcelles-line-fg")) {
+        this.map.setFilter("parcelles-line-fg", null);
+      }
     }
 
     highlightParcel(geom) {
@@ -1061,8 +1088,7 @@
           source: this.SRC_HL,
           paint: {
             "line-color": "#0284c7",
-            "line-width": 3,
-            "line-dasharray": [2, 1.5],
+            "line-width": 2.5,
             "line-opacity": 0.95
           }
         });
@@ -1643,8 +1669,7 @@
           source: this.SRC_HL,
           paint: {
             "line-color": "#ea580c",
-            "line-width": 3,
-            "line-dasharray": [2, 1.5],
+            "line-width": 2.5,
             "line-opacity": 0.95
           }
         });

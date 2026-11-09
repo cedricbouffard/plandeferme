@@ -304,17 +304,151 @@ class Terrain3DManager {
       return feature;
     }
 
+    // Dissolution des coutures internes entre tuiles
+    const outerRings = uniquePolygons.map(p => p[0]).filter(r => r && r.length >= 4);
+    const dissolvedRings = this.dissolveParcelRings(outerRings);
+
+    let resultGeom;
+    if (dissolvedRings.length === 1) {
+      resultGeom = {
+        type: 'Polygon',
+        coordinates: [dissolvedRings[0]]
+      };
+    } else if (dissolvedRings.length > 1) {
+      resultGeom = {
+        type: 'MultiPolygon',
+        coordinates: dissolvedRings.map(r => [r])
+      };
+    } else {
+      resultGeom = {
+        type: 'MultiPolygon',
+        coordinates: uniquePolygons
+      };
+    }
+
     return {
       type: 'Feature',
       id: feature.id,
       properties: Object.assign({}, feature.properties, {
         _multiTileSlices: uniquePolygons.length
       }),
-      geometry: {
-        type: 'MultiPolygon',
-        coordinates: uniquePolygons
-      }
+      geometry: resultGeom
     };
+  }
+
+  dissolveParcelRings(rings) {
+    if (!rings || rings.length <= 1) return rings || [];
+    const EPS = 1e-6; // ~10cm de précision en degrés WGS84
+    const allPts = [];
+    for (const ring of rings) {
+      if (!ring || ring.length < 3) continue;
+      for (const p of ring) allPts.push(p);
+    }
+
+    // 1. Division des segments aux sommets en contact le long des bords de tuiles
+    const splitRings = [];
+    for (const ring of rings) {
+      if (!ring || ring.length < 3) continue;
+      const newRing = [];
+      for (let i = 0; i < ring.length - 1; i++) {
+        const p1 = ring[i];
+        const p2 = ring[i + 1];
+        newRing.push(p1);
+
+        const splits = [];
+        const dx = p2[0] - p1[0];
+        const dy = p2[1] - p1[1];
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq > 1e-12) {
+          for (const p of allPts) {
+            const cross = Math.abs((p[1] - p1[1]) * dx - (p[0] - p1[0]) * dy);
+            if (cross / Math.sqrt(lenSq) < EPS) {
+              const dot = (p[0] - p1[0]) * dx + (p[1] - p1[1]) * dy;
+              const t = dot / lenSq;
+              if (t > 1e-5 && t < 1 - 1e-5) {
+                splits.push({ p, t });
+              }
+            }
+          }
+        }
+        splits.sort((a, b) => a.t - b.t);
+        for (const s of splits) newRing.push(s.p);
+      }
+      newRing.push(ring[ring.length - 1]);
+      splitRings.push(newRing);
+    }
+
+    // 2. Annulation des segments internes partagés en sens inverse
+    const PRECISION = 1e5; // ~1m
+    const keyPt = p => `${Math.round(p[0] * PRECISION)},${Math.round(p[1] * PRECISION)}`;
+    const keySeg = (p1, p2) => `${keyPt(p1)}->${keyPt(p2)}`;
+    const segMap = new Map();
+
+    for (const ring of splitRings) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const p1 = ring[i];
+        const p2 = ring[i + 1];
+        if (keyPt(p1) === keyPt(p2)) continue;
+        const kFwd = keySeg(p1, p2);
+        const kRev = keySeg(p2, p1);
+        if (segMap.has(kRev)) {
+          segMap.delete(kRev); // bord interne partagé entre 2 tuiles
+        } else {
+          segMap.set(kFwd, [p1, p2]);
+        }
+      }
+    }
+
+    // 3. Reconstitution des boucles extérieures
+    const adj = new Map();
+    for (const [p1, p2] of segMap.values()) {
+      const k1 = keyPt(p1);
+      if (!adj.has(k1)) adj.set(k1, []);
+      adj.get(k1).push(p2);
+    }
+
+    const outRings = [];
+    const visitedSegs = new Set();
+
+    for (const [p1, p2] of segMap.values()) {
+      const startKey = keyPt(p1);
+      const segKey = keySeg(p1, p2);
+      if (visitedSegs.has(segKey)) continue;
+
+      const ring = [p1];
+      let currPt = p2;
+      visitedSegs.add(segKey);
+
+      let safety = 0;
+      while (currPt && safety++ < 10000) {
+        ring.push(currPt);
+        const currKey = keyPt(currPt);
+        if (currKey === startKey) break;
+
+        const nextList = adj.get(currKey) || [];
+        let found = null;
+        for (const nextPt of nextList) {
+          const nextSegKey = keySeg(currPt, nextPt);
+          if (!visitedSegs.has(nextSegKey)) {
+            visitedSegs.add(nextSegKey);
+            found = nextPt;
+            break;
+          }
+        }
+        currPt = found;
+      }
+
+      if (ring.length >= 4) {
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (first[0] !== last[0] || first[1] !== last[1]) {
+          ring.push([first[0], first[1]]);
+        }
+        outRings.push(ring);
+      }
+    }
+
+    return outRings.length > 0 ? outRings : rings;
   }
 
 

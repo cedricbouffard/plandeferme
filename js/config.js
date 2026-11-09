@@ -227,6 +227,31 @@ const { ContourManager, readCogRegion, fromUrl, proj4 } = window.GeoLibreContour
         }
       }));
 
+      // Combler les micro-coutures ou pixels NaNs isoles entre tuiles adjacentes
+      if (intersecting.length > 1) {
+        for (let pass = 0; pass < 2; pass++) {
+          let filled = 0;
+          const copy = new Float32Array(unifiedData);
+          for (let y = 0; y < gridH; y++) {
+            const yW = y * gridW;
+            for (let x = 0; x < gridW; x++) {
+              const i = yW + x;
+              if (!isNaN(copy[i])) continue;
+              let sum = 0, count = 0;
+              if (x > 0 && !isNaN(copy[i - 1])) { sum += copy[i - 1]; count++; }
+              if (x < gridW - 1 && !isNaN(copy[i + 1])) { sum += copy[i + 1]; count++; }
+              if (y > 0 && !isNaN(copy[i - gridW])) { sum += copy[i - gridW]; count++; }
+              if (y < gridH - 1 && !isNaN(copy[i + gridW])) { sum += copy[i + gridW]; count++; }
+              if (count >= 2) {
+                unifiedData[i] = sum / count;
+                filled++;
+              }
+            }
+          }
+          if (filled === 0) break;
+        }
+      }
+
       let hasValid = false;
       for (let i = 0; i < unifiedData.length; i++) {
         if (!isNaN(unifiedData[i])) {
