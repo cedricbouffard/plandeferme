@@ -9,6 +9,13 @@
 
   const STORAGE_KEY_TEMPLATES = "plandeferme_composer_templates_v1";
 
+  // Les libellés de légende peuvent venir de couches importées : échappement avant innerHTML
+  function pfEscLabel(value) {
+    return String(value === undefined || value === null ? "" : value).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[c]);
+  }
+
   // Dimensions standards par défaut (en millimètres, inspiré de QGIS Layout-Composer)
   const DEFAULT_LAYOUT = {
     margin: 10,       // Marge extérieure (mm)
@@ -2309,7 +2316,8 @@ ${logoItemXml}
           });
           visibleVectorLayers.forEach(vl => {
             const isLine = vl.geometryType === "LineString";
-            const color = vl.style.fillColor || vl.style.strokeColor || "#16a34a";
+            const rawColor = vl.style.fillColor || vl.style.strokeColor || "#16a34a";
+            const color = typeof window.pfSafeColor === "function" ? window.pfSafeColor(rawColor) : "#16a34a";
             items.push({
               id: "vec_" + vl.id,
               groupId: "vectors",
@@ -2361,7 +2369,7 @@ ${logoItemXml}
           if (it.type === "gradient" || it.gradient) {
             leftHtml = `
               <div class="sheet-legend-gradient-block">
-                <div style="font-weight:600; font-size:7.5px; color:#1e293b;">${it.label}</div>
+                <div style="font-weight:600; font-size:7.5px; color:#1e293b;">${pfEscLabel(it.label)}</div>
                 <div class="sheet-legend-gradient-bar"></div>
                 <div class="sheet-legend-gradient-labels">
                   <span>${it.minText || "Bas"}</span>
@@ -2374,14 +2382,14 @@ ${logoItemXml}
             leftHtml = `
               <div class="sheet-legend-item-left">
                 <span class="sheet-legend-line" style="background: ${it.color};"></span>
-                <span>${it.label}</span>
+                <span>${pfEscLabel(it.label)}</span>
               </div>
             `;
           } else {
             leftHtml = `
               <div class="sheet-legend-item-left">
                 <span class="sheet-legend-color" style="background: ${it.color};"></span>
-                <span>${it.label}</span>
+                <span>${pfEscLabel(it.label)}</span>
               </div>
             `;
           }
@@ -2435,7 +2443,7 @@ ${logoItemXml}
         labelEl.innerHTML = `
           <input type="checkbox" data-id="${it.id}" ${isChecked ? "checked" : ""} />
           <span class="composer-legend-check-swatch" style="${swatchStyle}"></span>
-          <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${it.label}">${it.label}</span>
+          <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${pfEscLabel(it.label)}">${pfEscLabel(it.label)}</span>
         `;
 
         const cb = labelEl.querySelector("input");

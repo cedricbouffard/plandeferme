@@ -18,6 +18,27 @@
 
   const STORAGE_KEY_VECTORS = "plandeferme_vector_layers";
 
+  /**
+   * Échappement HTML/XML : toute valeur venant d'un fichier importé ou saisie par
+   * l'utilisateur (nom de couche, attributs, champs) passe par ici avant innerHTML.
+   */
+  function esc(value) {
+    return String(value === undefined || value === null ? "" : value).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[c]);
+  }
+
+  /** Couleur CSS sûre (les styles QML importés sont des données externes) */
+  function safeColor(value, fallback = "#16a34a") {
+    const v = String(value || "").trim();
+    if (/^#[0-9a-f]{3,8}$/i.test(v)) return v;
+    if (/^rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?\s*(,\s*[\d.]+%?\s*)?\)$/i.test(v)) return v;
+    if (/^[a-z]{3,20}$/i.test(v)) return v;
+    return fallback;
+  }
+  window.pfEsc = esc;
+  window.pfSafeColor = safeColor;
+
   const DEFAULT_PALETTE = [
     "#16a34a", // Vert prairie
     "#0284c7", // Bleu azur
@@ -1057,9 +1078,9 @@
         card.innerHTML = `
           <div class="vector-layer-top">
             <input type="checkbox" ${layer.visible ? "checked" : ""} class="vector-check-vis" title="Afficher / Masquer la couche sur la carte" />
-            <div class="vector-layer-swatch" style="background: ${color};"></div>
+            <div class="vector-layer-swatch" style="background: ${safeColor(color)};"></div>
             <div class="vector-layer-info">
-              <span class="vector-layer-name" contenteditable="true" spellcheck="false" title="Cliquer pour renommer">${layer.name}</span>
+              <span class="vector-layer-name" contenteditable="true" spellcheck="false" title="Cliquer pour renommer">${esc(layer.name)}</span>
               <span class="vector-badge-type ${typeClass}">${typeName}</span>
             </div>
             <span class="vector-badge-count">${count} entité${count > 1 ? "s" : ""}</span>
@@ -1158,8 +1179,8 @@
           row.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:5px 8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:11px;";
           row.innerHTML = `
             <div style="display:flex; align-items:center; gap:6px; overflow:hidden;">
-              <span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:${color}; flex-shrink:0;"></span>
-              <span style="font-weight:600; color:#1e293b; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${layer.name}</span>
+              <span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:${safeColor(color)}; flex-shrink:0;"></span>
+              <span style="font-weight:600; color:#1e293b; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${esc(layer.name)}</span>
             </div>
             <span style="font-size:10px; color:#64748b; font-weight:600; flex-shrink:0;">${count} entité${count > 1 ? "s" : ""}</span>
           `;
@@ -1210,8 +1231,8 @@
             <button type="button" class="personal-layer-btn btn-vis ${layer.visible ? "" : "muted"}" title="${layer.visible ? "Masquer la couche" : "Afficher la couche"}">
               ${eyeIcon}
             </button>
-            <span class="personal-layer-swatch" style="background: ${color};" title="Couleur de la couche"></span>
-            <span class="personal-layer-name" contenteditable="true" spellcheck="false" title="Double-cliquez ou modifiez pour renommer">${layer.name}</span>
+            <span class="personal-layer-swatch" style="background: ${safeColor(color)};" title="Couleur de la couche"></span>
+            <span class="personal-layer-name" contenteditable="true" spellcheck="false" title="Double-cliquez ou modifiez pour renommer">${esc(layer.name)}</span>
             <span style="font-size: 10px; color: #94a3b8; font-weight: 600; flex-shrink: 0;">(${count})</span>
           </div>
           <div class="personal-layer-actions">
@@ -1836,10 +1857,10 @@
       const featName = feat.properties.nom || feat.properties.name || "Entité";
       const popupHtml = `
         <div style="font-family: var(--font-sans, sans-serif); font-size: 12px; padding: 4px;">
-          <strong style="color: #0f172a; font-size: 13px;">${featName}</strong>
+          <strong style="color: #0f172a; font-size: 13px;">${esc(featName)}</strong>
           <div style="color: #64748b; margin: 3px 0 6px;">
-            ${feat.properties.superficie_ha ? `${feat.properties.superficie_ha} ha` : ""}
-            ${feat.properties.longueur_m ? `${feat.properties.longueur_m} m` : ""}
+            ${feat.properties.superficie_ha ? `${esc(feat.properties.superficie_ha)} ha` : ""}
+            ${feat.properties.longueur_m ? `${esc(feat.properties.longueur_m)} m` : ""}
           </div>
           <div style="display: flex; gap: 5px;">
             <button type="button" id="btn-popup-edit-attr" class="vector-tool-btn primary" style="font-size: 10.5px;">Éditer attributs</button>
@@ -1950,8 +1971,8 @@
         const isCalc = key.startsWith("superficie_") || key.startsWith("longueur_");
 
         row.innerHTML = `
-          <label>${key} ${isCalc ? '<span style="font-size:10px; color:#166534;">(calculé auto)</span>' : ""}</label>
-          <input type="text" name="${key}" value="${val}" class="vector-attr-input" ${isCalc ? "readonly style='background:#f8fafc; font-weight:600; color:#166534;'" : ""} />
+          <label>${esc(key)} ${isCalc ? '<span style="font-size:10px; color:#166534;">(calculé auto)</span>' : ""}</label>
+          <input type="text" name="${esc(key)}" value="${esc(val)}" class="vector-attr-input" ${isCalc ? "readonly style='background:#f8fafc; font-weight:600; color:#166534;'" : ""} />
         `;
         container.appendChild(row);
       });
@@ -2192,7 +2213,7 @@
       }
 
       // Étiquettes (Labels)
-      const fieldOptions = (layer.fields || []).map(f => `<option value="${f.name}" ${style.labelProperty === f.name ? "selected" : ""}>${f.name}</option>`).join("");
+      const fieldOptions = (layer.fields || []).map(f => `<option value="${esc(f.name)}" ${style.labelProperty === f.name ? "selected" : ""}>${esc(f.name)}</option>`).join("");
       container.innerHTML += `
         <div class="vector-style-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #e2e8f0;">
           <span class="vector-style-label">Étiquettes sur la carte</span>
@@ -2286,7 +2307,14 @@
       if (!el) return;
       const isPolygon = layer.geometryType.toLowerCase() === "polygon";
       const isLine = layer.geometryType.toLowerCase().includes("line");
-      const style = layer.style;
+      const raw = layer.style || {};
+      const num = (v, d, max) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.min(n, max) : d; };
+      const style = Object.assign({}, raw, {
+        fillColor: safeColor(raw.fillColor, ""),
+        strokeColor: safeColor(raw.strokeColor, ""),
+        strokeWidth: num(raw.strokeWidth, 0, 20),
+        markerSize: num(raw.markerSize, 0, 40)
+      });
 
       if (isPolygon) {
         const borderStyle = style.strokeStyle === "dashed" ? "dashed" : style.strokeStyle === "dotted" ? "dotted" : "solid";
@@ -2558,7 +2586,7 @@
         let extendedData = "<ExtendedData>";
         Object.entries(feat.properties).forEach(([k, v]) => {
           if (k !== "nom" && k !== "description") {
-            extendedData += `<Data name="${k}"><value>${v}</value></Data>`;
+            extendedData += `<Data name="${esc(k)}"><value>${esc(v)}</value></Data>`;
           }
         });
         extendedData += "</ExtendedData>";
@@ -2575,8 +2603,8 @@
 
         placemarksXml += `
           <Placemark>
-            <name>${name}</name>
-            <description>${desc}</description>
+            <name>${esc(name)}</name>
+            <description>${esc(desc)}</description>
             ${extendedData}
             ${geomXml}
           </Placemark>
@@ -2586,7 +2614,7 @@
       const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>${layer.name}</name>
+    <name>${esc(layer.name)}</name>
     ${placemarksXml}
   </Document>
 </kml>`;
@@ -2651,7 +2679,7 @@
 
       popover.innerHTML = `
         <div style="font-size: 10px; font-weight: 700; color: #64748b; padding: 4px 8px 6px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #f1f5f9; margin-bottom: 4px;">
-          Exporter "${layer.name}"
+          Exporter "${esc(layer.name)}"
         </div>
         <button type="button" class="personal-dropdown-item btn-exp-geojson">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -2950,7 +2978,9 @@
         reader.onload = (evt) => {
           try {
             const res = QmlHandler.parse(evt.target.result);
-            Object.assign(layer.style, res.style);
+            const qs = Object.assign({}, res.style);
+            ["fillColor", "strokeColor"].forEach((k) => { if (qs[k] !== undefined) qs[k] = safeColor(qs[k], layer.style[k] || "#16a34a"); });
+            Object.assign(layer.style, qs);
             this.updateLayerOnMap(layer);
             this.saveLayers();
             if (this.editingStyleLayerId === layer.id) {
@@ -3116,8 +3146,9 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${isError ? '#ef4444' : '#22c55e'}" stroke-width="2.5">
           ${isError ? '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>' : '<polyline points="20 6 9 17 4 12"></polyline>'}
         </svg>
-        <span>${message}</span>
+        <span class="vector-toast-text"></span>
       `;
+      toast.querySelector(".vector-toast-text").textContent = String(message);
       toast.classList.add("visible");
       clearTimeout(this._toastTimeout);
       this._toastTimeout = setTimeout(() => {

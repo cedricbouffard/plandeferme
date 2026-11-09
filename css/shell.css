@@ -657,3 +657,141 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 @media (max-width: 768px) {
   .pf-fiche .popup-tabs-header { min-height: 44px; }
 }
+
+/* ==========================================================================
+   Mes données : bibliothèque de couches (dossiers, sauvegarde, export)
+   ========================================================================== */
+.pf-section #card-custom-vectors.pf-lib-card,
+#card-custom-vectors.pf-lib-card {
+  background: transparent !important; border: none !important; box-shadow: none !important;
+  padding: 0 8px !important; margin: 0 !important;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.pf-lib-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pf-lib-add-wrap { position: relative; }
+.pf-lib-add-wrap .personal-add-dropdown { left: 0; right: auto; min-width: 200px; }
+.pf-lib-primary, .pf-lib-tool {
+  height: 34px; padding: 0 12px; border-radius: 9px;
+  display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.pf-lib-primary { background: var(--pf-accent); border: 1px solid var(--pf-accent); color: #fff; }
+.pf-lib-primary:hover { background: var(--pf-accent-strong); }
+.pf-lib-tool { background: #fff; border: 1px solid #d5d9d3; color: var(--pf-ink); }
+.pf-lib-tool:hover { background: var(--pf-hover); border-color: var(--pf-accent); color: var(--pf-accent-strong); }
+.pf-lib-primary:focus-visible, .pf-lib-tool:focus-visible, .pf-lib-danger:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: 2px; }
+
+.pf-lib-target {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 6px 5px 10px; border-radius: 8px;
+  background: var(--pf-accent-soft); color: var(--pf-accent-strong); font-size: 12px;
+}
+.pf-lib-target[hidden] { display: none; }
+.pf-lib-target strong { font-weight: 700; }
+.pf-lib-target button { width: 24px; height: 24px; border: none; border-radius: 6px; background: transparent; color: inherit; font-size: 16px; cursor: pointer; }
+.pf-lib-target button:hover { background: rgba(46, 106, 76, 0.12); }
+
+/* Arborescence */
+.personal-layers-inline-list.pf-lib-tree { max-height: none; overflow: visible; gap: 1px; margin: 0; padding: 0; }
+.pf-lib-empty { padding: 14px 10px; text-align: center; color: var(--pf-muted); font-size: 12px; line-height: 1.5; border: 1.5px dashed #c9cec6; border-radius: 10px; }
+.pf-lib-row {
+  display: flex; align-items: center; gap: 4px;
+  min-height: 36px; padding: 0 4px 0 calc(4px + var(--pf-depth, 0) * 18px);
+  border-radius: 8px; cursor: pointer; user-select: none;
+  color: var(--pf-ink); font-size: 12.5px;
+}
+.pf-lib-row:hover { background: var(--pf-hover); }
+.pf-lib-row.active { background: var(--pf-accent-soft); }
+.pf-lib-row.dragging { opacity: 0.45; }
+.pf-lib-row.pf-lib-drop-target { outline: 2px dashed var(--pf-accent); outline-offset: -2px; background: var(--pf-accent-soft); }
+.pf-lib-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-lib-folder .pf-lib-name { font-weight: 600; }
+.pf-lib-count {
+  flex-shrink: 0; min-width: 20px; padding: 1px 6px; border-radius: 10px;
+  background: var(--pf-ground); color: var(--pf-muted); font-size: 11px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.pf-lib-btn, .pf-lib-chevron {
+  flex-shrink: 0; width: 28px; height: 28px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 7px; background: transparent; color: var(--pf-muted); cursor: pointer;
+}
+.pf-lib-btn:hover, .pf-lib-chevron:hover { background: rgba(23, 33, 27, 0.07); color: var(--pf-ink); }
+.pf-lib-btn:focus-visible, .pf-lib-chevron:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: -2px; }
+.pf-lib-chevron svg { transition: transform 0.15s ease; }
+.pf-lib-chevron.open svg { transform: rotate(90deg); }
+.pf-lib-folder-icon { display: inline-flex; color: var(--pf-accent); flex-shrink: 0; }
+.pf-lib-vis { color: var(--pf-accent); }
+.pf-lib-vis.muted { color: #a3aaa5; }
+.pf-lib-layer .pf-lib-draw, .pf-lib-layer .pf-lib-zoom { opacity: 0; }
+.pf-lib-layer:hover .pf-lib-draw, .pf-lib-layer:hover .pf-lib-zoom,
+.pf-lib-layer:focus-within .pf-lib-draw, .pf-lib-layer:focus-within .pf-lib-zoom,
+.pf-lib-layer.active .pf-lib-draw, .pf-lib-layer.active .pf-lib-zoom { opacity: 1; }
+@media (hover: none) { .pf-lib-layer .pf-lib-draw, .pf-lib-layer .pf-lib-zoom { opacity: 1; } }
+.pf-lib-swatch { flex-shrink: 0; width: 12px; height: 12px; margin: 0 4px 0 2px; background: var(--pf-sw); border-radius: 3px; border: 1px solid rgba(0, 0, 0, 0.15); }
+.pf-lib-swatch-line { height: 3px; width: 14px; border: none; border-radius: 2px; }
+.pf-lib-swatch-point { border-radius: 50%; width: 10px; height: 10px; }
+
+.pf-lib-hint { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--pf-muted); }
+
+/* Stockage local */
+.pf-lib-storage { padding: 10px 12px; border-radius: 10px; background: var(--pf-ground); display: flex; flex-direction: column; gap: 4px; }
+.pf-lib-switch { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--pf-ink); cursor: pointer; }
+.pf-lib-switch input { width: 16px; height: 16px; margin: 0; accent-color: var(--pf-accent); }
+.pf-lib-storage-status { font-size: 11.5px; color: var(--pf-muted); padding-left: 24px; }
+
+.pf-lib-danger {
+  align-self: flex-start; height: 32px; padding: 0 12px; border-radius: 8px;
+  background: #fff; border: 1px solid #f1c4c4; color: #b42318;
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.pf-lib-danger:hover { background: #fef3f2; border-color: #b42318; }
+
+/* Menus contextuels */
+.pf-lib-menu {
+  position: fixed; z-index: 10050; min-width: 200px; max-width: 300px; max-height: 60vh; overflow-y: auto;
+  padding: 5px; background: #fff; border: 1px solid var(--pf-line); border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(23, 33, 27, 0.16);
+  font-family: Inter, system-ui, sans-serif;
+}
+.pf-lib-menu-item {
+  display: block; width: 100%; padding: 8px 10px; border: none; border-radius: 7px;
+  background: transparent; color: var(--pf-ink); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pf-lib-menu-item:hover:not(:disabled), .pf-lib-menu-item:focus-visible { background: var(--pf-hover); outline: none; }
+.pf-lib-menu-item:disabled { color: #a3aaa5; cursor: default; }
+.pf-lib-menu-item.danger { color: #b42318; }
+.pf-lib-menu-item.danger:hover { background: #fef3f2; }
+.pf-lib-menu-item.indent-1 { padding-left: 22px; }
+.pf-lib-menu-item.indent-2 { padding-left: 34px; }
+.pf-lib-menu-item.indent-3 { padding-left: 46px; }
+.pf-lib-menu-item.indent-4, .pf-lib-menu-item.indent-5, .pf-lib-menu-item.indent-6 { padding-left: 58px; }
+.pf-lib-menu-sep { height: 1px; margin: 4px 6px; background: var(--pf-line-soft); }
+
+/* Fenêtre de confirmation */
+.pf-lib-confirm { z-index: 10060; }
+.pf-lib-confirm .vector-modal { max-width: 440px; }
+.pf-lib-confirm .vector-modal-title { font-size: 15px; font-weight: 700; color: var(--pf-ink); }
+.pf-lib-confirm-msg { margin: 0 0 16px; font-size: 13px; line-height: 1.55; color: #3b4540; }
+.pf-lib-confirm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pf-lib-spacer { flex: 1; }
+.pf-lib-confirm-actions button {
+  height: 36px; padding: 0 14px; border-radius: 9px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  background: #fff; border: 1px solid #d5d9d3; color: var(--pf-ink);
+}
+.pf-lib-confirm-actions button:hover { background: var(--pf-hover); }
+.pf-lib-confirm-actions button:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: 2px; }
+.pf-lib-confirm-actions .pf-lib-confirm-extra { border-color: transparent; color: var(--pf-accent); padding: 0 6px; }
+.pf-lib-confirm-actions .pf-lib-confirm-ok { background: var(--pf-accent); border-color: var(--pf-accent); color: #fff; }
+.pf-lib-confirm-actions .pf-lib-confirm-ok:hover { background: var(--pf-accent-strong); }
+.pf-lib-confirm-actions .pf-lib-confirm-ok.danger { background: #b42318; border-color: #b42318; }
+.pf-lib-confirm-actions .pf-lib-confirm-ok.danger:hover { background: #912018; }
+
+/* Ajustements : barre d'outils sur une ligne, actions de confirmation */
+.pf-lib-head { flex-wrap: nowrap; }
+.pf-lib-primary, .pf-lib-tool { padding: 0 10px; font-size: 12px; gap: 5px; white-space: nowrap; }
+.pf-lib-tool { flex: 0 1 auto; }
+.pf-lib-confirm-actions { justify-content: flex-end; }
+.pf-lib-confirm-actions .pf-lib-spacer { display: none; }
+.pf-lib-confirm-actions .pf-lib-confirm-extra { flex-basis: 100%; order: -1; justify-content: flex-start; text-align: left; height: auto; padding: 0 0 6px; }
+.pf-lib-confirm-actions .pf-lib-confirm-extra:hover { background: transparent; text-decoration: underline; }
