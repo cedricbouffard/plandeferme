@@ -277,23 +277,19 @@
   }
   // WMS GetMap en BIL float32 (IGN) ; plusieurs couches par ordre de priorité
   function wmsBil(base, layers, epsg) {
+    const nanShare = (a) => { let n = 0; for (let i = 0; i < a.length; i++) if (Number.isNaN(a[i])) n++; return n / a.length; };
     return {
       def: () => DEF[epsg],
       async fill(dst, W, H, tB, signal) {
-        const grids = await Promise.all(layers.map(async (layer) => {
+        // Couches par ordre de priorité ; la suivante n'est demandée que s'il reste des trous (> 0,5 %)
+        for (const layer of layers) {
+          if (nanShare(dst) <= 0.005) break;
           const q = `${base}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=${layer}&STYLES=&CRS=EPSG:${epsg}&BBOX=${tB.join(",")}&WIDTH=${W}&HEIGHT=${H}&FORMAT=image/x-bil;bits=32`;
-          try {
-            const buf = await fetchBuf(q, signal);
-            if (buf.byteLength !== W * H * 4) return null;
-            const f = new Float32Array(buf); // petit-boutiste (x86 / ARM)
-            const out = new Float32Array(f.length);
-            for (let i = 0; i < f.length; i++) out[i] = clean(f[i], -99999);
-            return out;
-          } catch (e) { return null; }
-        }));
-        for (const g of grids) {
-          if (!g) continue;
-          for (let i = 0; i < dst.length; i++) if (Number.isNaN(dst[i]) && !Number.isNaN(g[i])) dst[i] = g[i];
+          let buf;
+          try { buf = await fetchBuf(q, signal); } catch (e) { if (signal && signal.aborted) throw e; continue; }
+          if (buf.byteLength !== W * H * 4) continue;
+          const f = new Float32Array(buf); // petit-boutiste (x86 / ARM)
+          for (let i = 0; i < dst.length; i++) if (Number.isNaN(dst[i])) dst[i] = clean(f[i], -99999);
         }
       }
     };
@@ -452,12 +448,75 @@
     return out;
   }
 
+  // Vue aux États-Unis : dalles COG 1 m de The National Map (requêtes partielles, comme au Canada),
+  // le projet le plus récent par dalle ; le serveur d'images 3DEP comble les trous et sert les vues larges.
+  const TNM_CELL = 0.25;
+  const tnmCellCache = new Map();
+  function tnmCell(cx, cy, signal) {
+    const key = `${cx}:${cy}`;
+    if (!tnmCellCache.has(key)) {
+      const b = [cx * TNM_CELL, cy * TNM_CELL, (cx + 1) * TNM_CELL, (cy + 1) * TNM_CELL];
+      const p = (async () => {
+        const out = [];
+        for (let offset = 0, page = 0; page < 6; page++) {
+          const u = `https://tnmaccess.nationalmap.gov/api/v1/products?datasets=${encodeURIComponent("Digital Elevation Model (DEM) 1 meter")}&bbox=${b.join(",")}&max=200&offset=${offset}&outputFormat=JSON`;
+          const j = await (await fetch(u, { signal: AbortSignal.timeout(25000) })).json();
+          const items = j.items || [];
+          items.forEach((it) => {
+            const url = it.downloadURL || "", bb = it.boundingBox || {};
+            const m = /USGS_1M_(\d+)_(x\d+y\d+)_/.exec(url);
+            if (!/\.tif$/i.test(url) || !m || !Number.isFinite(bb.minX)) return;
+            const project = String(it.title || "").split(" ").pop();
+            out.push({ url, zone: +m[1], tile: `${m[1]}_${m[2]}`, year: yearOf(project), date: it.publicationDate || "", bbox: [bb.minX, bb.minY, bb.maxX, bb.maxY] });
+          });
+          offset += items.length;
+          if (!items.length || offset >= (j.total || 0)) break;
+        }
+        return out;
+      })();
+      p.catch(() => tnmCellCache.delete(key));
+      if (tnmCellCache.size > 200) tnmCellCache.clear();
+      tnmCellCache.set(key, p);
+    }
+    return tnmCellCache.get(key);
+  }
+  function us3dep() {
+    const img = arcgisImage("https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer", "GRS80");
+    return {
+      def: img.def,
+      async fill(dst, W, H, tB, signal, bbox) {
+        const spanKm = (bbox[2] - bbox[0]) * 111 * Math.cos(((bbox[1] + bbox[3]) / 2) * D2R);
+        if (spanKm <= 30) {
+          let items = [];
+          try {
+            const cells = [];
+            for (let cx = Math.floor(bbox[0] / TNM_CELL); cx <= Math.floor(bbox[2] / TNM_CELL); cx++)
+              for (let cy = Math.floor(bbox[1] / TNM_CELL); cy <= Math.floor(bbox[3] / TNM_CELL); cy++) cells.push([cx, cy]);
+            if (cells.length <= 4) items = (await Promise.all(cells.map(([x, y]) => tnmCell(x, y, signal)))).flat();
+          } catch (e) { if (signal && signal.aborted) throw e; items = []; }
+          const zone = utmZone((bbox[0] + bbox[2]) / 2);
+          const best = new Map();
+          items.forEach((it) => {
+            if (it.zone !== zone) return;
+            if (it.bbox[2] < bbox[0] || it.bbox[0] > bbox[2] || it.bbox[3] < bbox[1] || it.bbox[1] > bbox[3]) return;
+            const cur = best.get(it.tile);
+            if (!cur || it.year > cur.year || (it.year === cur.year && it.date > cur.date)) best.set(it.tile, it);
+          });
+          if (best.size && best.size <= 16) await readCogMosaic([...best.values()].map((it) => it.url), dst, W, H, tB, signal);
+        }
+        let holes = 0;
+        for (let i = 0; i < dst.length; i++) if (Number.isNaN(dst[i])) holes++;
+        if (holes / dst.length > 0.005) await img.fill(dst, W, H, tB, signal, bbox);
+      }
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // 5. Sources par région
   // ---------------------------------------------------------------------------
   const yearOf = (s) => { const m = String(s).match(/(?:19|20)\d\d/g); return m ? +m[m.length - 1] : 0; };
   const SOURCES = {
-    US: { id: "us-3dep", label: "USGS 3DEP (mosaïque, 1 m là où le LiDAR existe)", reader: arcgisImage("https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer", "WGS84"),
+    US: { id: "us-3dep", label: "USGS 3DEP (mosaïque, 1 m là où le LiDAR existe)", reader: us3dep(),
       async surveys(bbox, signal) {
         const projects = await tnmProjects(bbox, signal);
         return projects.map((p) => {
@@ -500,8 +559,8 @@
   const COUNTRY = { US: "États-Unis", FR: "France", CH: "Suisse", NL: "Pays-Bas", "DE-NW": "Rhénanie-du-Nord–Westphalie", "DE-BB": "Brandebourg", "DE-MV": "Mecklembourg-Poméranie", "DE-SL": "Sarre", "BE-VLG": "Flandre", ES: "Espagne", AT: "Autriche", CZ: "Tchéquie", AU: "Australie", JP: "Japon" };
   Object.keys(SOURCES).forEach((k) => { SOURCES[k].region = k; SOURCES[k].country = COUNTRY[k]; });
 
-  async function readWith(reader, src, bbox, size, signal) {
-    const W = Math.max(8, Math.min(2048, Math.round(size || 256))), H = W;
+  async function readWith(reader, src, bbox, size, signal, width, height) {
+    const W = width || Math.max(8, Math.min(2048, Math.round(size || 256))), H = height || W;
     const def = reader.def(bbox);
     const tB = envelope(bbox, def);
     if (!(tB[0] < tB[2] && tB[1] < tB[3])) return null;
@@ -518,6 +577,66 @@
     return makeRegion(dst, W, H, tB, def, src);
   }
 
+  // ---------------------------------------------------------------------------
+  // Lecture partagée : les couches (courbes, relief, pentes, RUSLE, écoulement…) demandent toutes
+  // le MNT au même moment après un déplacement. Les demandes reçues dans un court délai sont
+  // regroupées en une seule lecture (emprise réunie, résolution la plus fine), puis chacune reçoit
+  // sa propre grille rééchantillonnée. Les dernières lectures restent en cache pour les demandes
+  // suivantes contenues dans la même emprise.
+  // ---------------------------------------------------------------------------
+  const BATCH_MS = 120, MAX_PIX = 1800 * 1800, VIEW_CACHE = [];
+  const batches = new Map();
+  const contains = (a, b) => a[0] <= b[0] && a[1] <= b[1] && a[2] >= b[2] && a[3] >= b[3];
+  function subset(r, bbox, size) {
+    const def = r.projection, tB = envelope(bbox, def), dst = emptyGrid(size, size);
+    resampleInto(dst, size, size, tB, { data: r.data, w: r.width, h: r.height, bbox: r.sourceBBox });
+    return makeRegion(dst, size, size, tB, def, { id: r.demSource, label: r.demLabel });
+  }
+  function sharedRead(src, bbox, size, signal) {
+    size = Math.max(8, Math.min(2048, Math.round(size || 256)));
+    const rx = (bbox[2] - bbox[0]) / size, ry = (bbox[3] - bbox[1]) / size;
+    const hit = VIEW_CACHE.find((c) => c.src === src.id && !c.aborted && contains(c.bbox, bbox) && c.rx <= rx * 1.15 && c.ry <= ry * 1.15);
+    if (hit) {
+      return hit.promise.then((r) => {
+        if (r) return subset(r, bbox, size);
+        return hit.aborted && !(signal && signal.aborted) ? sharedRead(src, bbox, size, signal) : null;
+      });
+    }
+    return new Promise((resolve) => {
+      let b = batches.get(src.id);
+      if (!b) { b = { reqs: [] }; batches.set(src.id, b); setTimeout(() => flush(src), BATCH_MS); }
+      b.reqs.push({ bbox, size, rx, ry, signal, resolve });
+    });
+  }
+  function flush(src) {
+    const b = batches.get(src.id);
+    batches.delete(src.id);
+    const live = b.reqs.filter((q) => !(q.signal && q.signal.aborted));
+    b.reqs.filter((q) => q.signal && q.signal.aborted).forEach((q) => q.resolve(null));
+    if (!live.length) return;
+    const ub = [Math.min(...live.map((q) => q.bbox[0])), Math.min(...live.map((q) => q.bbox[1])), Math.max(...live.map((q) => q.bbox[2])), Math.max(...live.map((q) => q.bbox[3]))];
+    const rx = Math.min(...live.map((q) => q.rx)), ry = Math.min(...live.map((q) => q.ry));
+    const W = Math.ceil((ub[2] - ub[0]) / rx), H = Math.ceil((ub[3] - ub[1]) / ry);
+    if (W * H > MAX_PIX || W > 4000 || H > 4000) {
+      // Emprises trop différentes : lectures séparées
+      live.forEach((q) => readWith(src.reader, src, q.bbox, q.size, q.signal).then(q.resolve, () => q.resolve(null)));
+      return;
+    }
+    // La lecture commune n'est annulée que si toutes les demandes le sont
+    const ctl = new AbortController();
+    let left = live.length;
+    let entry = null;
+    live.forEach((q) => { if (q.signal) q.signal.addEventListener("abort", () => { if (--left <= 0) { ctl.abort(); if (entry) entry.aborted = true; } }, { once: true }); });
+    const promise = readWith(src.reader, src, ub, Math.max(W, H), ctl.signal, W, H).catch(() => null);
+    entry = { src: src.id, bbox: ub, rx, ry, promise, aborted: ctl.signal.aborted };
+    VIEW_CACHE.unshift(entry);
+    if (VIEW_CACHE.length > 6) VIEW_CACHE.length = 6;
+    promise.then((r) => {
+      if (!r && ctl.signal.aborted) { entry.aborted = true; const i = VIEW_CACHE.indexOf(entry); if (i >= 0) VIEW_CACHE.splice(i, 1); }
+      live.forEach((q) => q.resolve(r && !(q.signal && q.signal.aborted) ? subset(r, q.bbox, q.size) : null));
+    });
+  }
+
   function sourceForBbox(bbox) {
     if (!bbox) return null;
     const k = regionAt((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2);
@@ -532,7 +651,7 @@
   if (typeof origRead === "function") {
     window.readMultiHrdemRegion = async function (bbox, targetSize = 256, signal = null, resampling = "bilinear", product = "dtm") {
       const src = sourceForBbox(bbox);
-      if (src) return product === "dtm" ? readWith(src.reader, src, bbox, targetSize, signal) : null;
+      if (src) return product === "dtm" ? sharedRead(src, bbox, targetSize, signal) : null;
       return origRead.apply(this, arguments);
     };
   }
@@ -628,6 +747,6 @@
     }));
   }
 
-  window.pfDem = { regionAt, sourceForBbox, sourceAt: (lng, lat) => { const k = regionAt(lng, lat); return k ? SOURCES[k] : null; }, read: (bbox, size, signal) => { const s = sourceForBbox(bbox); return s ? readWith(s.reader, s, bbox, size, signal) : Promise.resolve(null); }, surveys, SOURCES, REG, readWith, hasRelief, actionsHtml, bindActions };
+  window.pfDem = { regionAt, sourceForBbox, sourceAt: (lng, lat) => { const k = regionAt(lng, lat); return k ? SOURCES[k] : null; }, read: (bbox, size, signal) => { const s = sourceForBbox(bbox); return s ? sharedRead(s, bbox, size, signal) : Promise.resolve(null); }, surveys, SOURCES, REG, readWith, hasRelief, actionsHtml, bindActions };
   watch();
 })();
