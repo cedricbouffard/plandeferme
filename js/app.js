@@ -1457,7 +1457,7 @@
           if (btnNdviInPopup) {
             btnNdviInPopup.addEventListener("click", () => {
               popup.remove();
-              if (ndviManager) ndviManager.analyzeLocation(e.lngLat, parcelProps, null, parcelGeom || undefined);
+              if (ndviManager) ndviManager.analyzeLocation(e.lngLat, parcelProps);
             });
           }
 
@@ -2060,7 +2060,7 @@
         if (ndviManager) {
           ndviManager.selectedYear = yr;
           if (ndviManager.currentLocation) {
-            ndviManager.analyzeLocation(ndviManager.currentLocation, ndviManager.currentParcel, yr, ndviManager.currentGeometry);
+            ndviManager.analyzeLocation(ndviManager.currentLocation, ndviManager.currentParcel, yr);
           }
         }
       });
