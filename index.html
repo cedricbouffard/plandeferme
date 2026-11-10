@@ -682,6 +682,12 @@
       </details>
       
         </div>
+        <!-- Données régionales hors Québec : n'apparaît que dans la juridiction concernée (js/regions.js) -->
+        <div class="pf-group" id="pf-regional-group" hidden>
+          <div class="pf-group-title" id="pf-regional-title">Données régionales</div>
+          <div id="pf-regional-list" class="pf-regional-list"></div>
+          <p id="pf-regional-hint" class="pf-reg-hint"></p>
+        </div>
         <div class="pf-group">
           <div class="tool-card" id="card-wms">
         <div class="tool-card-header">
@@ -1580,6 +1586,7 @@
     <script src="js/sim.js"></script>
     <script src="js/cutfill.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/regions.js"></script>
     <script src="js/shell.js"></script>
 </body>
 </html>

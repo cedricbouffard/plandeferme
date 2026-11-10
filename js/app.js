@@ -513,6 +513,7 @@
 
       // Instantiate Sentinel-2 NDVI Manager
       ndviManager = new NdviManager(map);
+      window.ndviManager = ndviManager;
       ndviManager.initYearSelect();
       ndviManager.syncStretchUi();
 
