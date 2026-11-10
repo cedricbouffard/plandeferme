@@ -486,13 +486,14 @@
       def: img.def,
       async fill(dst, W, H, tB, signal, bbox) {
         const spanKm = (bbox[2] - bbox[0]) * 111 * Math.cos(((bbox[1] + bbox[3]) / 2) * D2R);
-        if (spanKm <= 30) {
+        let usedCog = false;
+        if (spanKm <= 60) {
           let items = [];
           try {
             const cells = [];
             for (let cx = Math.floor(bbox[0] / TNM_CELL); cx <= Math.floor(bbox[2] / TNM_CELL); cx++)
               for (let cy = Math.floor(bbox[1] / TNM_CELL); cy <= Math.floor(bbox[3] / TNM_CELL); cy++) cells.push([cx, cy]);
-            if (cells.length <= 4) items = (await Promise.all(cells.map(([x, y]) => tnmCell(x, y, signal)))).flat();
+            if (cells.length <= 12) items = (await Promise.all(cells.map(([x, y]) => tnmCell(x, y, signal)))).flat();
           } catch (e) { if (signal && signal.aborted) throw e; items = []; }
           const zone = utmZone((bbox[0] + bbox[2]) / 2);
           const best = new Map();
@@ -502,11 +503,13 @@
             const cur = best.get(it.tile);
             if (!cur || it.year > cur.year || (it.year === cur.year && it.date > cur.date)) best.set(it.tile, it);
           });
-          if (best.size && best.size <= 16) await readCogMosaic([...best.values()].map((it) => it.url), dst, W, H, tB, signal);
+          if (best.size && best.size <= 49) { await readCogMosaic([...best.values()].map((it) => it.url), dst, W, H, tB, signal); usedCog = true; }
         }
+        // Le serveur d'images 3DEP est lent (3 à 10 s par requête) : seulement sans dalle 1 m,
+        // ou s'il manque plus de 15 % de la vue (bord de projet, autre fuseau UTM)
         let holes = 0;
         for (let i = 0; i < dst.length; i++) if (Number.isNaN(dst[i])) holes++;
-        if (holes / dst.length > 0.005) await img.fill(dst, W, H, tB, signal, bbox);
+        if (!usedCog || holes / dst.length > 0.15) await img.fill(dst, W, H, tB, signal, bbox);
       }
     };
   }
@@ -584,7 +587,7 @@
   // sa propre grille rééchantillonnée. Les dernières lectures restent en cache pour les demandes
   // suivantes contenues dans la même emprise.
   // ---------------------------------------------------------------------------
-  const BATCH_MS = 120, MAX_PIX = 1800 * 1800, VIEW_CACHE = [];
+  const BATCH_MS = 120, MAX_SIDE = 1600, MAX_PIX = 2400 * 2400, VIEW_CACHE = [];
   const batches = new Map();
   const contains = (a, b) => a[0] <= b[0] && a[1] <= b[1] && a[2] >= b[2] && a[3] >= b[3];
   function subset(r, bbox, size) {
@@ -595,7 +598,7 @@
   function sharedRead(src, bbox, size, signal) {
     size = Math.max(8, Math.min(2048, Math.round(size || 256)));
     const rx = (bbox[2] - bbox[0]) / size, ry = (bbox[3] - bbox[1]) / size;
-    const hit = VIEW_CACHE.find((c) => c.src === src.id && !c.aborted && contains(c.bbox, bbox) && c.rx <= rx * 1.15 && c.ry <= ry * 1.15);
+    const hit = VIEW_CACHE.find((c) => c.src === src.id && !c.aborted && contains(c.bbox, bbox) && c.rx <= rx * 1.6 && c.ry <= ry * 1.6);
     if (hit) {
       return hit.promise.then((r) => {
         if (r) return subset(r, bbox, size);
@@ -616,6 +619,13 @@
     if (!live.length) return;
     const ub = [Math.min(...live.map((q) => q.bbox[0])), Math.min(...live.map((q) => q.bbox[1])), Math.max(...live.map((q) => q.bbox[2])), Math.max(...live.map((q) => q.bbox[3]))];
     const rx = Math.min(...live.map((q) => q.rx)), ry = Math.min(...live.map((q) => q.ry));
+    // Les services répondent en 1 à 5 s quelle que soit la taille de l'image : on lit d'un coup une zone
+    // plus large que la vue (jusqu'à 35 % de marge de chaque côté), pour que les déplacements et les
+    // petits zooms suivants soient servis par le cache.
+    const W0 = (ub[2] - ub[0]) / rx, H0 = (ub[3] - ub[1]) / ry;
+    const padF = Math.max(0, Math.min(0.35, (MAX_SIDE / Math.max(W0, H0) - 1) / 2));
+    const dxp = (ub[2] - ub[0]) * padF, dyp = (ub[3] - ub[1]) * padF;
+    ub[0] -= dxp; ub[2] += dxp; ub[1] -= dyp; ub[3] += dyp;
     const W = Math.ceil((ub[2] - ub[0]) / rx), H = Math.ceil((ub[3] - ub[1]) / ry);
     if (W * H > MAX_PIX || W > 4000 || H > 4000) {
       // Emprises trop différentes : lectures séparées
