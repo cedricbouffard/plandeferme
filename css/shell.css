@@ -1007,3 +1007,73 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
   .elevation-profile-dock .profile-dock-header-right { flex-shrink: 0; }
   .elevation-profile-dock .profile-dock-btn { white-space: nowrap; }
 }
+
+/* ==========================================================================
+   Écran partagé (js/split.js)
+   ========================================================================== */
+.pf-split-mirror, .pf-split-mirror.maplibregl-map { position: absolute !important; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+.pf-split-mirror .maplibregl-control-container { display: none; }
+.pf-split-mirror canvas { outline: none; }
+.pf-split-handle {
+  position: absolute; top: 0; bottom: 0; left: 50%; width: 28px; margin-left: -14px;
+  z-index: 3; cursor: ew-resize; touch-action: none; outline: none;
+}
+.pf-split-handle::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; margin-left: -1.5px;
+  background: #fff; box-shadow: 0 0 0 1px rgba(23, 33, 27, 0.18), 0 0 10px rgba(23, 33, 27, 0.25);
+}
+.pf-split-knob {
+  position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px;
+  border-radius: 50%; background: #fff; color: var(--pf-accent-strong);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(23, 33, 27, 0.25), 0 0 0 1px rgba(23, 33, 27, 0.08);
+  transition: transform 0.12s ease;
+}
+.pf-split-handle:hover .pf-split-knob, .pf-split-handle.pf-dragging .pf-split-knob, .pf-split-handle:focus-visible .pf-split-knob { transform: scale(1.08); color: var(--pf-accent); }
+.pf-split-handle:focus-visible .pf-split-knob { box-shadow: 0 0 0 3px var(--pf-accent-soft), 0 2px 10px rgba(23, 33, 27, 0.25); }
+.pf-split-tag {
+  position: absolute; top: 12px; z-index: 3; max-width: 38%;
+  padding: 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 1px 6px rgba(23, 33, 27, 0.16); color: var(--pf-ink);
+  font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+}
+.pf-split-panel {
+  position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 4;
+  width: 340px; max-width: calc(100% - 32px); max-height: 52vh; display: flex; flex-direction: column;
+  background: #fff; border-radius: 14px; border: 1px solid var(--pf-line);
+  box-shadow: 0 10px 30px rgba(23, 33, 27, 0.18); font-size: 13px; color: var(--pf-ink);
+}
+.pf-split-head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px 14px; border-bottom: 1px solid var(--pf-line-soft); }
+.pf-split-title { flex: 1; font-weight: 700; font-size: 13.5px; }
+.pf-split-head button { width: 28px; height: 28px; border-radius: 8px; border: none; background: var(--pf-ground); color: var(--pf-muted); font-size: 16px; line-height: 1; cursor: pointer; }
+.pf-split-head button:hover { background: var(--pf-hover); color: var(--pf-ink); }
+.pf-split-panel.pf-collapsed .pf-split-body { display: none; }
+.pf-split-panel.pf-collapsed .pf-split-collapse { transform: rotate(180deg); }
+.pf-split-body { overflow-y: auto; padding: 10px 14px 12px; }
+.pf-split-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.pf-split-presets button {
+  height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid #d5d9d3; background: #fff;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--pf-ink); cursor: pointer;
+}
+.pf-split-presets button:hover { border-color: var(--pf-accent); background: var(--pf-hover); color: var(--pf-accent-strong); }
+.pf-split-presets button[data-split="lidar-ndvi"] { background: var(--pf-accent); border-color: var(--pf-accent); color: #fff; }
+.pf-split-presets button[data-split="lidar-ndvi"]:hover { background: var(--pf-accent-strong); }
+.pf-split-cols, .pf-split-row { display: grid; grid-template-columns: 1fr 58px 58px; align-items: center; }
+.pf-split-cols { font-size: 11px; font-weight: 600; color: var(--pf-muted); text-transform: uppercase; letter-spacing: 0.05em; padding: 0 0 4px; }
+.pf-split-cols span:not(:first-child), .pf-split-row label { text-align: center; }
+.pf-split-row { padding: 6px 0; border-top: 1px solid var(--pf-line-soft); }
+.pf-split-name { font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-split-row input { width: 17px; height: 17px; accent-color: var(--pf-accent); cursor: pointer; margin: 0; }
+.pf-split-empty { color: var(--pf-muted); padding: 6px 0; }
+.pf-split-hint { margin: 8px 0 0; font-size: 11.5px; color: var(--pf-muted); line-height: 1.4; }
+.pf-list-btn.pf-on { background: var(--pf-accent-soft); }
+.pf-list-btn.pf-on .pf-list-name { color: var(--pf-accent-strong); }
+@media (max-width: 768px) {
+  .pf-split-tag { top: calc(var(--pf-safe-top, 0px) + 66px); font-size: 11px; max-width: 34%; }
+  .pf-split-panel {
+    left: 12px; right: 12px; width: auto; max-width: none; transform: none;
+    bottom: calc(var(--pf-nav-h) + 10px); max-height: 42vh;
+  }
+  .pf-split-knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+}
+@media (max-width: 768px) { .pf-split-knob { top: 34%; } }
