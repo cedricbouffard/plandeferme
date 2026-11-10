@@ -514,6 +514,67 @@
     };
   }
 
+  // France : tuiles d'altitude précalculées de l'IGN (WMTS, RGE ALTI, ~3 à 5 m au niveau 14), en
+  // coordonnées géographiques. ~0,3 s par tuile, contre 2 à 5 s par image pour le WMS LiDAR HD :
+  // on s'en sert dès que la résolution demandée le permet, le WMS LiDAR HD 0,5 m prenant le relais
+  // en vue très rapprochée.
+  function ignTiles() {
+    const LAYER = "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES", ZMAX = 14, ZMIN = 6;
+    const cache = new Map(), order = [];
+    function tile(z, c, r, signal) {
+      const key = `${z}/${c}/${r}`;
+      if (cache.has(key)) return cache.get(key);
+      const p = (async () => {
+        const u = `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${LAYER}&STYLE=normal&TILEMATRIXSET=WGS84G_6_14&TILEMATRIX=${z}&TILEROW=${r}&TILECOL=${c}&FORMAT=image/x-bil;bits=32`;
+        const res = await fetch(u, { signal: AbortSignal.timeout(20000) });
+        if (!res.ok) return null;
+        const buf = await res.arrayBuffer();
+        if (buf.byteLength !== 256 * 256 * 4) return null;
+        const f = new Float32Array(buf), a = new Float32Array(f.length);
+        for (let i = 0; i < f.length; i++) a[i] = clean(f[i], -99999);
+        return a;
+      })();
+      p.catch(() => { cache.delete(key); });
+      cache.set(key, p);
+      order.push(key);
+      while (order.length > 160) cache.delete(order.shift());
+      return p;
+    }
+    return {
+      def: (bbox) => eqcDef((bbox[1] + bbox[3]) / 2),
+      async fill(dst, W, H, tB, signal, bbox) {
+        const [kx, ky] = eqcScale((bbox[1] + bbox[3]) / 2);
+        const g = [tB[0] / kx, tB[1] / ky, tB[2] / kx, tB[3] / ky]; // degrés
+        const need = (g[2] - g[0]) / W;
+        let z = ZMIN;
+        while (z < ZMAX && 360 / (2 ** (z + 1) * 256) > need) z++;
+        const d = 360 / 2 ** (z + 1);
+        const c0 = Math.floor((g[0] + 180) / d), c1 = Math.floor((g[2] + 180) / d);
+        const r0 = Math.floor((90 - g[3]) / d), r1 = Math.floor((90 - g[1]) / d);
+        if ((c1 - c0 + 1) * (r1 - r0 + 1) > 100) throw new Error("trop de tuiles");
+        const jobs = [];
+        for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) jobs.push([c, r]);
+        await Promise.all(jobs.map(async ([c, r]) => {
+          let a = null;
+          try { a = await tile(z, c, r, signal); } catch (e) { a = null; }
+          if (!a || (signal && signal.aborted)) return;
+          const w = -180 + c * d, n = 90 - r * d;
+          resampleInto(dst, W, H, tB, { data: a, w: 256, h: 256, bbox: [w * kx, (n - d) * ky, (w + d) * kx, n * ky] });
+        }));
+      }
+    };
+  }
+  // Vue en France : tuiles IGN si la résolution demandée est ≥ 3 m, sinon WMS LiDAR HD (+ RGE ALTI)
+  function frView() {
+    const tiles = ignTiles();
+    const wms = wmsBil("https://data.geopf.fr/wms-r/wms", ["IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93", "RGEALTI-MNT_PYR-ZIP_FXX_LAMB93_WMS"], 2154);
+    const useTiles = (bbox, W) => ((bbox[2] - bbox[0]) * 111320 * Math.cos(((bbox[1] + bbox[3]) / 2) * D2R)) / W >= 3;
+    return {
+      def: (bbox, W) => (useTiles(bbox, W) ? tiles.def(bbox) : wms.def(bbox)),
+      fill: (dst, W, H, tB, signal, bbox) => (useTiles(bbox, W) ? tiles.fill(dst, W, H, tB, signal, bbox) : wms.fill(dst, W, H, tB, signal, bbox))
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // 5. Sources par région
   // ---------------------------------------------------------------------------
@@ -529,8 +590,8 @@
             read: (b, size, sig) => readWith({ def: () => def, fill: (dst, W, H, tB, s) => readCogMosaic(p.urls, dst, W, H, tB, s) }, SOURCES.US, b, size, sig) };
         });
       } },
-    FR: { id: "fr-ign", label: "IGN LiDAR HD 0,5 m, complété par RGE ALTI 1 m",
-      reader: wmsBil("https://data.geopf.fr/wms-r/wms", ["IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93", "RGEALTI-MNT_PYR-ZIP_FXX_LAMB93_WMS"], 2154),
+    FR: { id: "fr-ign", cog: true, label: "IGN RGE ALTI (tuiles) ; LiDAR HD 0,5 m en vue rapprochée",
+      reader: frView(),
       async surveys() {
         const hd = wmsBil("https://data.geopf.fr/wms-r/wms", ["IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93"], 2154);
         const rge = wmsBil("https://data.geopf.fr/wms-r/wms", ["RGEALTI-MNT_PYR-ZIP_FXX_LAMB93_WMS"], 2154);
@@ -564,7 +625,7 @@
 
   async function readWith(reader, src, bbox, size, signal, width, height) {
     const W = width || Math.max(8, Math.min(2048, Math.round(size || 256))), H = height || W;
-    const def = reader.def(bbox);
+    const def = reader.def(bbox, W);
     const tB = envelope(bbox, def);
     if (!(tB[0] < tB[2] && tB[1] < tB[3])) return null;
     const dst = emptyGrid(W, H);
