@@ -519,7 +519,7 @@
   // ---------------------------------------------------------------------------
   const yearOf = (s) => { const m = String(s).match(/(?:19|20)\d\d/g); return m ? +m[m.length - 1] : 0; };
   const SOURCES = {
-    US: { id: "us-3dep", label: "USGS 3DEP (mosaïque, 1 m là où le LiDAR existe)", reader: us3dep(),
+    US: { id: "us-3dep", cog: true, label: "USGS 3DEP (mosaïque, 1 m là où le LiDAR existe)", reader: us3dep(),
       async surveys(bbox, signal) {
         const projects = await tnmProjects(bbox, signal);
         return projects.map((p) => {
@@ -539,7 +539,7 @@
           { id: "fr-rgealti", label: "2009-2020 — IGN RGE ALTI [1 m]", year: 2014, read: (b, s, g) => readWith(rge, SOURCES.FR, b, s, g) }
         ];
       } },
-    CH: { id: "ch-swissalti3d", label: "swisstopo swissALTI3D", reader: swissAlti(null, false),
+    CH: { id: "ch-swissalti3d", cog: true, label: "swisstopo swissALTI3D", reader: swissAlti(null, false),
       async surveys(bbox, signal) {
         const years = [...new Set((await chItems(bbox, signal)).map((i) => i.year))];
         return years.map((y) => ({ id: `ch:${y}`, label: `${y} — swissALTI3D [0,5 m]`, year: y, read: (b, s, g) => readWith(swissAlti(y, true), SOURCES.CH, b, s, g) }));
@@ -551,7 +551,7 @@
     "DE-SL": { id: "de-sl", label: "LVGL Saarland, grille 5 m", reader: wcs2("https://geoportal.saarland.de/gdi-sl/inspireraster/inspirewcsel", "EL.GridCoverage", 25832, { scale: 0.01 }) },
     "BE-VLG": { id: "be-vlg", label: "Digitaal Vlaanderen DHMV II 1 m", reader: wcs2Geo("https://geo.api.vlaanderen.be/el-dtm/wcs", "EL.GridCoverage.DTM", "y", "x") },
     ES: { id: "es-mdt05", label: "IGN España MDT05 (LiDAR PNOA)", reader: wcs2("https://servicios.idee.es/wcs-inspire/mdt", "Elevacion25830_5", 25830) },
-    AT: { id: "at-bev", label: "BEV ALS DTM 1 m", reader: bev(null),
+    AT: { id: "at-bev", cog: true, label: "BEV ALS DTM 1 m", reader: bev(null),
       async surveys() {
         return AT_DATES.map((d) => ({ id: `at:${d}`, label: `${d.slice(0, 4)} — BEV ALS DTM, état au 15.09 [1 m]`, year: +d.slice(0, 4), read: (b, s, g) => readWith(bev(d), SOURCES.AT, b, s, g) }));
       } },
@@ -617,13 +617,35 @@
     const live = b.reqs.filter((q) => !(q.signal && q.signal.aborted));
     b.reqs.filter((q) => q.signal && q.signal.aborted).forEach((q) => q.resolve(null));
     if (!live.length) return;
+    if (!src.cog) { readGroup(src, live); return; }
+    // Fichiers COG (coût = volume lu) : on ne réunit que des demandes de résolution voisine, de la plus
+    // fine à la plus grossière ; une demande déjà couverte par une lecture plus fine en cours en profite.
+    live.sort((x, y) => x.rx - y.rx);
+    const groups = [];
+    live.forEach((q) => {
+      const g = groups.find((gg) => q.rx <= gg.rx * 2 && q.ry <= gg.ry * 2);
+      if (g) g.reqs.push(q); else groups.push({ rx: q.rx, ry: q.ry, reqs: [q] });
+    });
+    groups.forEach((g) => {
+      const rest = [];
+      g.reqs.forEach((q) => {
+        const hit = VIEW_CACHE.find((c) => c.src === src.id && !c.aborted && contains(c.bbox, q.bbox) && c.rx <= q.rx * 1.6 && c.ry <= q.ry * 1.6);
+        if (hit) hit.promise.then((r) => q.resolve(r && !(q.signal && q.signal.aborted) ? subset(r, q.bbox, q.size) : null));
+        else rest.push(q);
+      });
+      if (rest.length) readGroup(src, rest);
+    });
+  }
+
+  function readGroup(src, live) {
     const ub = [Math.min(...live.map((q) => q.bbox[0])), Math.min(...live.map((q) => q.bbox[1])), Math.max(...live.map((q) => q.bbox[2])), Math.max(...live.map((q) => q.bbox[3]))];
     const rx = Math.min(...live.map((q) => q.rx)), ry = Math.min(...live.map((q) => q.ry));
-    // Les services répondent en 1 à 5 s quelle que soit la taille de l'image : on lit d'un coup une zone
-    // plus large que la vue (jusqu'à 35 % de marge de chaque côté), pour que les déplacements et les
-    // petits zooms suivants soient servis par le cache.
+    // Services (WMS / WCS / ImageServer) : 1 à 5 s par requête quelle que soit la taille de l'image,
+    // donc une lecture large (35 % de marge) pour servir les déplacements suivants depuis le cache.
+    // Fichiers COG : le coût suit le volume lu, donc une petite marge (10 %).
+    const maxPad = src.cog ? 0.1 : 0.35, maxSide = src.cog ? 1100 : MAX_SIDE;
     const W0 = (ub[2] - ub[0]) / rx, H0 = (ub[3] - ub[1]) / ry;
-    const padF = Math.max(0, Math.min(0.35, (MAX_SIDE / Math.max(W0, H0) - 1) / 2));
+    const padF = Math.max(0, Math.min(maxPad, (maxSide / Math.max(W0, H0) - 1) / 2));
     const dxp = (ub[2] - ub[0]) * padF, dyp = (ub[3] - ub[1]) * padF;
     ub[0] -= dxp; ub[2] += dxp; ub[1] -= dyp; ub[3] += dyp;
     const W = Math.ceil((ub[2] - ub[0]) / rx), H = Math.ceil((ub[3] - ub[1]) / ry);
@@ -640,7 +662,7 @@
     const promise = readWith(src.reader, src, ub, Math.max(W, H), ctl.signal, W, H).catch(() => null);
     entry = { src: src.id, bbox: ub, rx, ry, promise, aborted: ctl.signal.aborted };
     VIEW_CACHE.unshift(entry);
-    if (VIEW_CACHE.length > 6) VIEW_CACHE.length = 6;
+    if (VIEW_CACHE.length > 8) VIEW_CACHE.length = 8;
     promise.then((r) => {
       if (!r && ctl.signal.aborted) { entry.aborted = true; const i = VIEW_CACHE.indexOf(entry); if (i >= 0) VIEW_CACHE.splice(i, 1); }
       live.forEach((q) => q.resolve(r && !(q.signal && q.signal.aborted) ? subset(r, q.bbox, q.size) : null));
