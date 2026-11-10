@@ -219,4 +219,17 @@
   applyTray();
   syncFiche();
   window.addEventListener("resize", () => { if (!isDesktop()) document.body.classList.remove("pf-collapsed"); });
+
+  // Mobile : la recherche est toujours affichée ; le bouton « Recherche » de la barre du bas
+  // donne simplement le focus au champ (au lieu d'ouvrir / fermer le panneau)
+  const mSearch = document.getElementById("mobile-btn-search");
+  if (mSearch) {
+    mSearch.addEventListener("click", (e) => {
+      if (isDesktop()) return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      const input = document.getElementById("address-input");
+      if (input) { input.focus(); input.select(); }
+    }, true);
+  }
 })();
