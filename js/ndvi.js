@@ -161,7 +161,89 @@
         this.setMode(!this.isActiveMode);
       }
 
-      async analyzeLocation(lngLat, parcelProps = null, year = null) {
+      // Champ contenant le point : parcelles du Québec, parcelles régionales (fiboa, CSB) ou polygones
+      // des couches personnelles. Renvoie une géométrie (Polygon / MultiPolygon) ou null.
+      findFieldGeometry(lngLat) {
+        const map = this.map;
+        if (!map || !lngLat) return null;
+        const pt = map.project([lngLat.lng, lngLat.lat]);
+        const pin = [lngLat.lng, lngLat.lat];
+        const ok = (g) => g && /Polygon$/.test(g.type) && (typeof isPointInGeom !== "function" || isPointInGeom(pin, g));
+        const t3 = window.terrain3DManager;
+        const tryLayers = (ids, assemble) => {
+          const layers = ids.filter((l) => map.getLayer(l));
+          if (!layers.length) return null;
+          const hits = map.queryRenderedFeatures(pt, { layers });
+          for (const f of hits) {
+            let g = f.geometry;
+            try { if (assemble) g = (assemble(f) || f).geometry; } catch (e) { /* tranche seule */ }
+            if (ok(g)) return g;
+          }
+          return null;
+        };
+        // Couches personnelles d'abord (le polygone tracé par l'utilisateur prime)
+        const personal = (map.getStyle().layers || []).map((l) => l.id).filter((id) => /^vector-fill-/.test(id));
+        let g = tryLayers(personal, null);
+        if (g) return g;
+        g = tryLayers(["parcelles-fill", "parcelles-hit-layer"], t3 ? (f) => t3.assembleParcelFeature(f) : null);
+        if (g) return g;
+        for (const key of ["fields", "us-csb"]) {
+          const lyr = `reg-lyr-${key}-hit`;
+          const L = map.getLayer(lyr);
+          g = tryLayers([lyr], t3 && L ? (f) => t3.assembleParcelFeature(f, { source: `reg-src-${key}`, sourceLayer: L.sourceLayer, idKey: "id" }) : null);
+          if (g) return g;
+        }
+        return null;
+      }
+
+      // Surface (ha) d'une géométrie en degrés, approximation locale
+      static geomAreaHa(geom) {
+        const ringArea = (r) => {
+          let a = 0;
+          const lat0 = r.reduce((s, p) => s + p[1], 0) / r.length;
+          const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
+          for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] * kx) * (r[i][1] * ky) - (r[i][0] * kx) * (r[j][1] * ky);
+          return Math.abs(a) / 2;
+        };
+        const polys = geom.type === "Polygon" ? [geom.coordinates] : geom.coordinates;
+        let m2 = 0;
+        for (const p of polys) { m2 += ringArea(p[0]); for (let k = 1; k < p.length; k++) m2 -= ringArea(p[k]); }
+        return m2 / 10000;
+      }
+
+      showFieldOutline(geom) {
+        const map = this.map;
+        const data = { type: "FeatureCollection", features: geom ? [{ type: "Feature", properties: {}, geometry: geom }] : [] };
+        if (map.getSource("ndvi-field-src")) map.getSource("ndvi-field-src").setData(data);
+        else if (geom) {
+          map.addSource("ndvi-field-src", { type: "geojson", data });
+          map.addLayer({ id: "ndvi-field-line", type: "line", source: "ndvi-field-src", paint: { "line-color": "#1f3b63", "line-width": 2.5, "line-dasharray": [2, 1.5] } });
+        }
+        if (map.getLayer("ndvi-field-line")) map.moveLayer("ndvi-field-line");
+      }
+
+      // Moyenne NDVI du champ pour une scène : pixels clairs seulement (masque SCL), via les
+      // statistiques zonales du Planetary Computer. Renvoie { mean, clear } ou null.
+      async fieldStats(itemId, feature, signal) {
+        const clear = "((SCL==2)|((SCL>=4)&(SCL<=7)))*1.0";
+        const expr = `(B08-B04)/(B08+B04)*${clear};${clear}`;
+        const u = `https://planetarycomputer.microsoft.com/api/data/v1/item/statistics?collection=sentinel-2-l2a&item=${encodeURIComponent(itemId)}&assets=B04&assets=B08&assets=SCL&asset_as_band=True&expression=${encodeURIComponent(expr)}`;
+        try {
+          const r = await fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(feature), signal });
+          if (!r.ok) return null;
+          const j = await r.json();
+          const st = Object.values((j.properties && j.properties.statistics) || {});
+          if (st.length < 2) return null;
+          const sumNdvi = st[0].mean, frac = st[1].mean;
+          if (!Number.isFinite(sumNdvi) || !Number.isFinite(frac)) return null;
+          return { clear: frac, mean: frac >= 0.5 ? sumNdvi / frac : null };
+        } catch (e) {
+          if (e.name === "AbortError") throw e;
+          return null;
+        }
+      }
+
+      async analyzeLocation(lngLat, parcelProps = null, year = null, geometry = undefined) {
         if (this.abortController) {
           this.abortController.abort();
         }
@@ -170,6 +252,15 @@
 
         this.currentLocation = lngLat;
         this.currentParcel = parcelProps;
+        if (geometry === undefined) geometry = this.findFieldGeometry(lngLat);
+        if (geometry && !/Polygon$/.test(geometry.type)) geometry = null;
+        // Champs démesurés (> 2 000 ha) : statistiques trop lourdes, on garde le point seul
+        this.fieldAreaHa = geometry ? NdviManager.geomAreaHa(geometry) : 0;
+        if (geometry && this.fieldAreaHa > 2000) geometry = null;
+        this.currentGeometry = geometry || null;
+        this.showFieldOutline(this.currentGeometry);
+        const round6 = (c) => (typeof c[0] === "number" ? [Math.round(c[0] * 1e6) / 1e6, Math.round(c[1] * 1e6) / 1e6] : c.map(round6));
+        const fieldFeature = this.currentGeometry ? { type: "Feature", properties: {}, geometry: { type: this.currentGeometry.type, coordinates: round6(this.currentGeometry.coordinates) } } : null;
         this.series = [];
         this.selectedIndex = -1;
 
@@ -209,9 +300,11 @@
         const crop = parcelProps ? (parcelProps.DESCODPR1 || parcelProps.descodpr1 || "") : "";
 
         if (titleEl) {
-          titleEl.textContent = pid 
-            ? `Série NDVI ${this.selectedYear} (mars–déc.) — Parcelle nº ${pid}${crop ? ` (${crop})` : ''}`
-            : `Série NDVI ${this.selectedYear} (mars–déc.) — Point [${lngLat.lat.toFixed(4)}°N, ${Math.abs(lngLat.lng).toFixed(4)}°O]`;
+          const fieldTxt = this.currentGeometry ? ` · point vs moyenne du champ (${this.fieldAreaHa.toLocaleString("fr-CA", { maximumFractionDigits: 1 })} ha)` : "";
+          const ew = lngLat.lng < 0 ? "O" : "E", ns = lngLat.lat < 0 ? "S" : "N";
+          titleEl.textContent = pid
+            ? `Série NDVI ${this.selectedYear} (mars–déc.) — Parcelle nº ${pid}${crop ? ` (${crop})` : ''}${fieldTxt}`
+            : `Série NDVI ${this.selectedYear} (mars–déc.) — Point [${Math.abs(lngLat.lat).toFixed(4)}°${ns}, ${Math.abs(lngLat.lng).toFixed(4)}°${ew}]${fieldTxt}`;
         }
 
         if (statsBar) {
@@ -295,6 +388,7 @@
             const batch = uniqueItems.slice(i, i + batchSize);
             const batchPromises = batch.map(async (scene) => {
               const itemId = scene.id;
+              const fieldPromise = fieldFeature ? this.fieldStats(itemId, fieldFeature, signal) : Promise.resolve(null);
               const pUrl = `https://planetarycomputer.microsoft.com/api/data/v1/item/point/${lngLat.lng.toFixed(5)},${lngLat.lat.toFixed(5)}?collection=sentinel-2-l2a&item=${itemId}&assets=B04&assets=B08&assets=SCL`;
               try {
                 const pResp = await fetch(pUrl, { signal });
@@ -318,7 +412,10 @@
                   if (b8 + b4 > 0) {
                     const ndvi = (b8 - b4) / (b8 + b4);
                     if (Number.isFinite(ndvi) && ndvi >= -0.15 && ndvi <= 1.0) {
+                      const fs = await fieldPromise;
                       return {
+                        fieldNdvi: fs && Number.isFinite(fs.mean) ? fs.mean : null,
+                        fieldClear: fs ? fs.clear : null,
                         id: itemId,
                         datetime: scene.properties.datetime,
                         dateKey: scene.properties.datetime.split("T")[0],
@@ -379,6 +476,15 @@
               <span class="stat-chip" style="background:#dcfce7; border-color:#86efac; color:#14532d;">Pic estival : <strong>${maxNdvi.toFixed(2)}</strong> (${peakStr})</span>
               <span class="stat-chip">Dernier NDVI : <strong>${latest.ndvi.toFixed(2)}</strong></span>
               <span class="stat-chip">Observations claires : <strong>${this.series.length} dates</strong></span>
+              ${(() => {
+                const both = this.series.filter((x) => x.fieldNdvi != null);
+                if (!this.currentGeometry) return "";
+                if (!both.length) return `<span class="stat-chip" style="color:#64748b;">Moyenne du champ indisponible (champ trop nuageux)</span>`;
+                const fmax = Math.max(...both.map((x) => x.fieldNdvi));
+                const gap = both.reduce((a, x) => a + (x.ndvi - x.fieldNdvi), 0) / both.length;
+                return `<span class="stat-chip" style="background:#e8eef7; border-color:#b7c6dd; color:#1f3b63;">Pic du champ : <strong>${fmax.toFixed(2)}</strong></span>
+                  <span class="stat-chip" title="Moyenne, sur les dates claires, de (NDVI du point − NDVI moyen du champ)">Point vs champ : <strong>${gap >= 0 ? "+" : ""}${gap.toFixed(2)}</strong> en moyenne</span>`;
+              })()}
               ${cloudFilteredCount > 0 ? `<span class="stat-chip" style="color:#64748b;" title="Passages éliminés car sous un nuage, une ombre ou de la neige">${cloudFilteredCount} nuageux filtrés</span>` : ''}
             `;
           }
@@ -410,14 +516,20 @@
           const mNames = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
           const mIdx = parseInt(parts[1], 10) - 1;
           const niceDate = (mIdx >= 0 && mIdx < 12) ? `${parseInt(parts[2], 10)} ${mNames[mIdx]} ${parts[0]}` : scene.dateKey;
-          badge.innerHTML = `<strong>${niceDate}</strong> &bull; NDVI : <strong style="color:#15803d;">${scene.ndvi.toFixed(2)}</strong> <span class="stat-chip" style="margin-left:4px;font-size:10px;padding:1px 5px;background:#dcfce7;color:#14532d;border-color:#86efac;">${this.getSclLabel(scene.scl)}</span> <span style="color:#64748b;font-size:10.5px;margin-left:3px;" title="Couverture nuageuse de la scène : ${scene.cloud.toFixed(1)}% (${scene.platform})">(${scene.cloud.toFixed(0)}% nuages)</span>`;
+          const fv = scene.fieldNdvi;
+          const fieldHtml = this.currentGeometry
+            ? (fv != null
+              ? ` &bull; Champ : <strong style="color:#1f3b63;">${fv.toFixed(2)}</strong> <span style="font-weight:700;color:${scene.ndvi - fv >= 0 ? "#15803d" : "#b91c1c"};">(${scene.ndvi - fv >= 0 ? "+" : ""}${(scene.ndvi - fv).toFixed(2)})</span>`
+              : ` &bull; <span style="color:#64748b;">Champ : trop nuageux${scene.fieldClear != null ? ` (${Math.round(scene.fieldClear * 100)} % clair)` : ""}</span>`)
+            : "";
+          badge.innerHTML = `<strong>${niceDate}</strong> &bull; Point : <strong style="color:#15803d;">${scene.ndvi.toFixed(2)}</strong>${fieldHtml} <span class="stat-chip" style="margin-left:4px;font-size:10px;padding:1px 5px;background:#dcfce7;color:#14532d;border-color:#86efac;">${this.getSclLabel(scene.scl)}</span> <span style="color:#64748b;font-size:10.5px;margin-left:3px;" title="Couverture nuageuse de la scène : ${scene.cloud.toFixed(1)}% (${scene.platform})">(${scene.cloud.toFixed(0)}% nuages)</span>`;
         }
         if (btnPrev) btnPrev.disabled = (index <= 0);
         if (btnNext) btnNext.disabled = (index >= this.series.length - 1);
 
         const collapsedSummary = document.getElementById("ndvi-collapsed-summary");
         if (collapsedSummary) {
-          collapsedSummary.textContent = `${scene.dateKey} • NDVI : ${scene.ndvi.toFixed(3)}`;
+          collapsedSummary.textContent = `${scene.dateKey} • Point : ${scene.ndvi.toFixed(2)}${scene.fieldNdvi != null ? ` • Champ : ${scene.fieldNdvi.toFixed(2)}` : ""}`;
         }
 
         if (!skipRender) {
@@ -470,6 +582,7 @@
             "raster-fade-duration": 180
           }
         }, beforeLayer);
+        if (this.map.getLayer("ndvi-field-line")) this.map.moveLayer("ndvi-field-line");
       }
 
       setTileOpacity(val) {
@@ -511,6 +624,8 @@
         }
         this.isCollapsed = false;
         this.clearLayer();
+        this.showFieldOutline(null);
+        this.currentGeometry = null;
         if (this.marker) {
           this.marker.remove();
           this.marker = null;
@@ -626,6 +741,26 @@
           `;
         });
 
+        // Moyenne du champ (pixels clairs) : trait bleu-ardoise pointillé, carrés
+        let fieldHtml = "";
+        const fieldPts = this.series.map((s, idx) => (s.fieldNdvi != null ? [getX(s.datetime), getY(s.fieldNdvi), idx] : null)).filter(Boolean);
+        if (fieldPts.length) {
+          let fd = `M ${fieldPts[0][0].toFixed(1)} ${fieldPts[0][1].toFixed(1)}`;
+          for (let i = 1; i < fieldPts.length; i++) fd += ` L ${fieldPts[i][0].toFixed(1)} ${fieldPts[i][1].toFixed(1)}`;
+          fieldHtml = `<path d="${fd}" fill="none" stroke="#1f3b63" stroke-width="2" stroke-dasharray="5 3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />` +
+            fieldPts.map(([x, y, idx]) => { const act = idx === activeIndex; const r = act ? 5 : 3.4; return `<rect x="${(x - r).toFixed(1)}" y="${(y - r).toFixed(1)}" width="${(2 * r).toFixed(1)}" height="${(2 * r).toFixed(1)}" rx="1" fill="#1f3b63" stroke="#fff" stroke-width="1.2" pointer-events="none" />`; }).join("");
+        }
+        const legendHtml = this.currentGeometry ? `
+            <g font-family="sans-serif" font-size="10.5" font-weight="600">
+              <rect x="${pad.left + 6}" y="4" width="196" height="16" rx="4" fill="rgba(255,255,255,0.85)" />
+              <line x1="${pad.left + 12}" y1="12" x2="${pad.left + 30}" y2="12" stroke="#16a34a" stroke-width="2.4" />
+              <circle cx="${pad.left + 21}" cy="12" r="3.5" fill="#16a34a" stroke="#fff" stroke-width="1" />
+              <text x="${pad.left + 35}" y="15.5" fill="#334155">Point</text>
+              <line x1="${pad.left + 72}" y1="12" x2="${pad.left + 90}" y2="12" stroke="#1f3b63" stroke-width="2" stroke-dasharray="5 3" />
+              <rect x="${pad.left + 78}" y="9" width="6" height="6" rx="1" fill="#1f3b63" />
+              <text x="${pad.left + 95}" y="15.5" fill="#334155">Moyenne du champ</text>
+            </g>` : "";
+
         const svgHtml = `
           <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
             ${bandsHtml}
@@ -633,8 +768,10 @@
             ${xAxisHtml}
             ${activeDateMarkerHtml}
             <path d="${areaD}" fill="rgba(22, 163, 74, 0.12)" />
+            ${fieldHtml}
             <path d="${pathD}" fill="none" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
             ${pointsHtml}
+            ${legendHtml}
           </svg>
         `;
 
@@ -654,7 +791,7 @@
             const idx = parseInt(circle.dataset.idx, 10);
             const item = this.series[idx];
             if (hoverInfo) {
-              hoverInfo.innerHTML = `<strong>${item.dateKey}</strong> &bull; NDVI : <strong>${item.ndvi.toFixed(3)}</strong> &bull; SCL : <strong>${this.getSclLabel(item.scl)}</strong> &bull; Nuages scène : ${item.cloud.toFixed(1)}% &bull; Cliquez pour afficher la tuile satellite sur la carte`;
+              hoverInfo.innerHTML = `<strong>${item.dateKey}</strong> &bull; Point : <strong>${item.ndvi.toFixed(3)}</strong>${item.fieldNdvi != null ? ` &bull; Champ : <strong>${item.fieldNdvi.toFixed(3)}</strong>` : ""} &bull; SCL : <strong>${this.getSclLabel(item.scl)}</strong> &bull; Nuages scène : ${item.cloud.toFixed(1)}% &bull; Cliquez pour afficher la tuile satellite sur la carte`;
             }
           });
 

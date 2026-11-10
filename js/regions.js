@@ -796,10 +796,10 @@
       panes.forEach((p) => p.classList.toggle("active", p.dataset.tab === b.dataset.tab));
     }));
 
-    let parcelProps = null;
+    let parcelProps = null, parcelGeom = null;
     dom.querySelector(".pf-reg-ndvi").addEventListener("click", () => {
       popup.remove();
-      if (window.ndviManager) window.ndviManager.analyzeLocation(e.lngLat, parcelProps);
+      if (window.ndviManager) window.ndviManager.analyzeLocation(e.lngLat, parcelProps, null, parcelGeom || undefined);
     });
 
     soilsPromise.then((h) => {
@@ -819,6 +819,7 @@
       return;
     }
     parcelProps = parcel.properties;
+    parcelGeom = parcel.geometry;
     title.textContent = parcel.title;
     meta.textContent = [Number.isFinite(parcel.area) ? `${fmt(parcel.area)} ha` : "", parcel.crop].filter(Boolean).join(" · ");
     if (cult) cult.innerHTML = facts(parcel.facts) + source(parcel.sourceLabel);
