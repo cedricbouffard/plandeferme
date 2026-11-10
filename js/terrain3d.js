@@ -189,24 +189,38 @@ class Terrain3DManager {
     if (!Number.isFinite(minLng) || !Number.isFinite(minLat)) return null;
     return [minLng, minLat, maxLng, maxLat];
   }
-  assembleParcelFeature(feature) {
+  // opts (facultatif) : { source, sourceLayer, idKey } pour une autre source de tuiles vectorielles
+  // (parcelles hors Québec) ; seules les tranches de cette source ayant le même idKey sont réunies.
+  assembleParcelFeature(feature, opts) {
     if (!feature || !feature.geometry) return feature;
     const map = this.map;
     if (!map) return feature;
 
     const props = feature.properties || {};
-    const pid = props.IDPAR || props.idpar || props.IDANPAR || props.idanpar;
-    const polyId = props.POLY_ID || props.poly_id;
-    const fid = feature.id;
+    if (props._assembled && !opts) return feature; // déjà reconstituée
+    const keyName = opts && opts.idKey;
+    const keyVal = keyName ? props[keyName] : undefined;
+    const pid = opts ? undefined : (props.IDPAR || props.idpar || props.IDANPAR || props.idanpar);
+    const polyId = opts ? undefined : (props.POLY_ID || props.poly_id);
+    const fid = opts ? undefined : feature.id;
 
-    if (!pid && !polyId && fid === undefined) {
+    if (!pid && !polyId && fid === undefined && keyVal === undefined) {
       return feature;
     }
 
     const candidateSlices = [];
 
+    if (opts && opts.source && keyVal !== undefined && typeof map.querySourceFeatures === 'function') {
+      try {
+        const hits = map.querySourceFeatures(opts.source, { sourceLayer: opts.sourceLayer, filter: ['==', ['get', keyName], keyVal] });
+        for (const f of hits || []) candidateSlices.push(f);
+      } catch (e) {
+        console.warn('querySourceFeatures error:', e);
+      }
+    }
+
     // 1. Récupération depuis le cache des tuiles de la source (toutes les tuiles chargées)
-    if (typeof map.querySourceFeatures === 'function') {
+    if (!opts && typeof map.querySourceFeatures === 'function') {
       try {
         if (pid) {
           const srcHits = map.querySourceFeatures('parcelles-source', { sourceLayer: 'BDPPAD_2026' });
@@ -226,7 +240,7 @@ class Terrain3DManager {
     }
 
     // 2. Récupération depuis les couches affichées dans la vue
-    if (typeof map.queryRenderedFeatures === 'function') {
+    if (!opts && typeof map.queryRenderedFeatures === 'function') {
       try {
         const queryLayers = ['parcelles-fill', 'parcelles-hit-layer', 'pedologie-fill', 'pedologie-hit-layer'].filter(l => map.getLayer(l));
         if (queryLayers.length > 0) {
@@ -251,7 +265,9 @@ class Terrain3DManager {
       const fPolyId = fp.POLY_ID || fp.poly_id;
 
       let isMatch = false;
-      if (pid && fPid && (String(fPid) === String(pid) || Number(fPid) === Number(pid))) {
+      if (keyName) {
+        isMatch = fp[keyName] !== undefined && String(fp[keyName]) === String(keyVal);
+      } else if (pid && fPid && (String(fPid) === String(pid) || Number(fPid) === Number(pid))) {
         isMatch = true;
       } else if (polyId && fPolyId && (String(fPolyId) === String(polyId) || Number(fPolyId) === Number(polyId))) {
         isMatch = true;

@@ -20,6 +20,10 @@
  *   Tchéquie     DMR 5G (ImageServer)
  *   Australie    Geoscience Australia, MNT LiDAR 5 m (WCS)
  *   Japon        GSI DEM5A (LiDAR) / DEM5B / DEM5C, puis DEM10 aux petites échelles (tuiles texte)
+ * Pour la vue (relief, courbes, pentes…), la plupart de ces régions passent par Mapterhorn
+ * (mapterhorn.com), des tuiles ouvertes qui fusionnent ces mêmes LiDAR nationaux : bien plus rapide
+ * que les services WMS / WCS. Les services nationaux restent utilisés pour la comparaison LiDAR,
+ * les vues plus fines que le niveau max de Mapterhorn et en secours.
  * Non retenues ici (le service refuse les requêtes venant d'un autre site, ou ne répond pas) :
  *   Angleterre (Environment Agency), Finlande, Pologne, Saxe-Anhalt, Nouvelle-Zélande, Estonie.
  * ========================================================================== */
@@ -575,6 +579,90 @@
     };
   }
 
+  // Mapterhorn (mapterhorn.com) : tuiles d'altitude ouvertes, fusion des LiDAR nationaux, 512 px,
+  // codage Terrarium en WebP, Web Mercator. Niveau max selon la région (16 ≈ 0,75 m, 14 ≈ 3 m).
+  // Les tuiles reçues restent en mémoire (WebP compressé) ; seules les dernières sont décodées.
+  const MT_URL = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp";
+  const mtBlobs = new Map(), mtBlobOrder = [], mtDecoded = new Map(), mtDecOrder = [];
+  async function mtDecode(blob) {
+    const bmp = await createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+    const w = bmp.width, h = bmp.height;
+    const cv = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(w, h) : Object.assign(document.createElement("canvas"), { width: w, height: h });
+    const ctx = cv.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(bmp, 0, 0);
+    if (bmp.close) bmp.close();
+    const d = ctx.getImageData(0, 0, w, h).data;
+    const a = new Float32Array(w * h);
+    for (let i = 0, j = 0; i < a.length; i++, j += 4) a[i] = d[j + 3] === 0 ? NaN : clean(d[j] * 256 + d[j + 1] + d[j + 2] / 256 - 32768);
+    return { a, w, h };
+  }
+  function mtBlob(z, x, y) {
+    const key = `${z}/${x}/${y}`;
+    if (!mtBlobs.has(key)) {
+      const p = fetch(MT_URL.replace("{z}", z).replace("{x}", x).replace("{y}", y), { signal: AbortSignal.timeout(25000) })
+        .then((r) => (r.ok ? r.blob() : null));
+      p.catch(() => mtBlobs.delete(key));
+      mtBlobs.set(key, p);
+      mtBlobOrder.push(key);
+      while (mtBlobOrder.length > 400) mtBlobs.delete(mtBlobOrder.shift());
+    }
+    return mtBlobs.get(key);
+  }
+  async function mtTile(z, x, y) {
+    const key = `${z}/${x}/${y}`;
+    if (mtDecoded.has(key)) return mtDecoded.get(key);
+    const p = (async () => { const b = await mtBlob(z, x, y); return b ? mtDecode(b) : null; })();
+    p.catch(() => mtDecoded.delete(key));
+    mtDecoded.set(key, p);
+    mtDecOrder.push(key);
+    while (mtDecOrder.length > 40) mtDecoded.delete(mtDecOrder.shift());
+    return p;
+  }
+  const MERC = 20037508.342789244;
+  const mtRes = (z, lat) => (2 * MERC / (512 * 2 ** z)) * Math.cos(lat * D2R); // m / pixel au sol
+  function mapterhorn(maxZ) {
+    return {
+      def: (bbox) => mercDef((bbox[1] + bbox[3]) / 2),
+      async fill(dst, W, H, tB, signal, bbox) {
+        const k = Math.cos(roundLat((bbox[1] + bbox[3]) / 2) * D2R);
+        const mb = [tB[0] / k, tB[1] / k, tB[2] / k, tB[3] / k];
+        const need = (mb[2] - mb[0]) / W;
+        let z = 1;
+        while (z < maxZ && 2 * MERC / (512 * 2 ** z) > need) z++;
+        const range = (zz) => { const sz = 2 * MERC / 2 ** zz; return [Math.floor((mb[0] + MERC) / sz), Math.floor((MERC - mb[3]) / sz), Math.floor((mb[2] + MERC) / sz), Math.floor((MERC - mb[1]) / sz), sz]; };
+        let tr = range(z);
+        while (z > 1 && (tr[2] - tr[0] + 1) * (tr[3] - tr[1] + 1) > 36) { z--; tr = range(z); }
+        const [x0, y0, x1, y1] = tr;
+        const jobs = [];
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) jobs.push([x, y]);
+        await Promise.all(jobs.map(async ([x, y]) => {
+          // Tuile absente à ce niveau : on remonte aux niveaux parents (jusqu'à 3)
+          for (let up = 0; up <= 3; up++) {
+            const zz = z - up, xx = x >> up, yy = y >> up;
+            let t = null;
+            try { t = await mtTile(zz, xx, yy); } catch (e) { t = null; }
+            if (signal && signal.aborted) return;
+            if (!t) continue;
+            const sz = 2 * MERC / 2 ** zz, bx = -MERC + xx * sz, by = MERC - yy * sz;
+            resampleInto(dst, W, H, tB, { data: t.a, w: t.w, h: t.h, bbox: [bx * k, (by - sz) * k, (bx + sz) * k, by * k] });
+            return;
+          }
+        }));
+      }
+    };
+  }
+  // Mapterhorn tant que son niveau max suffit à la résolution demandée, sinon le service national ;
+  // le service national sert aussi de secours si les tuiles manquent (readWith → fallback).
+  function mapterhornOr(native, maxZ) {
+    const mt = mapterhorn(maxZ);
+    const useMt = (bbox, W) => ((bbox[2] - bbox[0]) * 111320 * Math.cos(((bbox[1] + bbox[3]) / 2) * D2R)) / W >= 0.6 * mtRes(maxZ, (bbox[1] + bbox[3]) / 2);
+    return {
+      def: (bbox, W) => (useMt(bbox, W) ? mt.def(bbox) : native.def(bbox, W)),
+      fill: (dst, W, H, tB, signal, bbox) => (useMt(bbox, W) ? mt.fill(dst, W, H, tB, signal, bbox) : native.fill(dst, W, H, tB, signal, bbox)),
+      fallback: native
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // 5. Sources par région
   // ---------------------------------------------------------------------------
@@ -590,7 +678,7 @@
             read: (b, size, sig) => readWith({ def: () => def, fill: (dst, W, H, tB, s) => readCogMosaic(p.urls, dst, W, H, tB, s) }, SOURCES.US, b, size, sig) };
         });
       } },
-    FR: { id: "fr-ign", cog: true, label: "IGN RGE ALTI (tuiles) ; LiDAR HD 0,5 m en vue rapprochée",
+    FR: { id: "fr-ign", cog: true, label: "IGN LiDAR HD et RGE ALTI",
       reader: frView(),
       async surveys() {
         const hd = wmsBil("https://data.geopf.fr/wms-r/wms", ["IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93"], 2154);
@@ -620,6 +708,16 @@
     AU: { id: "au-ga", label: "Geoscience Australia, MNT LiDAR 5 m", reader: wcs10Geo("https://services.ga.gov.au/gis/services/DEM_LiDAR_5m_2025/MapServer/WCSServer", "1", "EPSG:4283") },
     JP: { id: "jp-gsi", label: "GSI DEM5A (LiDAR), DEM5B/5C, DEM10", reader: gsiTiles() }
   };
+  // Relief de la vue par Mapterhorn (niveau max mesuré par région) ; levés datés et vues très
+  // rapprochées : service national
+  const MT_MAX = { FR: 16, CH: 17, NL: 14, "DE-NW": 16, "DE-BB": 16, "DE-MV": 16, "DE-SL": 16, "BE-VLG": 16, ES: 16, CZ: 14, AU: 14, JP: 16 };
+  Object.keys(MT_MAX).forEach((k) => {
+    const src = SOURCES[k];
+    src.native = src.reader;
+    src.reader = mapterhornOr(src.reader, MT_MAX[k]);
+    src.cog = true;
+    src.label = `Mapterhorn, d'après ${src.label}`;
+  });
   const COUNTRY = { US: "États-Unis", FR: "France", CH: "Suisse", NL: "Pays-Bas", "DE-NW": "Rhénanie-du-Nord–Westphalie", "DE-BB": "Brandebourg", "DE-MV": "Mecklembourg-Poméranie", "DE-SL": "Sarre", "BE-VLG": "Flandre", ES: "Espagne", AT: "Autriche", CZ: "Tchéquie", AU: "Australie", JP: "Japon" };
   Object.keys(SOURCES).forEach((k) => { SOURCES[k].region = k; SOURCES[k].country = COUNTRY[k]; });
 
@@ -638,6 +736,18 @@
       return null;
     }
     if (signal && signal.aborted) return null;
+    if (reader.fallback) {
+      let holes = 0;
+      for (let i = 0; i < dst.length; i++) if (Number.isNaN(dst[i])) holes++;
+      if (holes / dst.length > 0.15) {
+        const alt = await readWith(reader.fallback, src, bbox, size, signal, width, height);
+        if (alt) {
+          let altHoles = 0;
+          for (let i = 0; i < alt.data.length; i++) if (Number.isNaN(alt.data[i])) altHoles++;
+          if (altHoles < holes) return alt;
+        }
+      }
+    }
     return makeRegion(dst, W, H, tB, def, src);
   }
 
