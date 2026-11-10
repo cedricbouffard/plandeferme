@@ -222,7 +222,19 @@
 
       const surveys = [];
 
-      try {
+      // Hors Canada : levés datés de la source LiDAR du pays (js/dem-world.js)
+      let world = null;
+      if (window.pfDem && typeof window.pfDem.surveys === 'function') {
+        try { world = await window.pfDem.surveys(geomBbox); } catch (err) { world = null; }
+      }
+      if (world) {
+        world.surveys.forEach((sv) => surveys.push({ id: sv.id, label: sv.label, url: null, year: sv.year || 0, bbox: null, isMosaic: false, read: sv.read }));
+        if (world.source && world.source.region === 'US') {
+          surveys.push({ id: 'mosaic', label: 'Mosaïque 3DEP (meilleure donnée disponible)', url: null, year: 0, bbox: null, isMosaic: true });
+        }
+      }
+
+      if (!world) try {
         const stacUrl = `https://datacube.services.geo.ca/pgstac/api/collections/hrdem-lidar/items?bbox=${queryBbox}&limit=50`;
         const res = await fetch(stacUrl);
         if (res.ok) {
@@ -255,7 +267,7 @@
       }
 
       // Ajout de la mosaïque nationale 1 m (HRDEM) comme référence toujours disponible
-      surveys.push({
+      if (!world) surveys.push({
         id: 'mosaic',
         label: 'Mosaïque nationale 1 m (HRDEM)',
         url: null,
@@ -349,7 +361,9 @@
       if (!p4) return 0;
       let reg = null;
       try {
-        if (survey.isMosaic) {
+        if (typeof survey.read === 'function') {
+          reg = await survey.read(geomBbox, 64, signal);
+        } else if (survey.isMosaic) {
           reg = typeof readMultiHrdemRegion === 'function' ? await readMultiHrdemRegion(geomBbox, 64, signal, 'bilinear') : null;
         } else if (survey.url && typeof readSingleHrdemProjectRegion === 'function') {
           reg = await readSingleHrdemProjectRegion(survey.url, geomBbox, 64, signal, 'bilinear');
@@ -463,7 +477,9 @@
       if (!survey) return null;
 
       let region = null;
-      if (survey.isMosaic) {
+      if (typeof survey.read === 'function') {
+        region = await survey.read(bbox, targetSize, signal);
+      } else if (survey.isMosaic) {
         if (typeof readMultiHrdemRegion === 'function') {
           region = await readMultiHrdemRegion(bbox, targetSize, signal, 'bilinear');
         }

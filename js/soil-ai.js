@@ -114,7 +114,7 @@
           const region = await readMultiHrdemRegion(bbox, 64, AbortSignal.timeout(6000), 'bilinear');
           if (!region || !region.data || !region.sourceBBox) return null;
 
-          const [clickX, clickY] = proj4('EPSG:4326', EPSG_3979_DEF, [lngLat.lng, lngLat.lat]);
+          const [clickX, clickY] = proj4('EPSG:4326', region.projection || EPSG_3979_DEF, [lngLat.lng, lngLat.lat]);
           const px = Math.max(0, Math.min(region.width - 1, Math.round(((clickX - region.sourceBBox[0]) / (region.sourceBBox[2] - region.sourceBBox[0])) * (region.width - 1))));
           const py = Math.max(0, Math.min(region.height - 1, Math.round(((region.sourceBBox[3] - clickY) / (region.sourceBBox[3] - region.sourceBBox[1])) * (region.height - 1))));
           const pointAlt = region.data[py * region.width + px];

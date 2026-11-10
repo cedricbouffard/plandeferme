@@ -1855,6 +1855,7 @@
       // Afficher un popup informatif sur l'entité exacte
       const center = clickCoords || this.getFeatureCenter(feat);
       const featName = feat.properties.nom || feat.properties.name || "Entité";
+      const isPolyFeat = !!(feat.geometry && /Polygon$/.test(feat.geometry.type));
       const popupHtml = `
         <div style="font-family: var(--font-sans, sans-serif); font-size: 12px; padding: 4px;">
           <strong style="color: #0f172a; font-size: 13px;">${esc(featName)}</strong>
@@ -1866,6 +1867,7 @@
             <button type="button" id="btn-popup-edit-attr" class="vector-tool-btn primary" style="font-size: 10.5px;">Éditer attributs</button>
             <button type="button" id="btn-popup-del-feat" class="vector-tool-btn danger" style="font-size: 10.5px;">Supprimer</button>
           </div>
+          ${isPolyFeat && window.pfDem && window.pfDem.hasRelief(feat.geometry) ? `<div class="pf-vec-lidar">${window.pfDem.actionsHtml("Analyses LiDAR")}</div>` : ""}
         </div>
       `;
 
@@ -1880,6 +1882,11 @@
           btnEdit.addEventListener("click", () => {
             this.openFeatureModal(layerId, actualId, feat);
           });
+        }
+        const lidarBox = this.activePopup && this.activePopup.getElement().querySelector(".pf-vec-lidar");
+        if (lidarBox && window.pfDem) {
+          const target = { type: "Feature", geometry: feat.geometry, properties: Object.assign({}, feat.properties) };
+          window.pfDem.bindActions(lidarBox, target, () => this.clearFeatureSelection());
         }
         const btnDel = document.getElementById("btn-popup-del-feat");
         if (btnDel) {

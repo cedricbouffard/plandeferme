@@ -1491,7 +1491,7 @@
           const ptLng = this.line[segIdx - 1][0] + (this.line[segIdx][0] - this.line[segIdx - 1][0]) * r;
           const ptLat = this.line[segIdx - 1][1] + (this.line[segIdx][1] - this.line[segIdx - 1][1]) * r;
 
-          const [projX, projY] = proj4('EPSG:4326', EPSG_3979_DEF, [ptLng, ptLat]);
+          const [projX, projY] = proj4('EPSG:4326', region.projection || EPSG_3979_DEF, [ptLng, ptLat]);
           if (spanX > 0 && spanY > 0) {
             const gx = ((projX - region.sourceBBox[0]) / spanX) * (region.width - 1);
             const gy = ((region.sourceBBox[3] - projY) / spanY) * (region.height - 1);

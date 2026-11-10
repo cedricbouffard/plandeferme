@@ -602,8 +602,9 @@
             <button type="button" class="btn-popup-parcel-action pf-reg-zoom"><span class="pf-act-name">Cadrer</span><span class="pf-act-desc">Zoom sur la parcelle</span></button>
             <button type="button" class="btn-popup-parcel-action pf-reg-copy"><span class="pf-act-name">Ajouter à Mes données</span><span class="pf-act-desc">Copie dans vos couches</span></button>
           </div>
-          <p class="pf-reg-note">Les analyses LiDAR (3D, pluie, déblais/remblais) utilisent le MNT HRDEM et ne couvrent pour l'instant que le Canada.</p>
-        </div>`;
+        </div>
+        ${window.pfDem && window.pfDem.hasRelief(parcel.geometry) ? window.pfDem.actionsHtml("Analyses LiDAR") : `<p class="pf-reg-note">Pas de MNT LiDAR public lisible ici pour les analyses 3D, pluie et déblais / remblais.</p>`}`;
+      if (window.pfDem) window.pfDem.bindActions(slot, targetP, () => popup.remove());
       slot.querySelector(".pf-reg-zoom").addEventListener("click", () => {
         let b = null;
         const scan = (c) => { if (typeof c[0] === "number") { b = b ? [Math.min(b[0], c[0]), Math.min(b[1], c[1]), Math.max(b[2], c[0]), Math.max(b[3], c[1])] : [c[0], c[1], c[0], c[1]]; } else c.forEach(scan); };
@@ -641,7 +642,7 @@
 
   function waitForMap() {
     const map = window.map;
-    if (!map) { setTimeout(waitForMap, 200); return; }
+    if (!map || typeof map.on !== "function") { setTimeout(waitForMap, 200); return; }
     if (map.loaded && map.loaded()) start(map);
     else map.once("load", () => start(map));
   }

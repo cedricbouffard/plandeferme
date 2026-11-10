@@ -822,3 +822,11 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-reg-note { margin: 8px 0 0; font-size: 11px; color: var(--pf-muted); line-height: 1.4; }
 .pf-reg-fiche .pf-fiche-actions-grid .btn-popup-parcel-action { min-height: 46px; }
 .pf-reg-muted { color: var(--pf-muted); font-size: 11px; }
+
+/* Source du relief LiDAR hors Canada */
+.pf-dem-note { margin: 10px 8px 4px; padding: 8px 10px; border-radius: 8px; background: var(--pf-accent-soft); color: var(--pf-ink); font-size: 11.5px; line-height: 1.4; display: flex; flex-direction: column; gap: 2px; }
+.pf-dem-note[hidden] { display: none; }
+.pf-dem-note strong { font-size: 12px; color: var(--pf-accent-strong); font-weight: 600; }
+.pf-dem-note span { color: var(--pf-muted); }
+.pf-vec-lidar { margin-top: 8px; min-width: 240px; }
+.pf-vec-lidar .pf-fiche-actions { margin: 0; padding: 8px 0 0; border-top: 1px solid var(--pf-line-soft); }
