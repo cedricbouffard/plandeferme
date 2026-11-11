@@ -1099,3 +1099,14 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 }
 .pf-tray-tab > button.pf-tray-eye + button { height: 30px; padding: 0 4px !important; font-size: 12px; font-weight: 600; color: inherit; background: transparent; border: none; cursor: pointer; }
 #sim-dock { max-height: 210px !important; }
+
+/* Écran partagé : panneau en haut de la carte, hors de portée du tiroir des résultats */
+.pf-split-panel { top: 52px; bottom: auto; max-height: calc(100% - 140px); }
+@media (max-width: 768px) {
+  .pf-split-panel {
+    top: calc(var(--pf-safe-top, 0px) + 104px); bottom: auto;
+    left: 12px; right: 64px; max-height: calc(100% - var(--pf-safe-top, 0px) - 104px - var(--pf-nav-h) - 24px);
+  }
+  .pf-split-knob { top: 62%; }
+}
+@media (max-width: 768px) { .pf-split-handle { z-index: 5; } .pf-split-knob { top: 30%; } }
