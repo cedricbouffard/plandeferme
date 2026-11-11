@@ -1077,3 +1077,25 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
   .pf-split-knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
 }
 @media (max-width: 768px) { .pf-split-knob { top: 34%; } }
+
+/* Tiroir des résultats : un seul visible à la fois, aussi sur mobile ; œil de visibilité */
+.pf-tray-hidden { display: none !important; }
+.pf-tray-tab > button.pf-tray-eye {
+  width: 26px; height: 26px; margin-left: 4px; padding: 0 !important;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: inherit; background: transparent; border: none; cursor: pointer;
+}
+.pf-tray-tab > button.pf-tray-eye:hover { background: rgba(0, 0, 0, 0.06) !important; }
+.pf-tray-tab > button.pf-tray-eye + button { padding-left: 4px !important; }
+.pf-tray-tab.pf-layer-off > button:not(:last-child) { opacity: 0.55; }
+.pf-tray-tab.pf-layer-off > button.pf-tray-eye { opacity: 1; color: var(--pf-muted); }
+@media (max-width: 768px) {
+  .pf-tray-tabs { margin: -2px -4px 6px; padding-bottom: 8px; gap: 4px; }
+  .pf-tray-tab { border: 1px solid var(--pf-line); background: #fff; }
+  .pf-tray-tab.pf-on { border-color: transparent; }
+  .pf-tray-tab > button:first-child:not(.pf-tray-eye), .pf-tray-tab > button.pf-tray-eye + button { height: 34px; font-size: 12.5px; }
+  .pf-tray-tab > button.pf-tray-eye { width: 30px; height: 30px; }
+  .pf-tray-tab > button:last-child { width: 30px; height: 30px; }
+}
+.pf-tray-tab > button.pf-tray-eye + button { height: 30px; padding: 0 4px !important; font-size: 12px; font-weight: 600; color: inherit; background: transparent; border: none; cursor: pointer; }
+#sim-dock { max-height: 210px !important; }

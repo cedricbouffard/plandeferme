@@ -157,11 +157,63 @@
 
   const isOpen = (d) => $(d.id).classList.contains("open");
 
+  // Couches de carte de chaque résultat : l'œil de l'onglet les masque / les réaffiche
+  const DOCK_LAYERS = {
+    "elevation-profile-dock": /^raster-profile/,
+    "ndvi-dock": /^sentinel2-ndvi/,
+    "sim-dock": /^sim-rain/,
+    "cutfill-dock": /^cutfill-/
+  };
+  const hiddenDocks = new Map(); // id du dock -> Set des couches masquées par l'œil
+  function applyDockVisibility(id) {
+    const map = window.map;
+    const re = DOCK_LAYERS[id];
+    if (!map || typeof map.getStyle !== "function" || !re || !map.getStyle()) return;
+    const hidden = hiddenDocks.get(id);
+    map.getStyle().layers.forEach((l) => {
+      if (!re.test(l.id)) return;
+      if (hidden) {
+        if (map.getLayoutProperty(l.id, "visibility") !== "none") { map.setLayoutProperty(l.id, "visibility", "none"); hidden.add(l.id); }
+      }
+    });
+  }
+  function setDockHidden(id, hide) {
+    const map = window.map;
+    if (hide) {
+      if (!hiddenDocks.has(id)) hiddenDocks.set(id, new Set());
+      applyDockVisibility(id);
+    } else {
+      const ids = hiddenDocks.get(id);
+      hiddenDocks.delete(id);
+      if (ids && map) ids.forEach((lid) => { if (map.getLayer(lid)) map.setLayoutProperty(lid, "visibility", "visible"); });
+    }
+  }
+  // Une couche recréée pendant qu'elle est masquée (ex. relance de la pluie) reste masquée
+  (function hookMap() {
+    const map = window.map;
+    if (!map || typeof map.on !== "function") { setTimeout(hookMap, 400); return; }
+    map.on("styledata", () => { hiddenDocks.forEach((_, id) => applyDockVisibility(id)); });
+  })();
+  const EYE = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+  const EYE_OFF = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+
   function renderTabs(openDocks) {
     tabsBar.textContent = "";
     openDocks.forEach((d) => {
       const wrap = document.createElement("div");
-      wrap.className = "pf-tray-tab" + (d.id === active ? " pf-on" : "");
+      const isHidden = hiddenDocks.has(d.id);
+      wrap.className = "pf-tray-tab" + (d.id === active ? " pf-on" : "") + (isHidden ? " pf-layer-off" : "");
+      if (DOCK_LAYERS[d.id]) {
+        const eye = document.createElement("button");
+        eye.type = "button";
+        eye.className = "pf-tray-eye";
+        eye.setAttribute("aria-pressed", isHidden ? "false" : "true");
+        eye.setAttribute("aria-label", (isHidden ? "Afficher " : "Masquer ") + d.name + " sur la carte");
+        eye.title = isHidden ? "Afficher sur la carte" : "Masquer sur la carte";
+        eye.innerHTML = isHidden ? EYE_OFF : EYE;
+        eye.addEventListener("click", () => { setDockHidden(d.id, !hiddenDocks.has(d.id)); applyTray(); });
+        wrap.appendChild(eye);
+      }
       const pick = document.createElement("button");
       pick.type = "button";
       pick.setAttribute("role", "tab");
@@ -185,6 +237,8 @@
     // nouveaux docks ouverts -> deviennent actifs
     openIds.forEach((id) => { if (!order.includes(id)) { order.unshift(id); active = id; } });
     order = order.filter((id) => openIds.includes(id));
+    // Résultat fermé : on oublie son état masqué (la couche est retirée par son module)
+    [...hiddenDocks.keys()].forEach((id) => { if (!openIds.includes(id)) setDockHidden(id, false); });
     if (!openIds.includes(active)) active = order[0] || null;
 
     DOCKS.forEach((d) => {
@@ -194,7 +248,7 @@
     });
     document.body.classList.toggle("pf-tray-open", openDocks.length > 0);
 
-    if (openDocks.length >= 2 && active) {
+    if (openDocks.length >= 1 && active) {
       const host = $(active);
       renderTabs(order.map((id) => DOCKS.find((d) => d.id === id)).filter(Boolean));
       if (tabsBar.parentNode !== host) host.insertBefore(tabsBar, host.firstChild);
