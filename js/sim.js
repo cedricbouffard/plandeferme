@@ -12,41 +12,53 @@
   "use strict";
 
   // Classes de pertes de sol RUSLE (t/ha/an) et palettes de couleurs
+  // Classes de pertes de sol RUSLE-CAN / RUSLEFAC (t/ha/an) et palettes de couleurs
+  // Norme Agriculture et Agroalimentaire Canada (AAC) et seuil de tolérance québécois (IRDA / MAPAQ) : 6 t/ha/an
   const RUSLE_CLASSES = [
     [1, [34, 197, 94], "Très faible (< 1 t/ha/an)"],
     [3, [163, 230, 53], "Faible (1 à 3 t/ha/an)"],
-    [6, [250, 204, 21], "Modéré (3 à 6 t/ha/an, seuil toléré)"],
-    [11, [251, 146, 60], "Élevé (6 à 11 t/ha/an)"],
+    [6, [250, 204, 21], "Modéré (3 à 6 t/ha/an, seuil toléré IRDA/MAPAQ)"],
+    [11, [251, 146, 60], "Élevé (6 à 11 t/ha/an, dépassement du seuil)"],
     [22, [239, 68, 68], "Sévère (11 à 22 t/ha/an)"],
     [Infinity, [168, 32, 90], "Critique (> 22 t/ha/an)"]
   ];
 
-  // Types de sols et paramètres hydropédologiques
+  // Types de sols et paramètres hydropédologiques calibrés pour le Canada (RUSLEFAC / IRDA)
+  // Valeurs du facteur d'érodibilité K en unités métriques [t·ha·h / (ha·MJ·mm)]
   const SOIL_TYPES = {
-    loam: { name: "Loam (de référence)", k: 0.040, f: 8 },
-    silt_loam: { name: "Loam limoneux", k: 0.048, f: 6 },
-    clay_loam: { name: "Loam argileux", k: 0.035, f: 4 },
-    clay: { name: "Argile", k: 0.028, f: 2 },
-    sandy_loam: { name: "Loam sableux", k: 0.026, f: 15 },
-    sand: { name: "Sable", k: 0.015, f: 25 }
+    loam: { name: "Loam standard (K = 0,040 - Réf. AAC)", k: 0.040, f: 8 },
+    silt_loam: { name: "Loam limoneux (K = 0,050 - Très érodible)", k: 0.050, f: 6 },
+    clay_loam: { name: "Loam argileux (K = 0,035)", k: 0.035, f: 4 },
+    clay: { name: "Argile lourde / Champlain (K = 0,026 - Ex. Ste-Rosalie)", k: 0.026, f: 2 },
+    sandy_loam: { name: "Loam sableux (K = 0,026)", k: 0.026, f: 15 },
+    sand: { name: "Sable / Sable loameux (K = 0,015)", k: 0.015, f: 25 },
+    organic: { name: "Terre noire / Sol organique (K = 0,010)", k: 0.010, f: 12 }
   };
 
-  // Couvert végétal et facteurs C
+  // Couvert végétal et facteurs C calibrés pour le Canada et le Québec (RUSLEFAC Wall et al., 2002)
   const CROP_FACTORS = {
-    bare: { name: "Sol nu sans couvert (C = 1,00 - Témoin)", c: 1.0 },
-    corn_plow: { name: "Maïs grain labour conventionnel (C = 0,38)", c: 0.38 },
-    corn_notill: { name: "Maïs semis direct / résidus (C = 0,15)", c: 0.15 },
-    soybean: { name: "Soya (C = 0,28)", c: 0.28 },
-    cereals: { name: "Céréales paille conservée (C = 0,12)", c: 0.12 },
-    hay: { name: "Prairie / Foin / Pâturage (C = 0,02)", c: 0.02 },
-    potato: { name: "Pomme de terre / Sarclés (C = 0,35)", c: 0.35 },
-    canola: { name: "Canola / Oléagineux (C = 0,20)", c: 0.20 }
+    bare: { name: "Sol nu sans couvert (C = 1,00 - Témoin standard)", c: 1.0 },
+    corn_silage: { name: "Maïs ensilage - labour automne (C = 0,45)", c: 0.45 },
+    potato: { name: "Pomme de terre / Sarclés maraîchers (C = 0,38)", c: 0.38 },
+    corn_plow: { name: "Maïs grain - labour conventionnel (C = 0,36)", c: 0.36 },
+    rot_corn_soy: { name: "Rotation Maïs - Soya (C = 0,34)", c: 0.34 },
+    soybean: { name: "Soya - labour conventionnel (C = 0,32)", c: 0.32 },
+    rot_corn_soy_cer: { name: "Rotation Maïs - Soya - Céréale (C = 0,25)", c: 0.25 },
+    corn_reduced: { name: "Maïs grain - travail réduit / chisel (C = 0,22)", c: 0.22 },
+    canola: { name: "Canola / Oléagineux (C = 0,20)", c: 0.20 },
+    soybean_notill: { name: "Soya - semis direct / résidus (C = 0,16)", c: 0.16 },
+    cereals: { name: "Céréales de printemps paille restituée (C = 0,15)", c: 0.15 },
+    corn_notill: { name: "Maïs grain - semis direct / résidus (C = 0,12)", c: 0.12 },
+    winter_cereals: { name: "Céréales d'automne (seigle, blé) (C = 0,10)", c: 0.10 },
+    rot_cer_hay: { name: "Rotation Céréales - Prairies 3 ans (C = 0,06)", c: 0.06 },
+    hay: { name: "Prairie pérenne / Foin / Pâturage (C = 0,015)", c: 0.015 }
   };
 
-  // Pratiques culturales et facteurs P
+  // Pratiques culturales et facteurs P (RUSLEFAC Wall et al., 2002 - Chapitre 6)
   const PRACTICE_FACTORS = {
-    none: { name: "Sens de la pente (P = 1,00)", p: 1.0 },
+    none: { name: "Sens de la pente (P = 1,00 - Sans aménagement)", p: 1.0 },
     contour: { name: "Travail selon les courbes de niveau (P = 0,75)", p: 0.75 },
+    buffer: { name: "Bandes riveraines élargies / tampons (P = 0,60)", p: 0.60 },
     strip: { name: "Cultures en bandes alternées (P = 0,50)", p: 0.50 }
   };
 
@@ -1225,10 +1237,11 @@
       this.seriesDb = null;
       this.isLoading = false;
 
-      // Paramètres RUSLE
+      // Paramètres RUSLE-CAN / RUSLEFAC (AAC / IRDA)
       this.rFactor = 1150;
       this.soilKey = "loam";
       this.cropKey = "bare";
+      this.practiceKey = "none";
       this.opacity = 0.85;
       this.isVisible = false;
 
@@ -1394,6 +1407,14 @@
         });
       }
 
+      const selPractice = document.getElementById("rusle-practice-select");
+      if (selPractice) {
+        selPractice.addEventListener("change", (e) => {
+          this.practiceKey = e.target.value;
+          if (this.currentGrid) this.compute();
+        });
+      }
+
       if (rngOpacity) {
         rngOpacity.addEventListener("input", (e) => {
           this.opacity = Number(e.target.value) / 100;
@@ -1484,7 +1505,9 @@
       if (pedoTexture || pedoSeriesName) {
         const raw = (pedoTexture || pedoSeriesName).toLowerCase();
         let soilKey = "loam";
-        if (raw.includes("argile lourde") || (raw.includes("argile") && !raw.includes("loam"))) {
+        if (raw.includes("organique") || raw.includes("tourbe") || raw.includes("noir") || raw.includes("muck")) {
+          soilKey = "organic";
+        } else if (raw.includes("argile lourde") || (raw.includes("argile") && !raw.includes("loam"))) {
           soilKey = "clay";
         } else if (raw.includes("argil") && raw.includes("loam")) {
           soilKey = "clay_loam";
@@ -1576,11 +1599,15 @@
 
       if (cLower.includes("pomme de terre") || cLower.includes("patate") || cLower.includes("sarclé") || cLower.includes("sarcle") || cLower.includes("maraîch") || cLower.includes("maraich")) {
         cropKey = "potato";
+      } else if (cLower.includes("ensilage")) {
+        cropKey = "corn_silage";
       } else if (cLower.includes("maïs") || cLower.includes("mais")) {
         cropKey = "corn_plow";
       } else if (cLower.includes("soya")) {
         cropKey = "soybean";
-      } else if (cLower.includes("céréale") || cLower.includes("cereale") || cLower.includes("orge") || cLower.includes("avoine") || cLower.includes("seigle") || cLower.includes("triticale") || cLower.includes("blé") || cLower.includes("ble ") || cLower.startsWith("ble")) {
+      } else if (cLower.includes("seigle") || cLower.includes("blé d'automne") || cLower.includes("ble d'automne") || cLower.includes("d'hiver") || cLower.includes("automne")) {
+        cropKey = "winter_cereals";
+      } else if (cLower.includes("céréale") || cLower.includes("cereale") || cLower.includes("orge") || cLower.includes("avoine") || cLower.includes("triticale") || cLower.includes("blé") || cLower.includes("ble ") || cLower.startsWith("ble")) {
         cropKey = "cereals";
       } else if (cLower.includes("foin") || cLower.includes("prairie") || cLower.includes("pâturage") || cLower.includes("paturage") || cLower.includes("luzerne") || cLower.includes("trèfle") || cLower.includes("trefle")) {
         cropKey = "hay";
@@ -1620,6 +1647,19 @@
       this.soilKey = soilInfo.soilKey;
       const selSoil = document.getElementById("rusle-soil-select");
       if (selSoil) selSoil.value = this.soilKey;
+
+      const autoHint = document.getElementById("rusle-auto-hint");
+      if (autoHint) {
+        const soilTxt = soilInfo ? soilInfo.sourceLabel : "";
+        const cropTxt = detectedCrop && detectedCrop.cropLabel ? `Culture BDPPAD : ${detectedCrop.cropLabel}` : "";
+        const parts = [soilTxt, cropTxt].filter(Boolean);
+        if (parts.length > 0) {
+          autoHint.innerHTML = `<span style="color:#059669; font-weight:700;">✓ Paramètres RUSLE-CAN auto-détectés :</span><br>${parts.join("<br>")}`;
+          autoHint.style.display = "block";
+        } else {
+          autoHint.style.display = "none";
+        }
+      }
 
       // Cadrage : le calcul à la volée se relance au « moveend »
       if (geomBbox && this.map) {
@@ -1687,13 +1727,14 @@
         }
       }
 
-      // Facteurs RUSLE
+      // Facteurs RUSLE-CAN / RUSLEFAC (AAC / IRDA)
       const R = this.rFactor;
       const soil = SOIL_TYPES[this.soilKey] || SOIL_TYPES.loam;
       const K = soil.k;
       const crop = CROP_FACTORS[this.cropKey] || CROP_FACTORS.bare;
       const C = crop.c;
-      const P = 1.0;
+      const practice = PRACTICE_FACTORS[this.practiceKey] || PRACTICE_FACTORS.none;
+      const P = practice.p;
 
       const A = new Float32Array(N).fill(NaN);
       let sumA = 0, countA = 0;
@@ -1822,10 +1863,30 @@
       if (!this.eroResult) return;
       const { mean } = this.eroResult;
       const hasParcel = Number.isFinite(this.parcelMean);
+      const val = hasParcel ? this.parcelMean : mean;
       const elMean = document.getElementById("rusle-mean-val");
-      if (elMean) elMean.textContent = `${(hasParcel ? this.parcelMean : mean).toFixed(1)} t/ha/an`;
+      if (elMean) {
+        elMean.textContent = `${val.toFixed(1)} t/ha/an`;
+        elMean.style.color = val <= 6 ? "#15803d" : (val <= 11 ? "#ea580c" : "#b91c1c");
+      }
       const elLabel = document.getElementById("rusle-mean-label");
       if (elLabel) elLabel.textContent = hasParcel ? "Moyenne sur la parcelle :" : "Moyenne sur la vue :";
+
+      const elTol = document.getElementById("rusle-tol-status");
+      if (elTol) {
+        if (val <= 1) {
+          elTol.innerHTML = `<span style="color:#15803d; font-weight:700;">✓ Très faible (&lt; 1 t/ha/an)</span> — Bien sous le seuil toléré`;
+        } else if (val <= 3) {
+          elTol.innerHTML = `<span style="color:#65a30d; font-weight:700;">✓ Faible (1 à 3 t/ha/an)</span> — En deçà du seuil toléré`;
+        } else if (val <= 6) {
+          elTol.innerHTML = `<span style="color:#d97706; font-weight:700;">⚖ Toléré (3 à 6 t/ha/an)</span> — Seuil maximal admissible IRDA/MAPAQ`;
+        } else if (val <= 11) {
+          elTol.innerHTML = `<span style="color:#ea580c; font-weight:700;">⚠ Élevé (${val.toFixed(1)} &gt; 6 t/ha/an)</span> — Dépassement du seuil toléré`;
+        } else {
+          elTol.innerHTML = `<span style="color:#dc2626; font-weight:700;">⚠ Sévère (${val.toFixed(1)} &gt; 6 t/ha/an)</span> — Risque majeur de dégradation`;
+        }
+      }
+
       const nameEl = document.getElementById("rusle-parcel-name");
       if (hasParcel && this.currentParcel) this.updateCardHeader(this.currentParcel.properties);
       else if (nameEl) nameEl.style.display = "none";
@@ -1834,8 +1895,8 @@
     updateRBadge(rVal, source = "RUSLEFAC") {
       const badge = document.getElementById("rusle-r-badge");
       if (badge) {
-        badge.textContent = `${rVal} MJ·mm/ha·h·an`;
-        badge.title = `Érosivité R = ${rVal} calculée automatiquement (${source})`;
+        badge.textContent = `${rVal} MJ·mm/(ha·h·an)`;
+        badge.title = `Érosivité R = ${rVal} incluant la fonte printanière (Norme ${source} AAC)`;
       }
     }
 

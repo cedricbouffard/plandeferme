@@ -650,7 +650,7 @@
             minZoom: 13,
             maxZoom: Infinity,
             badgeText: "z ≥ 13",
-            title: "Érosion (RUSLE) calculée à la volée dès le zoom 13"
+            title: "Érosion des sols (RUSLE-CAN) calculée à la volée dès le zoom 13"
           },
           {
             id: "card-pedo",
@@ -1138,33 +1138,24 @@
           <div style="font-size: 12px; color: #334155; line-height: 1.5; padding: 4px 0;">
 
             <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px; font-size: 12.5px; display: flex; align-items: center; gap: 6px;">
-
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.2"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path><line x1="8" y1="19" x2="8" y2="21"></line><line x1="8" y1="13" x2="8" y2="15"></line><line x1="16" y1="19" x2="16" y2="21"></line><line x1="16" y1="13" x2="16" y2="15"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="12" y1="15" x2="12" y2="17"></line></svg>
-
-              <span>Simulation Pluie &amp; Érosion des sols</span>
-
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2.2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path></svg>
+              <span>Simulation Pluie &amp; Érosion des sols (RUSLE-CAN)</span>
             </div>
-
             <p style="margin: 0 0 8px 0; color: #475569; font-size: 11.5px;">
-
-              Modélisez l'écoulement gravitationnel de l'eau (Horton) et évaluez les risques de perte de sol (RUSLE) sur le modèle numérique de terrain 1m de cette parcelle.
-
+              Modélisez l'écoulement gravitationnel de l'eau (Horton) et évaluez les risques de perte de sol selon le modèle officiel canadien RUSLE-CAN / RUSLEFAC (AAC &amp; IRDA) sur le MNT LiDAR 1m de cette parcelle.
             </p>
-
             <div style="display: flex; flex-direction: column; gap: 6px;">
-
               <button id="btn-popup-start-rain" type="button" class="btn-popup-parcel-action" style="padding: 8px 10px; background: #0284c7; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);">
-
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path><line x1="8" y1="19" x2="8" y2="21"></line><line x1="8" y1="13" x2="8" y2="15"></line><line x1="16" y1="19" x2="16" y2="21"></line><line x1="16" y1="13" x2="16" y2="15"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="12" y1="15" x2="12" y2="17"></line></svg>
-
                 <span>Lancer la simulation de pluie animée</span>
-
               </button>
-
+              <button id="btn-popup-start-erosion" type="button" class="btn-popup-parcel-action" style="padding: 8px 10px; background: #ea580c; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);" title="Calculer les pertes de sol selon le modèle canadien RUSLE-CAN / RUSLEFAC">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"></path></svg>
+                <span>Calculer l'érosion des sols (RUSLE-CAN)</span>
+              </button>
               <button id="btn-popup-start-cutfill" type="button" class="btn-popup-parcel-action" style="padding: 8px 10px; background: #7c3aed; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; font-size: 11.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);" title="Comparer 2 campagnes LiDAR multidates et évaluer les déblais / remblais (m³/ha)">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
                 <span>Comparer LiDAR (Déblais / Remblais)</span>
-
               </button>
 
             </div>
@@ -1305,10 +1296,13 @@
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-rain" title="Simuler l'écoulement gravitationnel de la pluie sur cette parcelle">
                   <span class="pf-act-name">Simuler la pluie</span><span class="pf-act-desc">Ruissellement</span>
                 </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-erosion" title="Calculer les pertes de sol selon le modèle canadien RUSLE-CAN / RUSLEFAC (AAC-IRDA)">
+                  <span class="pf-act-name">Érosion RUSLE-CAN</span><span class="pf-act-desc">Pertes de sol (t/ha)</span>
+                </button>
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-cutfill" title="Comparer 2 campagnes LiDAR et évaluer les déblais / remblais (m³/ha)">
                   <span class="pf-act-name">Comparer LiDAR</span><span class="pf-act-desc">Déblais / remblais</span>
                 </button>
-                <button type="button" class="btn-popup-parcel-action btn-popup-action-tif">
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-tif" style="grid-column: span 2;">
                   <span class="pf-act-name">Exporter le MNT</span><span class="pf-act-desc">GeoTIFF découpé</span>
                 </button>
               </div>
