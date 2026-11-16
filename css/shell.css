@@ -586,15 +586,18 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-fiche-actions { flex-shrink: 0; padding: 12px 18px 16px; border-top: 1px solid var(--pf-line); background: #fff; }
 .pf-fiche-actions-title { font-size: 11px; font-weight: 600; color: var(--pf-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
 .pf-fiche-actions-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.pf-fiche .btn-popup-parcel-action {
+.pf-fiche .btn-popup-parcel-action,
+.pf-vec-lidar .btn-popup-parcel-action {
   min-height: 52px; padding: 7px 10px;
   display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px;
   background: var(--pf-hover); border: 1px solid var(--pf-line); border-radius: 10px;
   color: var(--pf-ink); text-align: left; cursor: pointer; box-shadow: none;
   transition: background 0.15s, border-color 0.15s;
 }
-.pf-fiche .btn-popup-parcel-action:hover { background: var(--pf-accent-soft); border-color: var(--pf-accent); }
-.pf-fiche .btn-popup-parcel-action:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: 1px; }
+.pf-fiche .btn-popup-parcel-action:hover,
+.pf-vec-lidar .btn-popup-parcel-action:hover { background: var(--pf-accent-soft); border-color: var(--pf-accent); }
+.pf-fiche .btn-popup-parcel-action:focus-visible,
+.pf-vec-lidar .btn-popup-parcel-action:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: 1px; }
 .pf-act-name { font-size: 12.5px; font-weight: 600; }
 .pf-act-desc { font-size: 11px; color: var(--pf-muted); }
 
@@ -828,7 +831,9 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-dem-note[hidden] { display: none; }
 .pf-dem-note strong { font-size: 12px; color: var(--pf-accent-strong); font-weight: 600; }
 .pf-dem-note span { color: var(--pf-muted); }
-.pf-vec-lidar { margin-top: 8px; min-width: 240px; }
+.pf-vec-lidar { margin-top: 8px; min-width: 280px; }
+/* dernier bouton seul sur sa rangée : pleine largeur */
+.pf-vec-lidar .pf-fiche-actions-grid .btn-popup-parcel-action:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .pf-vec-lidar .pf-fiche-actions { margin: 0; padding: 8px 0 0; border-top: 1px solid var(--pf-line-soft); }
 
 /* ==========================================================================
@@ -1117,3 +1122,78 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .ndvi-save-btn.saved svg path { fill: currentColor; }
 .pf-lib-swatch-raster { width: 14px; border-radius: 2px; background: linear-gradient(90deg, #a50026, #f46d43, #fee08b, #d9ef8b, #66bd63, #006837); }
 @media (max-width: 768px) { .ndvi-save-btn span { display: none; } }
+
+/* ==========================================================================
+   Zones de gestion (SKATER) : réutilise le style du tiroir déblais / remblais
+   ========================================================================== */
+.pf-zn-controls { border-bottom: 0; padding-bottom: 0; }
+.pf-zn-label { font-weight: 600; color: var(--pf-muted); }
+.pf-zn-empty { font-size: 12px; color: var(--pf-muted); line-height: 1.45; }
+/* bouton du menu : résumé des couches, ouvre la fenêtre */
+.pf-zn .pf-zn-layers-btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 30px; max-width: 420px; padding: 0 10px;
+  border: 1px solid #d5d9d3; border-radius: 8px; background: #fff; font: inherit; color: var(--pf-ink); cursor: pointer;
+}
+.pf-zn .pf-zn-layers-btn:hover { border-color: var(--pf-accent); background: var(--pf-hover); }
+.pf-zn-layers-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.pf-zn-layers-edit { flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--pf-accent-strong); }
+/* fenêtre « Couches et pondération » */
+.pf-zn-modal .vector-modal { max-width: 440px; font-size: 13px; color: var(--pf-ink); }
+.pf-zn-modal-help { margin: 0; font-size: 12px; line-height: 1.45; color: var(--pf-muted); }
+.pf-zn-modal-head {
+  display: flex; justify-content: space-between; padding: 0 2px 5px; border-bottom: 1px solid var(--pf-line);
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--pf-muted);
+}
+.pf-zn-modal-list { display: flex; flex-direction: column; padding-top: 4px; }
+.pf-zn-modal-list .pf-zn-empty { padding: 6px 2px; }
+.pf-zn-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; padding: 0 2px; }
+.pf-zn-item + .pf-zn-item { border-top: 1px solid var(--pf-line-soft); }
+.pf-zn-item .pf-cf-check { flex: 1 1 auto; min-height: 34px; }
+.pf-zn .pf-zn-w {
+  width: 58px; height: 28px; padding: 0 6px; flex-shrink: 0;
+  border: 1px solid #d5d9d3; border-radius: 6px; background: #fff;
+  font: inherit; color: var(--pf-ink); font-variant-numeric: tabular-nums;
+}
+.pf-zn .pf-zn-w:focus { outline: 2px solid var(--pf-accent-soft); border-color: var(--pf-accent); }
+.pf-zn .pf-zn-w:disabled { opacity: 0.4; background: transparent; }
+.pf-zn-modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px; }
+.pf-zn-modal .pf-zn-modal-secondary { height: 30px; padding: 0 12px; border-radius: 8px; background: #fff; border: 1px solid #d5d9d3; color: var(--pf-ink); font-size: 12px; font-weight: 600; cursor: pointer; }
+.pf-zn .pf-cf-field input[type="number"] {
+  width: 62px; height: 30px; padding: 0 6px;
+  border: 1px solid #d5d9d3; border-radius: 8px; background: #fff;
+  font: inherit; color: var(--pf-ink); font-variant-numeric: tabular-nums;
+}
+.pf-zn .pf-cf-field input[type="number"]:focus { outline: 2px solid var(--pf-accent-soft); border-color: var(--pf-accent); }
+.pf-zn #zones-k { width: 48px; }
+.pf-zn .pf-zn-run {
+  height: 30px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--pf-accent-strong);
+  background: var(--pf-accent); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.pf-zn .pf-zn-run:hover { background: var(--pf-accent-strong); }
+.pf-zn .pf-zn-run:disabled, .pf-zn .pf-cf-btn:disabled { opacity: 0.5; cursor: default; }
+.pf-zn #zones-results { display: flex; flex-direction: column; gap: 6px; }
+.pf-zn .pf-cf-table td:first-child { white-space: nowrap; font-weight: 600; }
+.pf-zn .pf-cf-table .pf-cf-dot { width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; }
+.pf-zn-summary { font-size: 11px; color: var(--pf-muted); line-height: 1.45; }
+@media (max-width: 768px) {
+  .pf-zn .pf-cf-field input[type="number"] { width: 54px; }
+  .pf-zn .pf-zn-run { flex: 1 1 100%; }
+  .pf-zn .pf-zn-layers-btn { flex: 1 1 100%; max-width: none; }
+  .pf-zn-modal-actions .pf-zn-run { flex: 0 0 auto; }
+}
+
+/* ==========================================================================
+   Menu de langue (i18n)
+   ========================================================================== */
+.pf-lang {
+  display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 4px 0 10px;
+  border: 1px solid var(--pf-line); border-radius: 8px; background: #fff; color: var(--pf-muted); cursor: pointer;
+}
+.pf-lang:hover, .pf-lang:focus-within { border-color: var(--pf-accent); }
+.pf-lang-select {
+  height: 30px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--pf-ink); cursor: pointer;
+}
+.pf-lang-select:focus { outline: 2px solid var(--pf-accent-soft); }
+.pf-lang-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+.pf-lang-row .pf-lang-select { border: 1px solid #d5d9d3; background: #fff; padding: 0 8px; }

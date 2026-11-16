@@ -933,6 +933,7 @@
             <button type="button" class="btn-popup-parcel-action" data-pf-act="3d"><span class="pf-act-name">Vue 3D</span><span class="pf-act-desc">Relief découpé, 30×</span></button>
             <button type="button" class="btn-popup-parcel-action" data-pf-act="rain"><span class="pf-act-name">Simuler la pluie</span><span class="pf-act-desc">Ruissellement</span></button>
             <button type="button" class="btn-popup-parcel-action" data-pf-act="cutfill"><span class="pf-act-name">Comparer LiDAR</span><span class="pf-act-desc">Déblais / remblais</span></button>
+            <button type="button" class="btn-popup-parcel-action" data-pf-act="zones" title="Délimiter des zones de gestion contiguës à partir du relief LiDAR (méthode SKATER)"><span class="pf-act-name">Zones de gestion</span><span class="pf-act-desc">Zones contiguës (LiDAR)</span></button>
             <button type="button" class="btn-popup-parcel-action" data-pf-act="tif"><span class="pf-act-name">Exporter le MNT</span><span class="pf-act-desc">GeoTIFF découpé</span></button>
           </div>
         </div>`;
@@ -946,6 +947,7 @@
       if (act === "3d") { done(); if (window.terrain3DManager) window.terrain3DManager.viewParcel3D(feature); }
       else if (act === "rain") { done(); if (window.rainManager) window.rainManager.startSimulation(feature); else if (window.simManager) window.simManager.startSimulation(feature, "rain"); }
       else if (act === "cutfill") { done(); if (window.cutFillManager) window.cutFillManager.openForParcel(feature); }
+      else if (act === "zones") { done(); if (window.zonesManager) window.zonesManager.openForParcel(feature); }
       else if (act === "tif") { if (window.terrain3DManager) window.terrain3DManager.exportParcelGeoTiff(feature); }
     }));
   }

@@ -2389,6 +2389,11 @@
         const fillOp = style.fillOpacity !== undefined ? Math.max(0, Math.min(1, Number(style.fillOpacity))) : 0.45;
         const strokeCol = style.strokeColor || "#1d4ed8";
         const strokeW = Math.max(1, Number(style.strokeWidth || 2.5));
+        // Couleur par entité (ex. zones de gestion) : style.colorProperty nomme l'attribut qui porte la couleur
+        const fillBase = style.fillColor || "#3b82f6";
+        const fillCol = typeof style.colorProperty === "string" && /^[A-Za-z0-9_]{1,40}$/.test(style.colorProperty)
+          ? ["to-color", ["get", style.colorProperty], fillBase]
+          : fillBase;
 
         if (!this.map.getLayer(fillId)) {
           this.map.addLayer({
@@ -2396,13 +2401,13 @@
             type: "fill",
             source: sourceId,
             paint: {
-              "fill-color": style.fillColor || "#3b82f6",
+              "fill-color": fillCol,
               "fill-opacity": fillOp,
               "fill-outline-color": strokeCol
             }
           });
         } else {
-          this.map.setPaintProperty(fillId, "fill-color", style.fillColor || "#3b82f6");
+          this.map.setPaintProperty(fillId, "fill-color", fillCol);
           this.map.setPaintProperty(fillId, "fill-opacity", fillOp);
           try { this.map.setPaintProperty(fillId, "fill-outline-color", strokeCol); } catch (e) {}
         }

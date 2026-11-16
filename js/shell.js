@@ -146,7 +146,8 @@
     { id: "elevation-profile-dock", name: "Profil altimétrique", close: "btn-close-profile-dock" },
     { id: "ndvi-dock", name: "NDVI Sentinel-2", close: "btn-close-ndvi-dock" },
     { id: "sim-dock", name: "Simulation de pluie", close: "btn-close-sim-dock" },
-    { id: "cutfill-dock", name: "Déblais / remblais", close: "btn-close-cutfill-dock" }
+    { id: "cutfill-dock", name: "Déblais / remblais", close: "btn-close-cutfill-dock" },
+    { id: "zones-dock", name: "Zones de gestion", close: "btn-close-zones-dock" }
   ].filter((d) => $(d.id));
   let order = [];   // plus récent en premier
   let active = null;
@@ -162,7 +163,8 @@
     "elevation-profile-dock": /^raster-profile/,
     "ndvi-dock": /^sentinel2-ndvi/,
     "sim-dock": /^sim-rain/,
-    "cutfill-dock": /^cutfill-/
+    "cutfill-dock": /^cutfill-/,
+    "zones-dock": /^zones-/
   };
   const hiddenDocks = new Map(); // id du dock -> Set des couches masquées par l'œil
   function applyDockVisibility(id) {

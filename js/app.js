@@ -1302,7 +1302,10 @@
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-cutfill" title="Comparer 2 campagnes LiDAR et évaluer les déblais / remblais (m³/ha)">
                   <span class="pf-act-name">Comparer LiDAR</span><span class="pf-act-desc">Déblais / remblais</span>
                 </button>
-                <button type="button" class="btn-popup-parcel-action btn-popup-action-tif" style="grid-column: span 2;">
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-zones" title="Délimiter des zones de gestion contiguës à partir du relief LiDAR (méthode SKATER)">
+                  <span class="pf-act-name">Zones de gestion</span><span class="pf-act-desc">Zones contiguës (LiDAR)</span>
+                </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-tif">
                   <span class="pf-act-name">Exporter le MNT</span><span class="pf-act-desc">GeoTIFF découpé</span>
                 </button>
               </div>
@@ -1432,6 +1435,15 @@
               }
             });
           });
+
+          // Zones de gestion (SKATER sur les couches LiDAR)
+          const btnActionZones = popupDom.querySelector(".btn-popup-action-zones");
+          if (btnActionZones) {
+            btnActionZones.addEventListener("click", () => {
+              popup.remove();
+              if (window.zonesManager) window.zonesManager.openForParcel(targetP);
+            });
+          }
 
           // Comparaison LiDAR (Déblais / Remblais)
           const btnCutFillActions = popupDom.querySelectorAll(".btn-popup-action-cutfill, #btn-popup-start-cutfill");

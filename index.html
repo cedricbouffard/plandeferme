@@ -127,6 +127,9 @@
   <link rel="stylesheet" href="css/terrain3d.css"/>
   <link rel="stylesheet" href="css/shell.css"/>
 
+  <!-- Traductions de l'interface : français dans le code, autres langues dans le dossier i18n/ -->
+  <script src="js/i18n.js"></script>
+
   <!-- MapLibre GL JS & PMTiles -->
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -162,6 +165,10 @@
 
   
     <div class="pf-top-actions">
+      <label class="pf-lang" title="Choisir la langue de l'interface">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>
+        <select class="pf-lang-select" aria-label="Langue"></select>
+      </label>
       <button type="button" class="pf-btn" data-pf-click="btn-panel-share">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
         <span>Partager la vue</span>
@@ -773,7 +780,7 @@
         </div>
         <div class="pf-group">
           <div class="pf-group-title">Sur une parcelle</div>
-          <p class="pf-hint">Cliquez une parcelle sur la carte : sa fiche s'ouvre à droite avec toutes les analyses (vue 3D, simulation de pluie, érosion RUSLE-CAN, comparaison LiDAR, export du MNT).</p>
+          <p class="pf-hint">Cliquez une parcelle sur la carte : sa fiche s'ouvre à droite avec toutes les analyses (vue 3D, simulation de pluie, érosion RUSLE-CAN, comparaison LiDAR, zones de gestion, export du MNT).</p>
           <!-- Comparaison LiDAR multidates & Déblais/Remblais (m³/ha) -->
             <details class="topo-sub-accordion pf-tool-card" id="card-cutfill-tool" open>
               <summary class="topo-sub-header">
@@ -892,6 +899,7 @@
             <div class="tool-sublabel" style="line-height: 1.4;">Clé d'identification de terrain, conversationnelle. Pour un diagnostic localisé, utilisez le bouton de l'onglet Sols d'une parcelle.</div>
           </div>
           <button type="button" class="pf-list-btn" id="pf-install-entry" data-pf-click="pwa-install-btn"><span class="pf-list-name">Installer l'application</span><span class="pf-list-desc">Plan de Ferme sur votre appareil</span></button>
+          <label class="pf-list-btn pf-lang-row" title="Choisir la langue de l'interface"><span class="pf-list-name">Langue</span><select class="pf-lang-select" aria-label="Langue"></select></label>
         </div>
         <div class="pf-group pf-actions-group">
           <!-- Boutons d'action : Mise en page PDF, Partager la vue & GitHub -->
@@ -1179,6 +1187,110 @@
           </thead>
           <tbody id="cutfill-tbody"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+<!-- Zones de gestion (SKATER, zones spatialement contiguës) : tiroir du bas -->
+  <div id="zones-dock" class="elevation-profile-dock zones-dock pf-cf pf-zn" role="region" aria-label="Zones de gestion" style="display: none;">
+    <div class="profile-dock-header">
+      <div class="profile-dock-title pf-cf-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v14H3z"></path><path d="M3 12c4-3 6 3 10 0s5-2 8-1"></path><path d="M10 5c-1 3 2 5 1 8s1 4 0 6"></path></svg>
+        <span>Zones de gestion</span>
+        <span id="zones-parcel-name" class="pf-cf-parcel"></span>
+      </div>
+      <div class="profile-dock-header-right">
+        <button type="button" id="btn-zones-save" class="profile-dock-btn pf-cf-btn" title="Enregistrer les zones dans Mes données (dossier « Zones de gestion »), exportables en Shapefile" disabled>Enregistrer dans Mes données</button>
+        <button type="button" id="btn-zones-export" class="profile-dock-btn pf-cf-btn" title="Télécharger les zones en GeoJSON" disabled>Exporter GeoJSON</button>
+        <button id="btn-close-zones-dock" class="profile-dock-close" type="button" aria-label="Fermer les zones de gestion">&times;</button>
+      </div>
+    </div>
+
+    <div class="pf-cf-controls pf-zn-controls">
+      <button type="button" id="btn-zones-layers" class="pf-zn-layers-btn" aria-haspopup="dialog" title="Choisir les couches (LiDAR, NDVI enregistrés) et leur poids">
+        <span class="pf-zn-label">Couches</span>
+        <span id="zones-layers-summary" class="pf-zn-layers-summary"></span>
+        <span class="pf-zn-layers-edit">Modifier</span>
+      </button>
+      <label class="pf-cf-field" title="SKATER donne des zones d'un seul tenant. K-means regroupe les cellules semblables où qu'elles soient : une zone peut alors être en plusieurs îlots.">Méthode
+        <select id="zones-method">
+          <option value="skater" selected>SKATER (contiguës)</option>
+          <option value="kmeans">K-means (non contiguës)</option>
+        </select>
+      </label>
+      <label class="pf-cf-field" title="Nombre de zones à délimiter">Zones
+        <input type="number" id="zones-k" min="2" max="12" step="1" value="4" inputmode="numeric" />
+      </label>
+      <label class="pf-cf-field" title="Superficie minimale de chaque zone">Min
+        <input type="number" id="zones-min" min="0" step="0.1" inputmode="decimal" /> ha
+      </label>
+      <label class="pf-cf-field" title="Superficie maximale de chaque zone (vide : aucune limite)">Max
+        <input type="number" id="zones-max" min="0" step="0.1" placeholder="aucun" inputmode="decimal" /> ha
+      </label>
+      <label class="pf-cf-field" title="Taille des cellules de calcul">Résolution
+        <select id="zones-res">
+          <option value="auto" selected>Auto</option>
+          <option value="2">2 m</option>
+          <option value="3">3 m</option>
+          <option value="5">5 m</option>
+          <option value="10">10 m</option>
+        </select>
+      </label>
+      <label class="pf-cf-field" title="Lissage des couches et des contours des zones">Lissage
+        <select id="zones-smooth">
+          <option value="0">Aucun</option>
+          <option value="1">Léger</option>
+          <option value="2" selected>Moyen</option>
+          <option value="3">Fort</option>
+        </select>
+      </label>
+      <button type="button" id="btn-zones-run" class="pf-zn-run">Calculer les zones</button>
+      <span class="pf-cf-sep"></span>
+      <label class="pf-cf-field pf-cf-opacity">Opacité
+        <input type="range" id="zones-opacity-slider" min="10" max="100" value="60" />
+        <span id="zones-opacity-val" class="pf-cf-num">60 %</span>
+      </label>
+    </div>
+
+    <div id="zones-loading-bar" class="pf-cf-loading" style="display: none;">
+      <span class="sim-spinner pf-cf-spinner" aria-hidden="true"></span>
+      <span id="zones-loading-text">Lecture du MNT LiDAR…</span>
+    </div>
+
+    <div id="zones-alert-box" class="pf-cf-alert" style="display: none;"></div>
+
+    <div id="zones-results" style="display: none;">
+      <div class="pf-cf-table-wrap">
+        <table class="pf-cf-table">
+          <thead id="zones-thead"></thead>
+          <tbody id="zones-tbody"></tbody>
+        </table>
+      </div>
+      <div id="zones-summary" class="pf-zn-summary"></div>
+    </div>
+  </div>
+
+<!-- Zones de gestion : choix des couches et pondération -->
+  <div id="zones-layers-modal" class="vector-modal-overlay pf-zn pf-zn-modal">
+    <div class="vector-modal" role="dialog" aria-modal="true" aria-labelledby="zones-layers-modal-title">
+      <div class="vector-modal-header">
+        <div class="vector-modal-title"><span id="zones-layers-modal-title">Couches et pondération</span></div>
+        <button type="button" id="btn-zones-layers-close" class="vector-modal-close" aria-label="Fermer">&times;</button>
+      </div>
+      <div class="vector-modal-body">
+        <p class="pf-zn-modal-help">Cochez les couches qui servent à délimiter les zones. Le poids règle l'importance de chacune : 1 = normal, 2 = compte double.</p>
+        <div class="pf-zn-modal-group" role="group" aria-labelledby="zones-modal-lidar-title">
+          <div class="pf-zn-modal-head"><span id="zones-modal-lidar-title">Relief LiDAR</span><span>Poids</span></div>
+          <div id="zones-layers" class="pf-zn-modal-list"></div>
+        </div>
+        <div class="pf-zn-modal-group" role="group" aria-labelledby="zones-modal-ndvi-title">
+          <div class="pf-zn-modal-head"><span id="zones-modal-ndvi-title">NDVI enregistrés (Mes données)</span><span>Poids</span></div>
+          <div id="zones-ndvi-layers" class="pf-zn-modal-list"></div>
+        </div>
+        <div class="pf-zn-modal-actions">
+          <button type="button" id="btn-zones-layers-done" class="profile-dock-btn pf-zn-modal-secondary">Fermer</button>
+          <button type="button" id="btn-zones-layers-run" class="pf-zn-run">Calculer les zones</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1634,6 +1746,8 @@
     <script src="js/terrain3d.js"></script>
     <script src="js/sim.js"></script>
     <script src="js/cutfill.js"></script>
+    <script src="polygon-clipping.min.js"></script>
+    <script src="js/zones.js"></script>
     <script src="js/app.js"></script>
     <script src="js/regions.js"></script>
     <script src="js/split.js"></script>
