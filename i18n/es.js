@@ -1647,5 +1647,7 @@ window.pfI18n.langue("es", {
   "Sens des rangs de la grille : 0° = nord, 90° = est. Par défaut, le sens du champ (son grand côté). Vous pouvez aussi le tracer sur la carte.": "Dirección de las filas de la cuadrícula: 0° = norte, 90° = este. Por defecto, el sentido del campo (su lado largo). También puede trazarlo en el mapa.",
   "Cliquez sur la carte le début d'un rang, puis sa fin.": "Haga clic en el mapa en el inicio de una fila y luego en su final.",
   "Cliquez maintenant la fin du rang.": "Ahora haga clic en el final de la fila.",
-  "Les deux points sont trop proches : cliquez plus loin.": "Los dos puntos están demasiado cerca: haga clic más lejos."
+  "Les deux points sont trop proches : cliquez plus loin.": "Los dos puntos están demasiado cerca: haga clic más lejos.",
+  "Relief satellite — {0}": "Relieve satelital — {0}",
+  "Modèle de terrain à 15 m tiré d'images satellites stéréo : pas de LiDAR public ici. © Google (CC BY 4.0)": "Modelo del terreno a 15 m derivado de imágenes satelitales estéreo: no hay LiDAR público aquí. © Google (CC BY 4.0)"
 });

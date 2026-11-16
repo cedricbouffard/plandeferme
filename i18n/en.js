@@ -1647,5 +1647,7 @@ window.pfI18n.langue("en", {
   "Sens des rangs de la grille : 0° = nord, 90° = est. Par défaut, le sens du champ (son grand côté). Vous pouvez aussi le tracer sur la carte.": "Direction of the grid rows: 0° = north, 90° = east. By default, the direction of the field (its long side). You can also draw it on the map.",
   "Cliquez sur la carte le début d'un rang, puis sa fin.": "Click the start of a row on the map, then its end.",
   "Cliquez maintenant la fin du rang.": "Now click the end of the row.",
-  "Les deux points sont trop proches : cliquez plus loin.": "The two points are too close: click farther away."
+  "Les deux points sont trop proches : cliquez plus loin.": "The two points are too close: click farther away.",
+  "Relief satellite — {0}": "Satellite relief — {0}",
+  "Modèle de terrain à 15 m tiré d'images satellites stéréo : pas de LiDAR public ici. © Google (CC BY 4.0)": "15 m terrain model derived from stereo satellite imagery: no public LiDAR here. © Google (CC BY 4.0)"
 });

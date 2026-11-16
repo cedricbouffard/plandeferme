@@ -1647,5 +1647,7 @@ window.pfI18n.langue("xx", {
   "Sens des rangs de la grille : 0° = nord, 90° = est. Par défaut, le sens du champ (son grand côté). Vous pouvez aussi le tracer sur la carte.": "",
   "Cliquez sur la carte le début d'un rang, puis sa fin.": "",
   "Cliquez maintenant la fin du rang.": "",
-  "Les deux points sont trop proches : cliquez plus loin.": ""
+  "Les deux points sont trop proches : cliquez plus loin.": "",
+  "Relief satellite — {0}": "",
+  "Modèle de terrain à 15 m tiré d'images satellites stéréo : pas de LiDAR public ici. © Google (CC BY 4.0)": ""
 });

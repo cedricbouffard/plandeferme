@@ -24,6 +24,10 @@
  * (mapterhorn.com), des tuiles ouvertes qui fusionnent ces mêmes LiDAR nationaux : bien plus rapide
  * que les services WMS / WCS. Les services nationaux restent utilisés pour la comparaison LiDAR,
  * les vues plus fines que le niveau max de Mapterhorn et en secours.
+ * Partout ailleurs (et au Canada là où le MNEHR n'a pas de données), le relief vient de GEM-15 :
+ *   Monde        Google GEM-15, modèle de terrain à 15 m tiré d'images satellites stéréo (COG publics,
+ *                une dalle par degré). Ce n'est pas du LiDAR : précision moindre, surtout sous couvert
+ *                forestier, et pas de données en Russie, Chine, Mongolie, Groenland et Antarctique.
  * Non retenues ici (le service refuse les requêtes venant d'un autre site, ou ne répond pas) :
  *   Angleterre (Environment Agency), Finlande, Pologne, Saxe-Anhalt, Nouvelle-Zélande, Estonie.
  * ========================================================================== */
@@ -721,6 +725,39 @@
   const COUNTRY = { US: "États-Unis", FR: "France", CH: "Suisse", NL: "Pays-Bas", "DE-NW": "Rhénanie-du-Nord–Westphalie", "DE-BB": "Brandebourg", "DE-MV": "Mecklembourg-Poméranie", "DE-SL": "Sarre", "BE-VLG": "Flandre", ES: "Espagne", AT: "Autriche", CZ: "Tchéquie", AU: "Australie", JP: "Japon" };
   Object.keys(SOURCES).forEach((k) => { SOURCES[k].region = k; SOURCES[k].country = COUNTRY[k]; });
 
+  // ---------------------------------------------------------------------------
+  // GEM-15 (Google) : secours mondial quand aucun LiDAR public n'est lisible
+  //   gem-15/<groupe de 10°>/<dalle de 1°>/dtm/zall/mosaic.tif, en UTM de la dalle, altitudes EGM96
+  // ---------------------------------------------------------------------------
+  const GEM_BASE = "https://storage.googleapis.com/climate-and-sustainability/gem-15/";
+  const gemMissing = new Set(); // dalles absentes (océan, pays exclus) : on ne les redemande pas
+  const gemName = (v, plus) => (v < 0 ? "m" + -v : (plus ? "p" : "") + v);
+  function gemUrl(lonCell, latCell) {
+    const lat10 = Math.floor(latCell / 10) * 10, lon10 = Math.floor(lonCell / 10) * 10;
+    return `${GEM_BASE}${gemName(lat10, true)}_${gemName(lon10, true)}/w${gemName(lonCell)}s${gemName(latCell)}/dtm/zall/mosaic.tif`;
+  }
+  const gemInRange = (bbox) => !!bbox && bbox[1] > -60 && bbox[3] < 84;
+  function gem15() {
+    return {
+      def: (bbox) => utmDef(utmZone((bbox[0] + bbox[2]) / 2), (bbox[1] + bbox[3]) / 2 < 0),
+      async fill(dst, W, H, tB, signal, bbox) {
+        const zone = utmZone((bbox[0] + bbox[2]) / 2);
+        const x0 = Math.floor(bbox[0]), x1 = Math.floor(bbox[2]), y0 = Math.floor(bbox[1]), y1 = Math.floor(bbox[3]);
+        if ((x1 - x0 + 1) * (y1 - y0 + 1) > 16) throw new Error("zoom");
+        let urls = [];
+        // chaque fichier déborde largement de sa dalle : ceux de la même zone UTM suffisent à couvrir la vue
+        for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) if (utmZone(x + 0.5) === zone) urls.push(gemUrl(x, y));
+        if (!urls.length) urls.push(gemUrl(Math.floor((bbox[0] + bbox[2]) / 2), Math.floor((bbox[1] + bbox[3]) / 2)));
+        urls = urls.filter((u) => !gemMissing.has(u));
+        const ok = await Promise.all(urls.map((u) => cog(u).then(() => true, () => { gemMissing.add(u); return false; })));
+        urls = urls.filter((_, i) => ok[i]);
+        if (urls.length) await readCogMosaic(urls, dst, W, H, tB, signal);
+      }
+    };
+  }
+  const GEM = { id: "gem-15", cog: true, region: "GEM", country: "GEM-15 (Google)", satellite: true,
+    label: "Modèle de terrain à 15 m tiré d'images satellites stéréo : pas de LiDAR public ici. © Google (CC BY 4.0)", reader: gem15() };
+
   async function readWith(reader, src, bbox, size, signal, width, height) {
     const W = width || Math.max(8, Math.min(2048, Math.round(size || 256))), H = height || W;
     const def = reader.def(bbox, W);
@@ -851,18 +888,29 @@
   // ---------------------------------------------------------------------------
   const origRead = window.readMultiHrdemRegion;
   const origFind = window.findTilesForBbox;
+  let gemActive = false; // la dernière lecture du relief a été servie par GEM-15 (mention dans le panneau Couches)
   if (typeof origRead === "function") {
     window.readMultiHrdemRegion = async function (bbox, targetSize = 256, signal = null, resampling = "bilinear", product = "dtm") {
       const src = sourceForBbox(bbox);
       if (src) return product === "dtm" ? sharedRead(src, bbox, targetSize, signal) : null;
-      return origRead.apply(this, arguments);
+      let res = null;
+      try { res = await origRead.apply(this, arguments); } catch (e) { res = null; }
+      // Aucun LiDAR lisible (hors Canada, ou zone du Canada sans MNEHR) : GEM-15 à 15 m
+      if (!res && product === "dtm" && gemInRange(bbox) && !(signal && signal.aborted)) {
+        res = await sharedRead(GEM, bbox, targetSize, signal);
+        if (res) { gemActive = true; noteGem(); }
+      } else if (res && product === "dtm" && gemActive) { gemActive = false; noteGem(); }
+      return res;
     };
   }
   if (typeof origFind === "function") {
     window.findTilesForBbox = function (minLng, minLat, maxLng, maxLat, product = "dtm") {
-      const src = sourceForBbox([minLng, minLat, maxLng, maxLat]);
+      const bbox = [minLng, minLat, maxLng, maxLat];
+      const src = sourceForBbox(bbox);
       if (src) return product === "dtm" ? [{ key: `world:${src.id}`, world: true, source: src.id }] : [];
-      return origFind.apply(this, arguments);
+      const tiles = origFind.apply(this, arguments);
+      if ((!tiles || !tiles.length) && product === "dtm" && gemInRange(bbox)) return [{ key: "world:gem-15", world: true, source: "gem-15" }];
+      return tiles;
     };
   }
 
@@ -897,10 +945,16 @@
     el.hidden = false;
     el.innerHTML = "";
     const t = document.createElement("strong");
-    t.textContent = `Relief LiDAR — ${src.country}`;
+    t.textContent = src.satellite ? `Relief satellite — ${src.country}` : `Relief LiDAR — ${src.country}`;
     const s = document.createElement("span");
     s.textContent = src.label + (lastStatus ? ` · ${lastStatus}` : "");
     el.append(t, s);
+  }
+  // GEM-15 vient d'être utilisé : la mention l'indique tant que la vue reste hors des régions LiDAR
+  function noteGem() {
+    const map = window.map; if (!map || typeof map.getCenter !== "function") return;
+    const c = map.getCenter();
+    if (!regionAt(c.lng, c.lat)) render(gemActive ? GEM : null);
   }
   function watch() {
     const map = window.map;
@@ -909,7 +963,7 @@
       const c = map.getCenter();
       const k = regionAt(c.lng, c.lat);
       lastStatus = "";
-      render(k ? SOURCES[k] : null);
+      render(k ? SOURCES[k] : (gemActive ? GEM : null));
     };
     map.on("moveend", upd);
     if (map.loaded && map.loaded()) upd(); else map.once("load", upd);
@@ -952,6 +1006,6 @@
     }));
   }
 
-  window.pfDem = { regionAt, sourceForBbox, sourceAt: (lng, lat) => { const k = regionAt(lng, lat); return k ? SOURCES[k] : null; }, read: (bbox, size, signal) => { const s = sourceForBbox(bbox); return s ? sharedRead(s, bbox, size, signal) : Promise.resolve(null); }, surveys, SOURCES, REG, readWith, hasRelief, actionsHtml, bindActions };
+  window.pfDem = { GEM, gemUrl, regionAt, sourceForBbox, sourceAt: (lng, lat) => { const k = regionAt(lng, lat); return k ? SOURCES[k] : null; }, read: (bbox, size, signal) => { const s = sourceForBbox(bbox); return s ? sharedRead(s, bbox, size, signal) : Promise.resolve(null); }, surveys, SOURCES, REG, readWith, hasRelief, actionsHtml, bindActions };
   watch();
 })();
