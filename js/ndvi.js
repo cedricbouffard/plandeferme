@@ -14,6 +14,67 @@
         this.stretchDebounceTimer = null;
         this.abortController = null;
         this.marker = null;
+        // Bouton « Enregistrer » : la tuile affichée devient un lien dans Mes données
+        const saveBtn = document.getElementById("btn-ndvi-save");
+        if (saveBtn) saveBtn.addEventListener("click", () => this.saveCurrentTile());
+        document.addEventListener("pf-raster-links-changed", () => this.updateSaveButton());
+      }
+
+      // URL des tuiles NDVI (titiler du Planetary Computer, sur les COG B04 et B08 de la scène)
+      tileUrlFor(sceneId, minVal, maxVal) {
+        const rescaleStr = `${minVal.toFixed(2)},${maxVal.toFixed(2)}`;
+        return `https://planetarycomputer.microsoft.com/api/data/v1/item/tiles/WebMercatorQuad/{z}/{x}/{y}@1x?collection=sentinel-2-l2a&item=${sceneId}&assets=B08&assets=B04&asset_as_band=True&expression=%28B08-B04%29%2F%28B08%2BB04%29&rescale=${encodeURIComponent(rescaleStr)}&colormap_name=rdylgn`;
+      }
+
+      currentSaveKey() {
+        const scene = this.series[this.selectedIndex];
+        return scene ? `${scene.id}|${this.stretchMin.toFixed(2)},${this.stretchMax.toFixed(2)}` : null;
+      }
+
+      updateSaveButton() {
+        const btn = document.getElementById("btn-ndvi-save");
+        if (!btn) return;
+        const vm = window.vectorManager;
+        const key = this.currentSaveKey();
+        const saved = !!(key && vm && typeof vm.findRasterLink === "function" && vm.findRasterLink(key));
+        btn.classList.toggle("saved", saved);
+        btn.setAttribute("aria-pressed", saved ? "true" : "false");
+        const label = btn.querySelector("span");
+        if (label) label.textContent = saved ? "Enregistrée" : "Enregistrer";
+        btn.title = saved
+          ? "Cette tuile (date et nuancier) est déjà dans Mes données › NDVI Sentinel 2"
+          : "Enregistrer cette tuile NDVI dans Mes données (dossier « NDVI Sentinel 2 ») : un lien vers les COG Sentinel-2, sans téléchargement";
+      }
+
+      saveCurrentTile() {
+        const scene = this.series[this.selectedIndex];
+        const vm = window.vectorManager;
+        if (!scene || !vm || typeof vm.addRasterLink !== "function") return;
+        const key = this.currentSaveKey();
+        const existing = vm.findRasterLink(key);
+        if (existing) {
+          vm.showToast(`La tuile du ${scene.dateKey} est déjà enregistrée dans « NDVI Sentinel 2 ».`);
+          return;
+        }
+        const loc = this.currentLocation;
+        const p = this.currentParcel || {};
+        vm.addRasterLink({
+          name: scene.dateKey,
+          folderPath: ["NDVI Sentinel 2"],
+          key,
+          tiles: this.tileUrlFor(scene.id, this.stretchMin, this.stretchMax),
+          bounds: Array.isArray(scene.bbox) && scene.bbox.length === 4 ? scene.bbox : null,
+          center: loc ? [loc.lng, loc.lat] : null,
+          opacity: this.tileOpacity,
+          attribution: "Sentinel-2 L2A © ESA / Copernicus • Microsoft Planetary Computer",
+          legend: { kind: "ndvi", min: this.stretchMin, max: this.stretchMax, colormap: "rdylgn" },
+          meta: {
+            source: "Sentinel-2 L2A (Planetary Computer)", scene: scene.id, date: scene.dateKey,
+            ndviPoint: Number(scene.ndvi.toFixed(3)), cloud: Number((scene.cloud || 0).toFixed(1)),
+            parcel: p.IDPAR || p.idpar || null
+          }
+        });
+        this.updateSaveButton();
       }
 
       initYearSelect() {
@@ -322,6 +383,7 @@
                         id: itemId,
                         datetime: scene.properties.datetime,
                         dateKey: scene.properties.datetime.split("T")[0],
+                        bbox: scene.bbox || null,
                         ndvi,
                         b4,
                         b8,
@@ -437,13 +499,12 @@
         }
 
         this.displayNdviLayer(scene.id, scene.ndvi);
+        this.updateSaveButton();
       }
 
       displayNdviLayer(sceneId, sampleNdvi) {
-        const minVal = this.stretchMin;
-        const maxVal = this.stretchMax;
-        const rescaleStr = `${minVal.toFixed(2)},${maxVal.toFixed(2)}`;
-        const tileUrl = `https://planetarycomputer.microsoft.com/api/data/v1/item/tiles/WebMercatorQuad/{z}/{x}/{y}@1x?collection=sentinel-2-l2a&item=${sceneId}&assets=B08&assets=B04&asset_as_band=True&expression=%28B08-B04%29%2F%28B08%2BB04%29&rescale=${encodeURIComponent(rescaleStr)}&colormap_name=rdylgn`;
+        const tileUrl = this.tileUrlFor(sceneId, this.stretchMin, this.stretchMax);
+        this.updateSaveButton();
 
         if (this.map.getLayer("sentinel2-ndvi-layer")) {
           this.map.removeLayer("sentinel2-ndvi-layer");
@@ -824,4 +885,4 @@
       }
     }
 
-    // Gestionnaire de l'hydrologie (écoulement à la volée & raster des zones plates par pente < 0.1%)
+    // Gestionnaire de l'hydrologie (écoulement à la volée & raster des zones plates par pente < 0.1%)

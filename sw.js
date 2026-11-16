@@ -1,4 +1,4 @@
-const CACHE_NAME = "plandeferme-v26";
+const CACHE_NAME = "plandeferme-v27";
 
 const ASSETS = [
   "/",

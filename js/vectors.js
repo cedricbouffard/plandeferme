@@ -1072,7 +1072,7 @@
         const count = layer.data && layer.data.features ? layer.data.features.length : 0;
         const geomType = layer.geometryType.toLowerCase();
         const typeClass = geomType.includes("poly") ? "polygon" : geomType.includes("line") ? "line" : "point";
-        const typeName = geomType.includes("poly") ? "Polygones" : geomType.includes("line") ? "Lignes" : "Points";
+        const typeName = layer.kind === "raster" ? "Tuiles NDVI (lien COG)" : geomType.includes("poly") ? "Polygones" : geomType.includes("line") ? "Lignes" : "Points";
         const color = layer.style.fillColor || layer.style.strokeColor || "#16a34a";
 
         card.innerHTML = `
@@ -1165,6 +1165,8 @@
           }
         });
 
+        // Lien de tuiles (NDVI) : pas d'entités à dessiner, styler ou exporter
+        if (layer.kind === "raster") card.querySelectorAll(".btn-draw, .btn-style, .btn-table, .btn-export-data").forEach((b) => b.remove());
         container.appendChild(card);
       });
 
@@ -1182,7 +1184,7 @@
               <span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:${safeColor(color)}; flex-shrink:0;"></span>
               <span style="font-weight:600; color:#1e293b; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${esc(layer.name)}</span>
             </div>
-            <span style="font-size:10px; color:#64748b; font-weight:600; flex-shrink:0;">${count} entité${count > 1 ? "s" : ""}</span>
+            <span style="font-size:10px; color:#64748b; font-weight:600; flex-shrink:0;">${layer.kind === "raster" ? "NDVI (lien)" : `${count} entité${count > 1 ? "s" : ""}`}</span>
           `;
           quickContainer.appendChild(row);
         });

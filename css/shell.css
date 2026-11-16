@@ -1110,3 +1110,11 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
   .pf-split-knob { top: 62%; }
 }
 @media (max-width: 768px) { .pf-split-handle { z-index: 5; } .pf-split-knob { top: 30%; } }
+
+/* ---- Tuiles NDVI enregistrées (liens vers les COG Sentinel-2) ---- */
+.ndvi-save-btn { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px !important; font-weight: 600; color: #166534; background: #f0fdf4; border-color: #86efac; }
+.ndvi-save-btn.saved { color: #fff; background: #16a34a; border-color: #15803d; }
+.ndvi-save-btn.saved svg path { fill: currentColor; }
+.pf-lib-swatch-raster { width: 14px; border-radius: 2px; background: linear-gradient(90deg, #a50026, #f46d43, #fee08b, #d9ef8b, #66bd63, #006837); }
+.pf-lib-kind { flex-shrink: 0; font-size: 9.5px; font-weight: 700; letter-spacing: .02em; color: #166534; background: #dcfce7; border-radius: 4px; padding: 1px 4px; }
+@media (max-width: 768px) { .ndvi-save-btn span { display: none; } }

@@ -2323,8 +2323,8 @@ ${logoItemXml}
               groupId: "vectors",
               type: isLine ? "line" : "swatch",
               line: isLine,
-              label: vl.name || "Couche vectorielle",
-              color: color
+              label: vl.kind === "raster" ? `NDVI Sentinel-2 — ${vl.name}` : (vl.name || "Couche vectorielle"),
+              color: vl.kind === "raster" ? "#16a34a" : color
             });
           });
         }

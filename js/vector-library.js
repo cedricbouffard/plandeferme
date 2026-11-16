@@ -135,7 +135,8 @@
         layers.forEach((l, i) => ls.put({
           id: l.id, name: l.name, geometryType: l.geometryType, visible: !!l.visible,
           style: JSON.parse(JSON.stringify(l.style || {})), fields: JSON.parse(JSON.stringify(l.fields || [])),
-          folderId: l.folderId || null, order: i, updatedAt: Date.now()
+          folderId: l.folderId || null, order: i, updatedAt: Date.now(),
+          kind: l.kind || "vector", raster: l.raster ? JSON.parse(JSON.stringify(l.raster)) : null
         }));
         prevL.forEach((id) => { if (!layerIds.has(id)) { ls.delete(id); ds.delete(id); } });
         layers.forEach((l) => {
@@ -200,6 +201,13 @@
           fields: Array.isArray(m.fields) ? m.fields : [],
           folderId: m.folderId || null
         };
+        if (m.kind === "raster") {
+          if (!sanitizeRaster(m.raster)) return;
+          layer.kind = "raster";
+          layer.geometryType = "Raster";
+          layer.raster = sanitizeRaster(m.raster);
+          layer.data = { type: "FeatureCollection", features: [] };
+        }
         this.layers.push(layer);
         restored.push(layer);
         this.syncLayerToMap(layer);
@@ -265,6 +273,11 @@
     if (layer && layer.folderId === undefined) {
       // Nouvelle couche (dessin ou import) : elle va dans le dossier sélectionné
       layer.folderId = this.activeFolderId && this.getFolder(this.activeFolderId) ? this.activeFolderId : null;
+    }
+    if (layer && layer.kind === "raster") {
+      this.syncRasterToMap(layer);
+      if (!this._restoring) this.markDirty(layer);
+      return;
     }
     const out = origSync.apply(this, arguments);
     if (layer && !this._restoring) this.markDirty(layer);
@@ -453,6 +466,7 @@
       container.appendChild(empty);
       this.updateStorageStatus();
       this.scheduleSave();
+      document.dispatchEvent(new CustomEvent("pf-raster-links-changed"));
       return;
     }
 
@@ -468,6 +482,7 @@
     container.appendChild(frag);
     this.updateStorageStatus();
     this.scheduleSave();
+    document.dispatchEvent(new CustomEvent("pf-raster-links-changed"));
   };
 
   P.buildFolderRow = function (folder, depth) {
@@ -513,6 +528,7 @@
   };
 
   P.buildLayerRow = function (layer, depth) {
+    if (layer.kind === "raster") return this.buildRasterRow(layer, depth);
     const row = document.createElement("div");
     row.className = "pf-lib-row pf-lib-layer" + (layer.id === this.activeLayerId ? " active" : "");
     row.style.setProperty("--pf-depth", depth);
@@ -922,7 +938,7 @@
         else { b[0] = Math.min(b[0], c[0]); b[1] = Math.min(b[1], c[1]); b[2] = Math.max(b[2], c[0]); b[3] = Math.max(b[3], c[1]); }
       } else c.forEach(scan);
     };
-    layers.forEach((l) => (l.data.features || []).forEach((f) => f.geometry && scan(f.geometry.coordinates)));
+    layers.forEach((l) => (l.kind === "raster" ? [] : (l.data.features || [])).forEach((f) => f.geometry && scan(f.geometry.coordinates)));
     if (b && this.map) this.map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 80, maxZoom: 17, duration: 900 });
   };
 
@@ -1008,6 +1024,11 @@
       layers: []
     };
     this.layers.forEach((l) => {
+      if (l.kind === "raster") {
+        // Lien seulement : rien à empaqueter, le manifeste suffit
+        manifest.layers.push({ name: l.name, kind: "raster", raster: l.raster, visible: !!l.visible, folderId: l.folderId || null });
+        return;
+      }
       const file = pathFor(l.folderId, l.name, "geojson");
       zip.file(file, JSON.stringify(l.data));
       manifest.layers.push({ name: l.name, geometryType: l.geometryType, visible: !!l.visible, style: l.style, fields: l.fields || [], folderId: l.folderId || null, file });
@@ -1037,6 +1058,11 @@
       });
       const created = [];
       for (const m of manifest.layers) {
+        if (m && m.kind === "raster") {
+          const lyr = this.createRasterLayer(m.name, m.raster, m.folderId && idMap.has(m.folderId) ? idMap.get(m.folderId) : null, m.visible !== false);
+          if (lyr) created.push(lyr);
+          continue;
+        }
         const entry = m && m.file ? zip.file(prefix + m.file) : null;
         if (!entry) continue;
         const fc = JSON.parse(await entry.async("string"));
@@ -1328,5 +1354,181 @@
     btn.addEventListener("click", () => { pop.remove(); this.exportLayerShapefile(layer); });
     if (csv && csv.parentNode) csv.parentNode.insertBefore(btn, csv.nextSibling);
     else pop.appendChild(btn);
+  };
+
+  // ===========================================================================
+  // 8. COUCHES MATRICIELLES PAR LIEN (tuiles NDVI Sentinel-2 enregistrées)
+  //    Rien n'est téléchargé : la couche garde l'URL des tuiles calculées à la volée
+  //    depuis les COG de la scène (Planetary Computer), le nuancier et l'emprise.
+  // ===========================================================================
+  const RASTER_HOSTS = /^https:\/\/planetarycomputer\.microsoft\.com\/api\/data\/v1\//;
+  function sanitizeRaster(r) {
+    if (!r || typeof r.tiles !== "string" || !RASTER_HOSTS.test(r.tiles) || !/\{z\}.*\{x\}.*\{y\}/.test(r.tiles)) return null;
+    const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+    const bounds = Array.isArray(r.bounds) && r.bounds.length === 4 && r.bounds.every((v) => Number.isFinite(Number(v))) ? r.bounds.map(Number) : null;
+    const center = Array.isArray(r.center) && r.center.length === 2 && r.center.every((v) => Number.isFinite(Number(v))) ? r.center.map(Number) : null;
+    const lg = r.legend && typeof r.legend === "object" ? r.legend : {};
+    const meta = {};
+    if (r.meta && typeof r.meta === "object") Object.keys(r.meta).slice(0, 20).forEach((k) => { const v = r.meta[k]; if (v == null || ["string", "number"].includes(typeof v)) meta[k] = typeof v === "string" ? v.slice(0, 200) : v; });
+    return {
+      tiles: r.tiles, key: String(r.key || r.tiles).slice(0, 400), bounds, center,
+      opacity: Math.max(0, Math.min(1, num(r.opacity, 0.85))),
+      attribution: String(r.attribution || "").slice(0, 200),
+      legend: { kind: "ndvi", min: num(lg.min, -0.05), max: num(lg.max, 0.85), colormap: "rdylgn" },
+      meta
+    };
+  }
+  const rasterIds = (id) => ({ src: `vector-rsrc-${id}`, lyr: `vector-raster-${id}` });
+
+  P.createRasterLayer = function (name, raster, folderId, visible = true) {
+    const r = sanitizeRaster(raster);
+    if (!r) return null;
+    const layer = {
+      id: "ras_" + Date.now().toString(36) + "_" + Math.floor(Math.random() * 100000),
+      name: String(name || "Tuile").slice(0, 160),
+      kind: "raster", geometryType: "Raster", visible: !!visible,
+      data: { type: "FeatureCollection", features: [] },
+      style: {}, fields: [], folderId: folderId || null, raster: r
+    };
+    this.layers.push(layer);
+    this.syncLayerToMap(layer);
+    return layer;
+  };
+
+  P.findRasterLink = function (key) {
+    return key ? this.layers.find((l) => l.kind === "raster" && l.raster && l.raster.key === key) || null : null;
+  };
+
+  /** Ajoute un lien de tuiles dans un dossier (créé au besoin), masqué pour ne pas doubler la couche affichée */
+  P.addRasterLink = function (opts) {
+    const folderId = this.ensureFolderPath(opts.folderPath || [], null);
+    const f = this.getFolder(folderId);
+    if (f) f.collapsed = false;
+    const layer = this.createRasterLayer(opts.name, opts, folderId, opts.visible === true);
+    if (!layer) { this.showToast("Lien de tuiles invalide.", true); return null; }
+    // Garder les dates en ordre chronologique dans le dossier
+    const inFolder = this.layers.filter((l) => l.folderId === folderId && l.kind === "raster").sort((a, b) => a.name.localeCompare(b.name));
+    const others = this.layers.filter((l) => !(l.folderId === folderId && l.kind === "raster"));
+    this.layers = others.concat(inFolder);
+    this.renderLayersList();
+    this.showToast(`Tuile du ${layer.name} enregistrée dans Mes données › ${(opts.folderPath || []).join(" / ")} (masquée : cliquez l'œil pour l'afficher).`);
+    return layer;
+  };
+
+  P.syncRasterToMap = function (layer) {
+    if (!this.map) return;
+    if (!this.map.style) {
+      this.map.once("load", () => this.syncRasterToMap(layer));
+      return;
+    }
+    const { src, lyr } = rasterIds(layer.id);
+    const r = layer.raster;
+    if (!this.map.getSource(src)) {
+      const def = { type: "raster", tiles: [r.tiles], tileSize: 256, attribution: r.attribution, maxzoom: 15 };
+      if (r.bounds) def.bounds = r.bounds;
+      this.map.addSource(src, def);
+    }
+    if (!this.map.getLayer(lyr)) {
+      // Sous les parcelles et les couches vectorielles, comme la tuile NDVI de l'analyse
+      const before = this.map.getLayer("parcelles-line-bg") ? "parcelles-line-bg" : (this.map.getLayer("parcelles-fill") ? "parcelles-fill" : undefined);
+      this.map.addLayer({ id: lyr, type: "raster", source: src, paint: { "raster-opacity": r.opacity, "raster-fade-duration": 150, "raster-resampling": "linear" } }, before);
+    } else {
+      this.map.setPaintProperty(lyr, "raster-opacity", r.opacity);
+    }
+    this.map.setLayoutProperty(lyr, "visibility", layer.visible ? "visible" : "none");
+  };
+
+  const origSetVis = P.setLayerVisibility;
+  P.setLayerVisibility = function (layerId, isVisible) {
+    const layer = this.getLayer(layerId);
+    if (layer && layer.kind === "raster") {
+      const { lyr } = rasterIds(layerId);
+      if (this.map && this.map.getLayer(lyr)) this.map.setLayoutProperty(lyr, "visibility", isVisible ? "visible" : "none");
+      this.markDirty(layer);
+      return;
+    }
+    return origSetVis.apply(this, arguments);
+  };
+
+  const origRemove = P.removeLayerFromMap;
+  P.removeLayerFromMap = function (layerId) {
+    const { src, lyr } = rasterIds(layerId);
+    if (this.map && this.map.style) {
+      if (this.map.getLayer(lyr)) this.map.removeLayer(lyr);
+      if (this.map.getSource(src)) this.map.removeSource(src);
+    }
+    return origRemove.apply(this, arguments);
+  };
+
+  const origZoom = P.zoomToLayer;
+  P.zoomToLayer = function (layerId) {
+    const layer = this.getLayer(layerId);
+    if (layer && layer.kind === "raster") {
+      const r = layer.raster;
+      if (this.dom && this.dom.managerModal) this.dom.managerModal.classList.remove("active");
+      if (r.center) this.map.flyTo({ center: r.center, zoom: Math.max(this.map.getZoom(), 14.5), duration: 900 });
+      else if (r.bounds) this.map.fitBounds([[r.bounds[0], r.bounds[1]], [r.bounds[2], r.bounds[3]]], { padding: 40, duration: 900 });
+      return;
+    }
+    return origZoom.apply(this, arguments);
+  };
+
+  P.setRasterOpacity = function (layer, op) {
+    layer.raster.opacity = op;
+    const { lyr } = rasterIds(layer.id);
+    if (this.map && this.map.getLayer(lyr)) this.map.setPaintProperty(lyr, "raster-opacity", op);
+    this.markDirty(layer);
+  };
+
+  P.buildRasterRow = function (layer, depth) {
+    const row = document.createElement("div");
+    row.className = "pf-lib-row pf-lib-layer pf-lib-raster" + (layer.id === this.activeLayerId ? " active" : "");
+    row.style.setProperty("--pf-depth", depth);
+    row.draggable = true;
+    row.dataset.layerId = layer.id;
+    const r = layer.raster, m = r.meta || {}, lg = r.legend || {};
+    const fmt2 = (v) => Number(v).toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const tip = [m.source || "Lien de tuiles", m.scene ? `Scène ${m.scene}` : "", `Nuancier NDVI ${fmt2(lg.min)} à ${fmt2(lg.max)}`,
+      Number.isFinite(m.ndviPoint) ? `NDVI au point analysé : ${fmt2(m.ndviPoint)}` : "", Number.isFinite(m.cloud) ? `Nuages sur la scène : ${m.cloud} %` : "",
+      m.parcel ? `Parcelle nº ${m.parcel}` : ""].filter(Boolean).join("\n");
+    row.innerHTML = `
+      <button type="button" class="pf-lib-btn pf-lib-vis${layer.visible ? "" : " muted"}" aria-pressed="${layer.visible ? "true" : "false"}" aria-label="${layer.visible ? "Masquer" : "Afficher"} ${esc(layer.name)}" title="${layer.visible ? "Masquer" : "Afficher"}">${layer.visible ? ICON.eye : ICON.eyeOff}</button>
+      <span class="pf-lib-swatch pf-lib-swatch-raster" title="${esc(`NDVI ${fmt2(lg.min)} (rouge) à ${fmt2(lg.max)} (vert)`)}"></span>
+      <span class="pf-lib-name" title="${esc(tip)}">${esc(layer.name)}</span>
+      <span class="pf-lib-kind" title="Lien vers les COG Sentinel-2 : rien n'est téléchargé">COG</span>
+      <button type="button" class="pf-lib-btn pf-lib-zoom" aria-label="Zoomer sur ${esc(layer.name)}" title="Aller au point analysé">${ICON.zoom}</button>
+      <button type="button" class="pf-lib-btn pf-lib-more" aria-label="Actions de la couche ${esc(layer.name)}" title="Actions">${ICON.more}</button>
+    `;
+    row.querySelector(".pf-lib-vis").addEventListener("click", (e) => {
+      e.stopPropagation();
+      layer.visible = !layer.visible;
+      this.setLayerVisibility(layer.id, layer.visible);
+      this.renderLayersList();
+    });
+    row.querySelector(".pf-lib-zoom").addEventListener("click", (e) => { e.stopPropagation(); this.zoomToLayer(layer.id); });
+    row.querySelector(".pf-lib-name").addEventListener("dblclick", (e) => { e.stopPropagation(); this.renameLayer(layer.id); });
+    row.querySelector(".pf-lib-more").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const cur = Math.round((r.opacity || 0) * 100);
+      const ops = [100, 85, 60, 40].map((v) => ({ label: `${v === cur ? "✓ " : ""}Opacité ${v} %`, indent: 1, onClick: () => this.setRasterOpacity(layer, v / 100) }));
+      this.openMenu(e.currentTarget, [
+        { label: "Renommer", onClick: () => this.renameLayer(layer.id) },
+        { label: "Déplacer vers…", onClick: (a) => this.openMoveMenu(a, { layerId: layer.id }), keepOpen: true },
+        ...ops,
+        { label: "Copier le lien des tuiles", onClick: () => {
+          const done = () => this.showToast("Lien des tuiles copié (format XYZ, utilisable dans QGIS).");
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(r.tiles).then(done).catch(() => prompt("Lien des tuiles :", r.tiles));
+          else prompt("Lien des tuiles :", r.tiles);
+        } },
+        { sep: true },
+        { label: "Supprimer le lien", danger: true, onClick: () => this.confirmDeleteLayer(layer.id) }
+      ]);
+    });
+    row.addEventListener("click", () => {
+      document.querySelectorAll("#panel-vector-layers-list .pf-lib-layer.active").forEach((el) => el.classList.remove("active"));
+      row.classList.add("active");
+    });
+    this.bindDragSource(row, DND_LAYER, layer.id);
+    return row;
   };
 })();
