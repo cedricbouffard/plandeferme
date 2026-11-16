@@ -833,9 +833,13 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         if (!/^[A-Za-z0-9_.-]+$/.test(scene) || seen.has(scene)) return; // même scène enregistrée avec deux nuanciers : une seule fois
         if (b && r.bounds && (r.bounds[2] < b[0] || r.bounds[0] > b[2] || r.bounds[3] < b[1] || r.bounds[1] > b[3])) return;
         seen.add(scene);
+        // Sentinel-2 : décalage de 1000 par bande depuis le traitement 04.00 (scènes du 25 janvier 2022 et après)
+        let tilesTxt = ""; try { tilesTxt = decodeURIComponent(r.tiles || ""); } catch (e) { tilesTxt = r.tiles || ""; }
+        const s2Offset = /B08\+B04-2000/.test(tilesTxt) || String((r.meta && r.meta.date) || l.name || "") >= "2022-01-25";
+        const landsat = /collection=landsat-c2-l2/.test(r.tiles || "") || /^L[COTEM]\d\d_/.test(scene);
         const date = String((r.meta && r.meta.date) || l.name || "").slice(0, 10);
         const compact = date.replace(/[^0-9]/g, "");
-        out.push({ key: "ndvi:" + scene, scene, label: "NDVI " + date, short: "NDVI " + date, unit: "", digits: 2, prop: "nd_" + (compact.slice(2) || scene.slice(-6)), title: "NDVI Sentinel-2 du " + date + " (tuile enregistrée dans Mes données)" });
+        out.push({ key: "ndvi:" + scene, scene, landsat, s2Offset: !landsat && s2Offset, label: "NDVI " + date, short: "NDVI " + date, unit: "", digits: 2, prop: "nd_" + (compact.slice(2) || scene.slice(-6)), title: `NDVI ${landsat ? "Landsat (30 m)" : "Sentinel-2 (10 m)"} du ${date} (tuile enregistrée dans Mes données)` });
       });
       return out.sort((a, c) => a.label.localeCompare(c.label));
     }
@@ -848,15 +852,19 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       const kept = {}; box.querySelectorAll(".pf-zn-w").forEach((i) => { kept[i.dataset.w] = i.value; });
       this.ndviDefs = this.savedNdvi();
       box.innerHTML = this.ndviDefs.length
-        ? this.ndviDefs.map((l) => layerItem(l, l.label.replace("NDVI ", ""), checked.has(l.key), kept[l.key])).join("")
-        : `<span class="pf-zn-empty">Aucune tuile NDVI enregistrée ne couvre cette parcelle. Pour en ajouter : outil NDVI Sentinel-2, puis « Enregistrer ».</span>`;
+        ? this.ndviDefs.map((l) => layerItem(l, l.label.replace("NDVI ", "") + (l.landsat ? " · Landsat 30 m" : ""), checked.has(l.key), kept[l.key])).join("")
+        : `<span class="pf-zn-empty">Aucune tuile NDVI enregistrée ne couvre cette parcelle. Pour en ajouter : outil NDVI satellite, puis « Enregistrer ».</span>`;
       this.updateLayersSummary();
     }
 
     // Valeurs NDVI réelles d'une scène sur l'emprise (bandes B08 et B04 à 10 m), nuages et ombres écartés
     async fetchNdvi(def, bboxWgs, widthM, heightM, signal) {
-      const w = Math.max(8, Math.min(1024, Math.ceil(widthM / 10))), h = Math.max(8, Math.min(1024, Math.ceil(heightM / 10)));
-      const url = `${PC_DATA}bbox/${bboxWgs.map((v) => v.toFixed(6)).join(",")}/${w}x${h}.npy?collection=sentinel-2-l2a&item=${encodeURIComponent(def.scene)}&assets=B08&assets=B04&assets=SCL&asset_as_band=True&expression=${encodeURIComponent("(B08-B04)/(B08+B04);SCL")}`;
+      const px = def.landsat ? 30 : 10; // taille native des pixels
+      const w = Math.max(8, Math.min(1024, Math.ceil(widthM / px))), h = Math.max(8, Math.min(1024, Math.ceil(heightM / px)));
+      const query = def.landsat
+        ? `collection=landsat-c2-l2&item=${encodeURIComponent(def.scene)}&assets=nir08&assets=red&assets=qa_pixel&asset_as_band=True&expression=${encodeURIComponent("(nir08-red)/(nir08+red-14545.4545);qa_pixel")}`
+        : `collection=sentinel-2-l2a&item=${encodeURIComponent(def.scene)}&assets=B08&assets=B04&assets=SCL&asset_as_band=True&expression=${encodeURIComponent(def.s2Offset ? "(B08-B04)/(B08+B04-2000);SCL" : "(B08-B04)/(B08+B04);SCL")}`;
+      const url = `${PC_DATA}bbox/${bboxWgs.map((v) => v.toFixed(6)).join(",")}/${w}x${h}.npy?${query}`;
       let npy;
       try {
         const resp = await fetch(url, { signal });
@@ -868,7 +876,12 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       }
       const n = npy.w * npy.h, out = new Float32Array(n), cls = new Uint8Array(n);
       for (let i = 0; i < n; i++) {
-        const v = npy.data[i], scl = npy.bands > 1 ? Math.round(npy.data[n + i]) : 4, mask = npy.bands > 2 ? npy.data[2 * n + i] : 255;
+        const v = npy.data[i], mask = npy.bands > 2 ? npy.data[2 * n + i] : 255;
+        let scl = npy.bands > 1 ? Math.round(npy.data[n + i]) : 4;
+        if (def.landsat) { // qa_pixel de Landsat ramené aux classes de Sentinel-2 : 0 sans donnée, 9 nuage, 11 neige, 8 nuage possible, 10 cirrus, 3 ombre, 4 clair
+          const q = scl;
+          scl = (q & 1) || q === 0 ? 0 : (q & 8) ? 9 : (q & 32) ? 11 : (q & 2) ? 8 : (q & 4) ? 10 : (q & 16) ? 3 : 4;
+        }
         cls[i] = scl >= 0 && scl < 255 ? scl : 0;
         out[i] = Number.isFinite(v) && v >= -1 && v <= 1 && mask !== 0 && !SCL_BAD.has(scl) ? v : NaN;
       }
@@ -1053,7 +1066,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         if (myRun !== this.runId) return;
         if (!region) throw new Error("Pas de MNT LiDAR lisible pour cette parcelle.");
         // NDVI enregistrés : valeurs réelles lues en parallèle
-        if (ndviSel.length) this.setLoading(true, `Lecture de ${ndviSel.length} date${ndviSel.length > 1 ? "s" : ""} NDVI Sentinel-2…`);
+        if (ndviSel.length) this.setLoading(true, `Lecture de ${ndviSel.length} date${ndviSel.length > 1 ? "s" : ""} NDVI…`);
         const ndviGrids = await Promise.all(ndviSel.map((d) => this.fetchNdvi(d, bboxWgs, maxX - minX, maxY - minY, signal)));
         if (myRun !== this.runId) return;
 
@@ -1107,7 +1120,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
           if (part > 0.5) throw new Error(`${d.label} : ${fr(part * 100, 0)} % de la parcelle est sans donnée (nuage épais, neige ou hors scène). Décochez cette date.`);
           if (part > 0.05) cloudy.push(`${d.label} : ${fr(part * 100, 0)} % de la parcelle écarté (nuage épais, neige ou hors scène) et comblé par les pixels voisins.`);
           const st = ndviStats[t], doubt = Object.keys(st.doubt).map((c) => ({ name: SCL_DOUBT[c], part: st.doubt[c] / st.inside })).filter((x) => x.part > 0.01).sort((a, b) => b.part - a.part);
-          if (doubt.reduce((a, x) => a + x.part, 0) > 0.05) cloudy.push(`${d.label} : toutes les valeurs sont utilisées, mais Sentinel-2 classe une partie de la parcelle en ${doubt.map((x) => `${x.name} (${fr(x.part * 100, 0)} %)`).join(", ")}. Ce classement se trompe souvent sur un sol nu ou foncé ; si la tuile montre un vrai nuage ou son ombre, décochez cette date.`);
+          if (doubt.reduce((a, x) => a + x.part, 0) > 0.05) cloudy.push(`${d.label} : toutes les valeurs sont utilisées, mais le masque de qualité du satellite classe une partie de la parcelle en ${doubt.map((x) => `${x.name} (${fr(x.part * 100, 0)} %)`).join(", ")}. Ce classement se trompe souvent sur un sol nu ou foncé ; si la tuile montre un vrai nuage ou son ombre, décochez cette date.`);
         });
         const cellHa = (res * res) / 10000;
         const input = { dem, W, H, res, inside, layers, extra, weights, method, k, smooth, margin: mc - 2, minCells: Math.ceil(minHa / cellHa), maxCells: maxHa ? Math.floor(maxHa / cellHa) : 0 };

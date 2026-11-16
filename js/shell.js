@@ -144,7 +144,7 @@
   /* ---------------- 3. Tiroir des résultats à onglets ---------------- */
   const DOCKS = [
     { id: "elevation-profile-dock", name: "Profil altimétrique", close: "btn-close-profile-dock" },
-    { id: "ndvi-dock", name: "NDVI Sentinel-2", close: "btn-close-ndvi-dock" },
+    { id: "ndvi-dock", name: "NDVI satellite", close: "btn-close-ndvi-dock" },
     { id: "sim-dock", name: "Simulation de pluie", close: "btn-close-sim-dock" },
     { id: "cutfill-dock", name: "Déblais / remblais", close: "btn-close-cutfill-dock" },
     { id: "zones-dock", name: "Zones de gestion", close: "btn-close-zones-dock" }

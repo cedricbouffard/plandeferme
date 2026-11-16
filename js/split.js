@@ -18,7 +18,7 @@
   const LIDAR = ["relief", "ombrage", "pentes", "canopee", "courbes"];
   const GROUP_LABEL = {
     basemap: "Fond de carte", google: "Imagerie Google", relief: "Relief LiDAR (MNE)", ombrage: "Ombrage LiDAR",
-    pentes: "Pentes", canopee: "Canopée", courbes: "Courbes de niveau", ndvi: "NDVI Sentinel-2",
+    pentes: "Pentes", canopee: "Canopée", courbes: "Courbes de niveau", ndvi: "NDVI satellite",
     parcelles: "Parcelles", sols: "Sols", drainage: "Drainage", ecoulement: "Écoulement",
     cutfill: "Déblais / remblais", erosion: "Érosion / pluie", cadastre: "Cadastre",
     regional: "Couches régionales", vectors: "Mes données", autres: "Autres couches"

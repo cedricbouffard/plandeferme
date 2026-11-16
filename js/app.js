@@ -515,6 +515,7 @@
       ndviManager = new NdviManager(map);
       window.ndviManager = ndviManager;
       ndviManager.initYearSelect();
+      ndviManager.initSensorSelect();
       ndviManager.syncStretchUi();
 
       // Instantiate Soil AI Assistant
@@ -1169,9 +1170,9 @@
         // Tab 3: NDVI HTML
         const ndviTabHtml = `
           <div style="font-size: 12px; color: #334155; line-height: 1.5; padding: 4px 0;">
-            <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px; font-size: 12.5px;">Vigueur Végétale &mdash; Sentinel-2</div>
+            <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px; font-size: 12.5px;">Vigueur végétale &mdash; NDVI satellite</div>
             <p style="margin: 0 0 10px 0; color: #475569; font-size: 11.5px;">
-              Analysez la courbe annuelle de l'indice de végétation par différence normalisée (NDVI) à 10 m de résolution pour ce point ou cette parcelle agricole (2018&ndash;2026).
+              Analysez la courbe annuelle de l'indice de végétation par différence normalisée (NDVI) pour ce point ou cette parcelle agricole : Sentinel-2 à 10 m depuis 2015, Landsat à 30 m depuis 1984.
             </p>
             <button id="btn-tab-ndvi" type="button" class="btn-popup-ndvi">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>

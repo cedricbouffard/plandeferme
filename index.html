@@ -774,7 +774,7 @@
           <div class="pf-group-title">Sur la carte</div>
           <button type="button" class="pf-list-btn" data-pf-click="btn-quick-measure"><span class="pf-list-name">Mesurer</span><span class="pf-list-desc">Distances et superficies, métrique ou impérial</span></button>
           <button type="button" class="pf-list-btn" data-pf-click="btn-quick-profile"><span class="pf-list-name">Coupe topographique</span><span class="pf-list-desc">Tracez une ligne : profil altimétrique LiDAR 1 m</span></button>
-          <button type="button" class="pf-list-btn" data-pf-click="btn-quick-ndvi"><span class="pf-list-name">NDVI Sentinel-2</span><span class="pf-list-desc">Vigueur de la végétation, date par date</span></button>
+          <button type="button" class="pf-list-btn" data-pf-click="btn-quick-ndvi"><span class="pf-list-name">NDVI satellite</span><span class="pf-list-desc">Vigueur de la végétation, date par date (Sentinel-2 ou Landsat)</span></button>
           <button type="button" class="pf-list-btn" id="pf-split-entry"><span class="pf-list-name">Écran partagé</span><span class="pf-list-desc">Comparez deux jeux de couches avec un curseur (ex. LiDAR et NDVI)</span></button>
           <button type="button" class="pf-list-btn" data-pf-click="btn-quick-3d"><span class="pf-list-name">Relief 3D</span><span class="pf-list-desc">Perspective et exagération verticale sur une parcelle</span></button>
         </div>
@@ -968,10 +968,14 @@
     <div class="profile-dock-header">
       <div class="profile-dock-title" id="ndvi-dock-title-wrap" title="Cliquer pour réduire ou agrandir">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>
-        <span id="ndvi-dock-title">NDVI Sentinel-2</span>
+        <span id="ndvi-dock-title">NDVI satellite</span>
         <span id="ndvi-collapsed-summary" class="stat-chip" style="display:none; margin-left: 6px; font-weight:600; color:#14532d; background:#dcfce7; border-color:#86efac;"></span>
       </div>
       <div class="profile-dock-header-right">
+        <select id="ndvi-sensor-select" class="tool-select" title="Capteur satellite et résolution des pixels. Par défaut : Sentinel-2 s'il a des dates utilisables, sinon Landsat." style="font-size: 11px; padding: 2px 6px;">
+          <option value="s2" selected>Sentinel-2 · 10 m</option>
+          <option value="landsat">Landsat · 30 m</option>
+        </select>
         <select id="ndvi-year-select" class="tool-select" title="Année de la saison de croissance au Québec" style="font-size: 11px; padding: 2px 6px;">
           <option value="2026" selected>2026</option>
           <option value="2025">2025</option>
@@ -1436,9 +1440,9 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
     </button>
     <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
-    <button id="btn-quick-ndvi" class="floating-profile-btn btn-ndvi-mode" type="button" title="Activer l'analyse NDVI Sentinel-2 (cliquez sur une parcelle ou n'importe où sur la carte)">
+    <button id="btn-quick-ndvi" class="floating-profile-btn btn-ndvi-mode" type="button" title="Activer l'analyse NDVI par satellite, Sentinel-2 ou Landsat (cliquez sur une parcelle ou n'importe où sur la carte)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>
-      <span id="ndvi-btn-text">NDVI Sentinel-2</span>
+      <span id="ndvi-btn-text">NDVI satellite</span>
     </button>
     <div style="width: 1px; height: 18px; background: #cbd5e1; margin: 0 1px;"></div>
     <button id="btn-quick-rag" class="floating-profile-btn btn-rag-mode" type="button" title="Consulter la base documentaire Agri-Réseau (RAG agronomique)">
@@ -1629,7 +1633,7 @@
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>
         </div>
         <div class="mobile-tool-info">
-          <div class="mobile-tool-name">NDVI Sentinel-2</div>
+          <div class="mobile-tool-name">NDVI satellite</div>
           <div class="mobile-tool-desc">Santé &amp; vigueur de la végétation</div>
         </div>
         <span id="mobile-tool-ndvi-badge" class="mobile-tool-badge" style="display: none;">Actif</span>
