@@ -1495,7 +1495,6 @@
       <button type="button" class="pf-lib-btn pf-lib-vis${layer.visible ? "" : " muted"}" aria-pressed="${layer.visible ? "true" : "false"}" aria-label="${layer.visible ? "Masquer" : "Afficher"} ${esc(layer.name)}" title="${layer.visible ? "Masquer" : "Afficher"}">${layer.visible ? ICON.eye : ICON.eyeOff}</button>
       <span class="pf-lib-swatch pf-lib-swatch-raster" title="${esc(`NDVI ${fmt2(lg.min)} (rouge) à ${fmt2(lg.max)} (vert)`)}"></span>
       <span class="pf-lib-name" title="${esc(tip)}">${esc(layer.name)}</span>
-      <span class="pf-lib-kind" title="Lien vers les COG Sentinel-2 : rien n'est téléchargé">COG</span>
       <button type="button" class="pf-lib-btn pf-lib-zoom" aria-label="Zoomer sur ${esc(layer.name)}" title="Aller au point analysé">${ICON.zoom}</button>
       <button type="button" class="pf-lib-btn pf-lib-more" aria-label="Actions de la couche ${esc(layer.name)}" title="Actions">${ICON.more}</button>
     `;

@@ -1116,5 +1116,4 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .ndvi-save-btn.saved { color: #fff; background: #16a34a; border-color: #15803d; }
 .ndvi-save-btn.saved svg path { fill: currentColor; }
 .pf-lib-swatch-raster { width: 14px; border-radius: 2px; background: linear-gradient(90deg, #a50026, #f46d43, #fee08b, #d9ef8b, #66bd63, #006837); }
-.pf-lib-kind { flex-shrink: 0; font-size: 9.5px; font-weight: 700; letter-spacing: .02em; color: #166534; background: #dcfce7; border-radius: 4px; padding: 1px 4px; }
 @media (max-width: 768px) { .ndvi-save-btn span { display: none; } }
