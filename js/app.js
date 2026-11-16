@@ -1305,6 +1305,12 @@
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-zones" title="Délimiter des zones de gestion contiguës à partir du relief LiDAR (méthode SKATER)">
                   <span class="pf-act-name">Zones de gestion</span><span class="pf-act-desc">Zones contiguës (LiDAR)</span>
                 </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-buffer" title="Créer une zone tampon autour ou à l'intérieur de la parcelle">
+                  <span class="pf-act-name">Zone tampon</span><span class="pf-act-desc">Autour ou à l'intérieur</span>
+                </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-save" title="Copier cette parcelle dans Mes données, couche « Mes parcelles »">
+                  <span class="pf-act-name">Enregistrer la parcelle</span><span class="pf-act-desc">Dans Mes données</span>
+                </button>
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-tif">
                   <span class="pf-act-name">Exporter le MNT</span><span class="pf-act-desc">GeoTIFF découpé</span>
                 </button>
@@ -1435,6 +1441,21 @@
               }
             });
           });
+
+          // Zone tampon et enregistrement de la parcelle dans Mes données
+          const btnActionBuffer = popupDom.querySelector(".btn-popup-action-buffer");
+          if (btnActionBuffer) {
+            btnActionBuffer.addEventListener("click", () => {
+              popup.remove();
+              if (window.pfTampon) window.pfTampon.openForParcel(targetP);
+            });
+          }
+          const btnActionSave = popupDom.querySelector(".btn-popup-action-save");
+          if (btnActionSave) {
+            btnActionSave.addEventListener("click", () => {
+              if (window.pfTampon) window.pfTampon.saveParcel(targetP);
+            });
+          }
 
           // Zones de gestion (SKATER sur les couches LiDAR)
           const btnActionZones = popupDom.querySelector(".btn-popup-action-zones");

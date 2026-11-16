@@ -1197,3 +1197,25 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-lang-select:focus { outline: 2px solid var(--pf-accent-soft); }
 .pf-lang-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
 .pf-lang-row .pf-lang-select { border: 1px solid #d5d9d3; background: #fff; padding: 0 8px; }
+
+/* ==========================================================================
+   Zone tampon : fenêtre posée à droite, sans voile, pour voir l'aperçu sur la carte
+   ========================================================================== */
+.pf-tp.vector-modal-overlay, .pf-tp.vector-modal-overlay.active { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; pointer-events: none; align-items: flex-start; justify-content: flex-end; padding: 76px 20px 20px; }
+.pf-tp.vector-modal-overlay.active .vector-modal { pointer-events: auto; max-width: 360px; box-shadow: 0 12px 40px rgba(15, 23, 42, 0.28); border: 1px solid var(--pf-line); }
+.pf-tp [hidden] { display: none !important; }
+.pf-tp-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; font-weight: 600; }
+.pf-tp-row > span:last-child { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+.pf-tp-choices { flex-wrap: wrap; justify-content: flex-end; gap: 4px 12px !important; }
+.pf-tp #tampon-distance {
+  width: 84px; height: 32px; padding: 0 8px; border: 1px solid #d5d9d3; border-radius: 8px; background: #fff;
+  font: inherit; font-weight: 600; color: var(--pf-ink); font-variant-numeric: tabular-nums;
+}
+.pf-tp #tampon-distance:focus { outline: 2px solid var(--pf-accent-soft); border-color: var(--pf-accent); }
+.pf-tp #tampon-poly-options { display: flex; flex-direction: column; gap: 6px; }
+.pf-tp-check { min-height: 28px; }
+.pf-tp-note { margin: 0; min-height: 18px; font-size: 12px; font-weight: 600; color: var(--pf-accent-strong); }
+.pf-tp-note.pf-tp-warn { color: #9a3412; }
+@media (max-width: 768px) {
+  .pf-tp.vector-modal-overlay { justify-content: center; align-items: flex-end; padding: 12px 12px 84px; }
+}

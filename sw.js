@@ -1,4 +1,4 @@
-const CACHE_NAME = "plandeferme-v30";
+const CACHE_NAME = "plandeferme-v32";
 
 const ASSETS = [
   "/",
@@ -20,9 +20,9 @@ const ASSETS = [
   "/logos/logo_plandeferme_v3_joyeux.png",
   "/data/wms-catalog.json",
   "/js/i18n.js",
-  "/i18n/langues.json",
-  "/i18n/en.json",
-  "/i18n/es.json",
+  "/i18n/langues.js",
+  "/i18n/en.js",
+  "/i18n/es.js",
   "/js/config.js",
   "/js/topo.js",
   "/js/hydro.js",
@@ -33,6 +33,8 @@ const ASSETS = [
   "/js/vectors.js",
   "/js/vector-library.js",
   "/js/zones.js",
+  "/clipper.min.js",
+  "/js/tampon.js",
   "/js/app.js",
   "/js/regions.js",
   "/js/dem-world.js",
@@ -114,7 +116,7 @@ self.addEventListener("fetch", (event) => {
 
   // 2. Scripts et styles locaux (.js, .css) : NETWORK-FIRST avec secours Cache
   // Permet de propager immédiatement les corrections et nouvelles fonctionnalités sans cache résiduel
-  // Les fichiers de traduction (i18n/*.json) suivent la même règle : une correction est visible au rechargement
+  // Les fichiers de traduction (i18n/*.js) suivent la même règle : une correction est visible au rechargement
   const isCodeAsset = url.pathname.endsWith(".js") || url.pathname.endsWith(".css") || url.pathname.startsWith("/i18n/");
 
   if (isCodeAsset) {

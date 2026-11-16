@@ -575,6 +575,7 @@
         { label: "Style et QML", onClick: () => this.openStyleModal(layer.id) },
         { label: "Table d'attributs", onClick: () => this.openTableModal(layer.id) },
         { label: "Exporter…", onClick: () => this.showExportMenu(layer, anchor) },
+        { label: "Zone tampon…", onClick: () => { if (window.pfTampon) window.pfTampon.open({ features: (layer.data && layer.data.features) || [], name: layer.name }); } },
         { sep: true },
         { label: "Supprimer la couche", danger: true, onClick: () => this.confirmDeleteLayer(layer.id) }
       ]);

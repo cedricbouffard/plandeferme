@@ -847,6 +847,7 @@
           <div class="pf-fiche-actions-grid">
             <button type="button" class="btn-popup-parcel-action pf-reg-zoom"><span class="pf-act-name">Cadrer</span><span class="pf-act-desc">Zoom sur la parcelle</span></button>
             <button type="button" class="btn-popup-parcel-action pf-reg-copy"><span class="pf-act-name">Ajouter à Mes données</span><span class="pf-act-desc">Copie dans vos couches</span></button>
+            <button type="button" class="btn-popup-parcel-action pf-reg-buffer" title="Créer une zone tampon autour ou à l'intérieur de la parcelle"><span class="pf-act-name">Zone tampon</span><span class="pf-act-desc">Autour ou à l'intérieur</span></button>
           </div>
         </div>
         ${window.pfDem && window.pfDem.hasRelief(parcel.geometry) ? window.pfDem.actionsHtml("Analyses LiDAR") : `<p class="pf-reg-note">Pas de MNT LiDAR public lisible ici pour les analyses 3D, pluie et déblais / remblais.</p>`}`;
@@ -856,6 +857,10 @@
         const scan = (c) => { if (typeof c[0] === "number") { b = b ? [Math.min(b[0], c[0]), Math.min(b[1], c[1]), Math.max(b[2], c[0]), Math.max(b[3], c[1])] : [c[0], c[1], c[0], c[1]]; } else c.forEach(scan); };
         scan(parcel.geometry.coordinates);
         if (b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 80, maxZoom: 17, duration: 800 });
+      });
+      slot.querySelector(".pf-reg-buffer").addEventListener("click", () => {
+        popup.remove();
+        if (window.pfTampon) window.pfTampon.open({ features: [{ type: "Feature", properties: { nom: parcel.title }, geometry: parcel.geometry }], name: parcel.title });
       });
       slot.querySelector(".pf-reg-copy").addEventListener("click", async () => {
         const vm = window.vectorManager;

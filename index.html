@@ -780,7 +780,7 @@
         </div>
         <div class="pf-group">
           <div class="pf-group-title">Sur une parcelle</div>
-          <p class="pf-hint">Cliquez une parcelle sur la carte : sa fiche s'ouvre à droite avec toutes les analyses (vue 3D, simulation de pluie, érosion RUSLE-CAN, comparaison LiDAR, zones de gestion, export du MNT).</p>
+          <p class="pf-hint">Cliquez une parcelle sur la carte : sa fiche s'ouvre à droite avec toutes les analyses (vue 3D, simulation de pluie, érosion RUSLE-CAN, comparaison LiDAR, zones de gestion, zone tampon, enregistrement de la parcelle, export du MNT).</p>
           <!-- Comparaison LiDAR multidates & Déblais/Remblais (m³/ha) -->
             <details class="topo-sub-accordion pf-tool-card" id="card-cutfill-tool" open>
               <summary class="topo-sub-header">
@@ -1295,6 +1295,36 @@
     </div>
   </div>
 
+<!-- Zone tampon : distance, côté, aperçu sur la carte puis enregistrement dans Mes données -->
+  <div id="tampon-modal" class="vector-modal-overlay pf-zn pf-zn-modal pf-tp">
+    <div class="vector-modal" role="dialog" aria-modal="false" aria-labelledby="tampon-title">
+      <div class="vector-modal-header">
+        <div class="vector-modal-title"><span id="tampon-title">Zone tampon</span></div>
+        <button type="button" id="btn-tampon-close" class="vector-modal-close" aria-label="Fermer">&times;</button>
+      </div>
+      <div class="vector-modal-body">
+        <p class="pf-zn-modal-help">Autour de : <strong id="tampon-source" data-no-i18n></strong></p>
+        <label class="pf-tp-row"><span>Distance</span><span><input type="number" id="tampon-distance" min="0.5" max="5000" step="0.5" value="10" inputmode="decimal" /> m</span></label>
+        <div id="tampon-poly-options">
+          <div class="pf-tp-row" role="radiogroup" aria-label="Côté du tampon">
+            <span>Côté</span>
+            <span class="pf-tp-choices">
+              <label class="pf-cf-check"><input type="radio" name="tampon-side" value="out" checked /><span>Vers l'extérieur</span></label>
+              <label class="pf-cf-check"><input type="radio" name="tampon-side" value="in" /><span>Vers l'intérieur</span></label>
+            </span>
+          </div>
+          <label class="pf-cf-check pf-tp-check" title="Garde seulement la bande entre le contour d'origine et le tampon (ex. bande riveraine, tournière)"><input type="checkbox" id="tampon-ring" /><span>Garder seulement la bande</span></label>
+        </div>
+        <label id="tampon-dissolve-row" class="pf-cf-check pf-tp-check" title="Réunit en une seule entité les tampons qui se chevauchent"><input type="checkbox" id="tampon-dissolve" checked /><span>Fusionner les tampons qui se touchent</span></label>
+        <p id="tampon-note" class="pf-tp-note" aria-live="polite"></p>
+        <div class="pf-zn-modal-actions">
+          <button type="button" id="btn-tampon-cancel" class="profile-dock-btn pf-zn-modal-secondary">Annuler</button>
+          <button type="button" id="btn-tampon-save" class="pf-zn-run" disabled>Enregistrer dans Mes données</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <!-- Slide-Over Drawer for Agri-Réseau RAG -->
   <aside id="rag-dock" class="rag-dock" aria-label="Base documentaire Agri-Réseau">
     <div class="rag-dock-header">
@@ -1748,6 +1778,8 @@
     <script src="js/cutfill.js"></script>
     <script src="polygon-clipping.min.js"></script>
     <script src="js/zones.js"></script>
+    <script src="clipper.min.js"></script>
+    <script src="js/tampon.js"></script>
     <script src="js/app.js"></script>
     <script src="js/regions.js"></script>
     <script src="js/split.js"></script>

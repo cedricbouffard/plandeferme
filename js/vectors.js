@@ -1867,6 +1867,7 @@
           </div>
           <div style="display: flex; gap: 5px;">
             <button type="button" id="btn-popup-edit-attr" class="vector-tool-btn primary" style="font-size: 10.5px;">Éditer attributs</button>
+            <button type="button" id="btn-popup-buffer-feat" class="vector-tool-btn" style="font-size: 10.5px;" title="Créer une zone tampon autour de cette entité">Zone tampon</button>
             <button type="button" id="btn-popup-del-feat" class="vector-tool-btn danger" style="font-size: 10.5px;">Supprimer</button>
           </div>
           ${isPolyFeat && window.pfDem && window.pfDem.hasRelief(feat.geometry) ? `<div class="pf-vec-lidar">${window.pfDem.actionsHtml("Analyses LiDAR")}</div>` : ""}
@@ -1889,6 +1890,14 @@
         if (lidarBox && window.pfDem) {
           const target = { type: "Feature", geometry: feat.geometry, properties: Object.assign({}, feat.properties) };
           window.pfDem.bindActions(lidarBox, target, () => this.clearFeatureSelection());
+        }
+        const btnBuffer = document.getElementById("btn-popup-buffer-feat");
+        if (btnBuffer) {
+          btnBuffer.addEventListener("click", () => {
+            const target = { type: "Feature", geometry: feat.geometry, properties: Object.assign({}, feat.properties) };
+            this.clearFeatureSelection();
+            if (window.pfTampon) window.pfTampon.open({ features: [target], name: featName });
+          });
         }
         const btnDel = document.getElementById("btn-popup-del-feat");
         if (btnDel) {
