@@ -598,6 +598,10 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-vec-lidar .btn-popup-parcel-action:hover { background: var(--pf-accent-soft); border-color: var(--pf-accent); }
 .pf-fiche .btn-popup-parcel-action:focus-visible,
 .pf-vec-lidar .btn-popup-parcel-action:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: 1px; }
+/* grille d'outils placée dans l'onglet « Outils » de la fiche */
+.pf-fiche-actions.pf-fiche-tools { padding: 4px 0 2px; border-top: 0; background: transparent; }
+.pf-fiche-tools .pf-fiche-actions-grid .btn-popup-parcel-action:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.pf-fiche-tools-note { margin: 10px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--pf-muted); }
 .pf-act-name { font-size: 12.5px; font-weight: 600; }
 .pf-act-desc { font-size: 11px; color: var(--pf-muted); }
 
@@ -1219,3 +1223,46 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 @media (max-width: 768px) {
   .pf-tp.vector-modal-overlay { justify-content: center; align-items: flex-end; padding: 12px 12px 84px; }
 }
+
+/* ==========================================================================
+   Visionneuse de plans numérisés (plans de drainage)
+   ========================================================================== */
+.pf-plan-viewer { position: fixed; inset: 0; z-index: 10050; display: none; flex-direction: column; background: rgba(15, 23, 20, 0.94); color: #fff; }
+.pf-plan-viewer.open { display: flex; }
+.pf-plan-bar { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; background: rgba(0, 0, 0, 0.35); }
+.pf-plan-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.pf-plan-tools { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; }
+.pf-plan-btn {
+  min-width: 36px; height: 36px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 8px; background: rgba(255, 255, 255, 0.08);
+  color: #fff; font: inherit; font-size: 18px; line-height: 1; text-decoration: none; cursor: pointer;
+}
+.pf-plan-btn.pf-plan-text { padding: 0 12px; font-size: 12.5px; font-weight: 600; }
+.pf-plan-btn:hover { background: rgba(255, 255, 255, 0.2); }
+.pf-plan-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.pf-plan-stage { position: relative; flex: 1 1 auto; overflow: hidden; cursor: grab; touch-action: none; }
+.pf-plan-stage.pf-plan-grab { cursor: grabbing; }
+.pf-plan-img { position: absolute; top: 0; left: 0; max-width: none; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; background: #fff; }
+.pf-plan-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+.pf-plan-status { position: absolute; left: 0; right: 0; top: 0; z-index: 1; padding: 10px 14px; text-align: center; font-size: 12.5px; color: rgba(255, 255, 255, 0.85); pointer-events: none; }
+.pf-plan-status:empty { display: none; }
+.pf-plan-framed .pf-plan-stage { cursor: default; touch-action: auto; }
+.pf-plan-framed .pf-plan-status { background: rgba(15, 23, 20, 0.8); }
+.pf-plan-framed [data-act="in"], .pf-plan-framed [data-act="out"], .pf-plan-framed [data-act="fit"] { display: none; }
+
+/* NDVI : la ligne d'aide et de lecture au survol est plus lisible que les pastilles de la saison */
+#ndvi-hover-info { font-size: 13.5px; line-height: 1.4; min-height: 22px; padding: 3px 0; font-style: normal; font-weight: 500; color: var(--pf-ink); }
+#ndvi-hover-info strong { font-weight: 700; }
+#ndvi-stats-bar { font-size: 11px; }
+
+/* Grille d'échantillonnage : mêmes fenêtres latérales que la zone tampon */
+.pf-tp .pf-tp-num {
+  width: 72px; height: 32px; padding: 0 8px; border: 1px solid #d5d9d3; border-radius: 8px; background: #fff;
+  font: inherit; font-weight: 600; color: var(--pf-ink); font-variant-numeric: tabular-nums;
+}
+.pf-tp .pf-tp-select { height: 32px; max-width: 190px; padding: 0 6px; border: 1px solid #d5d9d3; border-radius: 8px; background: #fff; font: inherit; color: var(--pf-ink); }
+.pf-tp .pf-tp-num:focus, .pf-tp .pf-tp-select:focus { outline: 2px solid var(--pf-accent-soft); border-color: var(--pf-accent); }
+.pf-tp .pf-tp-auto { height: 32px; white-space: nowrap; }
+.pf-tp .pf-tp-auto.pf-on { background: var(--pf-accent-soft); border-color: var(--pf-accent); color: var(--pf-accent-strong); }
+.pf-tp .pf-tp-draw { width: 100%; height: 34px; margin-top: -4px; }
+.pf-tp .pf-tp-draw.pf-on { background: #fff7ed; border-color: #ea580c; color: #9a3412; }

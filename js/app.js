@@ -924,7 +924,7 @@
             plansListHtml = `
               <div style="font-size: 11.5px; color: #475569; margin-bottom: 10px;">Fichier : <code style="font-size: 11px; background: #f1f5f9; padding: 2px 4px; border-radius: 3px; color: #0f172a;">${nomFichier}</code></div>
               ${planUrl ? `
-                <a href="${planUrl}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 6px; background: #0284c7; color: #ffffff; text-decoration: none; font-size: 11.5px; font-weight: 600; padding: 7px 12px; border-radius: 5px; box-sizing: border-box; transition: background 0.15s ease;">
+                <a href="${planUrl}" data-pf-plan="${String(nomFichier).replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 6px; background: #0284c7; color: #ffffff; text-decoration: none; font-size: 11.5px; font-weight: 600; padding: 7px 12px; border-radius: 5px; box-sizing: border-box; transition: background 0.15s ease;">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                   <span>Consulter le plan numérisé (JPG)</span>
                 </a>
@@ -948,7 +948,7 @@
                       </div>
                       <div style="display: flex; align-items: center; justify-content: flex-end; margin-top: 2px;">
                         ${planUrl ? `
-                          <a href="${planUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; background: #0284c7; color: #ffffff; text-decoration: none; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 4px; transition: background 0.15s ease;">
+                          <a href="${planUrl}" data-pf-plan="${String(nom).replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; background: #0284c7; color: #ffffff; text-decoration: none; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 4px; transition: background 0.15s ease;">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                             <span>Ouvrir (JPG)</span>
                           </a>
@@ -981,7 +981,9 @@
         }
 
         let activeTab = defaultTab || (drainagePlans.length > 0 && defaultTab === "drainage" ? "drainage" : (pedoProps ? "sols" : (parcelProps ? "cultures" : "drainage")));
+        if (activeTab === "ndvi") activeTab = "outils";
         if (!pedoProps && parcelProps) activeTab = defaultTab || "cultures";
+        if (activeTab === "ndvi") activeTab = "outils";
         if (!parcelProps && pedoProps && activeTab === "cultures") activeTab = "sols";
         if (defaultTab === "drainage" && drainagePlans.length > 0) activeTab = "drainage";
 
@@ -1167,20 +1169,6 @@
 
 
 
-        // Tab 3: NDVI HTML
-        const ndviTabHtml = `
-          <div style="font-size: 12px; color: #334155; line-height: 1.5; padding: 4px 0;">
-            <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px; font-size: 12.5px;">Vigueur végétale &mdash; NDVI satellite</div>
-            <p style="margin: 0 0 10px 0; color: #475569; font-size: 11.5px;">
-              Analysez la courbe annuelle de l'indice de végétation par différence normalisée (NDVI) pour ce point ou cette parcelle agricole : Sentinel-2 à 10 m depuis 2015, Landsat à 30 m depuis 1984.
-            </p>
-            <button id="btn-tab-ndvi" type="button" class="btn-popup-ndvi">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>
-              <span>Analyser l'évolution NDVI annuelle</span>
-            </button>
-          </div>
-        `;
-
         // Tab 4: Drainage HTML
         let drainageTabHtml = "";
         if (drainagePlans.length > 0) {
@@ -1216,7 +1204,7 @@
               </p>
 
               ${planUrl ? `
-                <a href="${planUrl}" target="_blank" rel="noopener noreferrer" class="pedo-study-link" style="background: #0284c7; color: #ffffff; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-weight: 600; font-size: 11.5px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; box-sizing: border-box; transition: background 0.15s ease;">
+                <a href="${planUrl}" data-pf-plan="${String(nomFichier).replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" class="pedo-study-link" style="background: #0284c7; color: #ffffff; text-decoration: none; padding: 8px 12px; border-radius: 6px; font-weight: 600; font-size: 11.5px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; box-sizing: border-box; transition: background 0.15s ease;">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                     <polyline points="15 3 21 3 21 9"></polyline>
@@ -1253,7 +1241,7 @@
                       <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                         <span style="font-size: 10px; color: #64748b;">Feuillet JPG</span>
                         ${planUrl ? `
-                          <a href="${planUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; background: #0284c7; color: #ffffff; text-decoration: none; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 4px; transition: background 0.15s ease;">
+                          <a href="${planUrl}" data-pf-plan="${String(nom).replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; background: #0284c7; color: #ffffff; text-decoration: none; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 4px; transition: background 0.15s ease;">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                             <span>Ouvrir (JPG)</span>
                           </a>
@@ -1287,18 +1275,21 @@
           cadastreProps && cadastreProps.NO_LOT && parcelProps ? `Lot ${cadastreProps.NO_LOT}` : ""
         ].filter(Boolean).join(" · ");
 
-        const ficheActionsHtml = parcelProps ? `
-            <div class="pf-fiche-actions">
-              <div class="pf-fiche-actions-title">Analyser cette parcelle</div>
-              <div class="pf-fiche-actions-grid">
+        // Onglet « Outils » : toutes les analyses au même endroit. Le NDVI fonctionne sur n'importe quel point ;
+        // les autres outils demandent une parcelle.
+        const ndviToolBtn = `
+                <button type="button" id="btn-tab-ndvi" class="btn-popup-parcel-action btn-popup-action-ndvi" title="Courbe annuelle de l'indice de végétation (NDVI) pour ce point ou cette parcelle : Sentinel-2 à 10 m depuis 2015, Landsat à 30 m depuis 1984">
+                  <span class="pf-act-name">NDVI satellite</span><span class="pf-act-desc">Sentinel-2 ou Landsat</span>
+                </button>`;
+        const toolsTabHtml = `
+            <div class="pf-fiche-actions pf-fiche-tools">
+              <div class="pf-fiche-actions-title">${parcelProps ? "Analyser cette parcelle" : "Analyser ce point"}</div>
+              <div class="pf-fiche-actions-grid">${ndviToolBtn}${parcelProps ? `
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-3d">
                   <span class="pf-act-name">Vue 3D</span><span class="pf-act-desc">Relief découpé, 30×</span>
                 </button>
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-rain" title="Simuler l'écoulement gravitationnel de la pluie sur cette parcelle">
                   <span class="pf-act-name">Simuler la pluie</span><span class="pf-act-desc">Ruissellement</span>
-                </button>
-                <button type="button" class="btn-popup-parcel-action btn-popup-action-erosion" title="Calculer les pertes de sol selon le modèle canadien RUSLE-CAN / RUSLEFAC (AAC-IRDA)">
-                  <span class="pf-act-name">Érosion RUSLE-CAN</span><span class="pf-act-desc">Pertes de sol (t/ha)</span>
                 </button>
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-cutfill" title="Comparer 2 campagnes LiDAR et évaluer les déblais / remblais (m³/ha)">
                   <span class="pf-act-name">Comparer LiDAR</span><span class="pf-act-desc">Déblais / remblais</span>
@@ -1309,14 +1300,18 @@
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-buffer" title="Créer une zone tampon autour ou à l'intérieur de la parcelle">
                   <span class="pf-act-name">Zone tampon</span><span class="pf-act-desc">Autour ou à l'intérieur</span>
                 </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-grid" title="Placer des points d'échantillonnage sur une grille régulière, alignée sur le sens du champ">
+                  <span class="pf-act-name">Grille d'échantillonnage</span><span class="pf-act-desc">1 point par hectare ou par acre</span>
+                </button>
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-save" title="Copier cette parcelle dans Mes données, couche « Mes parcelles »">
                   <span class="pf-act-name">Enregistrer la parcelle</span><span class="pf-act-desc">Dans Mes données</span>
                 </button>
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-tif">
                   <span class="pf-act-name">Exporter le MNT</span><span class="pf-act-desc">GeoTIFF découpé</span>
-                </button>
+                </button>` : ""}
               </div>
-            </div>` : "";
+              ${parcelProps ? "" : `<p class="pf-fiche-tools-note">Les autres analyses (3D, pluie, zones de gestion…) demandent une parcelle : cliquez dans un champ.</p>`}
+            </div>`;
 
         const popupHtml = `
           <div class="pedo-popup pf-fiche">
@@ -1335,9 +1330,9 @@
                 <span>Cultures</span>
                 ${parcelProps ? `<span class="popup-tab-dot" title="Parcelle agricole présente"></span>` : ''}
               </button>
-              <button type="button" class="popup-tab-btn ${activeTab === 'ndvi' ? 'active' : ''}" data-tab="ndvi">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg>
-                <span>NDVI</span>
+              <button type="button" class="popup-tab-btn ${activeTab === 'outils' ? 'active' : ''}" data-tab="outils">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0 5 5L11 20a2.1 2.1 0 0 1-3-3z"></path><path d="M14.7 6.3 18 3"></path></svg>
+                <span>Outils</span>
               </button>
               ${drainagePlans.length > 0 ? `
               <button type="button" class="popup-tab-btn ${activeTab === 'drainage' ? 'active' : ''}" data-tab="drainage">
@@ -1353,15 +1348,14 @@
             <div class="popup-tab-pane ${activeTab === 'cultures' ? 'active' : ''}" data-tab="cultures">
               ${culturesTabHtml}
             </div>
-            <div class="popup-tab-pane ${activeTab === 'ndvi' ? 'active' : ''}" data-tab="ndvi">
-              ${ndviTabHtml}
+            <div class="popup-tab-pane ${activeTab === 'outils' ? 'active' : ''}" data-tab="outils">
+              ${toolsTabHtml}
             </div>
             ${drainagePlans.length > 0 ? `
             <div class="popup-tab-pane ${activeTab === 'drainage' ? 'active' : ''}" data-tab="drainage">
               ${drainageTabHtml}
             </div>` : ''}
             </div>
-            ${ficheActionsHtml}
           </div>
         `;
 
@@ -1449,6 +1443,13 @@
             btnActionBuffer.addEventListener("click", () => {
               popup.remove();
               if (window.pfTampon) window.pfTampon.openForParcel(targetP);
+            });
+          }
+          const btnActionGrid = popupDom.querySelector(".btn-popup-action-grid");
+          if (btnActionGrid) {
+            btnActionGrid.addEventListener("click", () => {
+              popup.remove();
+              if (window.pfGrille) window.pfGrille.openForParcel(targetP);
             });
           }
           const btnActionSave = popupDom.querySelector(".btn-popup-action-save");

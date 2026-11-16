@@ -780,7 +780,7 @@
         </div>
         <div class="pf-group">
           <div class="pf-group-title">Sur une parcelle</div>
-          <p class="pf-hint">Cliquez une parcelle sur la carte : sa fiche s'ouvre à droite avec toutes les analyses (vue 3D, simulation de pluie, érosion RUSLE-CAN, comparaison LiDAR, zones de gestion, zone tampon, enregistrement de la parcelle, export du MNT).</p>
+          <p class="pf-hint">Cliquez une parcelle sur la carte : sa fiche s'ouvre à droite avec toutes les analyses (NDVI, vue 3D, simulation de pluie, comparaison LiDAR, zones de gestion, zone tampon, grille d'échantillonnage, enregistrement de la parcelle, export du MNT).</p>
           <!-- Comparaison LiDAR multidates & Déblais/Remblais (m³/ha) -->
             <details class="topo-sub-accordion pf-tool-card" id="card-cutfill-tool" open>
               <summary class="topo-sub-header">
@@ -1001,7 +1001,7 @@
     <div class="ndvi-dock-body" id="ndvi-dock-body">
       <div id="ndvi-stats-bar" class="profile-stats-bar"></div>
 
-      <div id="ndvi-hover-info" class="profile-hover-info" style="font-size: 10.5px; color: #64748b; font-style: italic; min-height: 15px;">
+      <div id="ndvi-hover-info" class="profile-hover-info">
         Cliquez sur une date du graphique pour afficher la tuile satellite correspondante
       </div>
 
@@ -1324,6 +1324,50 @@
         <div class="pf-zn-modal-actions">
           <button type="button" id="btn-tampon-cancel" class="profile-dock-btn pf-zn-modal-secondary">Annuler</button>
           <button type="button" id="btn-tampon-save" class="pf-zn-run" disabled>Enregistrer dans Mes données</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- Grille d'échantillonnage : densité, disposition, angle, aperçu sur la carte puis enregistrement dans Mes données -->
+  <div id="grille-modal" class="vector-modal-overlay pf-zn pf-zn-modal pf-tp">
+    <div class="vector-modal" role="dialog" aria-modal="false" aria-labelledby="grille-title">
+      <div class="vector-modal-header">
+        <div class="vector-modal-title"><span id="grille-title">Grille d'échantillonnage</span></div>
+        <button type="button" id="btn-grille-close" class="vector-modal-close" aria-label="Fermer">&times;</button>
+      </div>
+      <div class="vector-modal-body">
+        <p class="pf-zn-modal-help">Dans : <strong id="grille-source" data-no-i18n></strong></p>
+        <div class="pf-tp-row">
+          <span>Densité</span>
+          <span>
+            <input type="number" id="grille-density" class="pf-tp-num" min="0.05" max="100" step="0.5" value="1" inputmode="decimal" aria-label="Densité" />
+            <select id="grille-unit" class="pf-tp-select" aria-label="Unité de densité">
+              <option value="ha" selected>point(s) par hectare</option>
+              <option value="acre">point(s) par acre</option>
+            </select>
+          </span>
+        </div>
+        <label class="pf-tp-row" title="Carrée : points alignés en rangs et en colonnes. En quinconce : un rang sur deux est décalé d'un demi-pas, tous les voisins sont à la même distance.">
+          <span>Disposition</span>
+          <select id="grille-layout" class="pf-tp-select">
+            <option value="carree" selected>Carrée</option>
+            <option value="quinconce">En quinconce</option>
+          </select>
+        </label>
+        <div class="pf-tp-row" title="Sens des rangs de la grille : 0° = nord, 90° = est. Par défaut, le sens du champ (son grand côté). Vous pouvez aussi le tracer sur la carte.">
+          <span>Angle</span>
+          <span>
+            <input type="number" id="grille-angle" class="pf-tp-num" min="0" max="180" step="1" inputmode="decimal" aria-label="Angle des rangs en degrés" /> °
+            <button type="button" id="btn-grille-auto" class="profile-dock-btn pf-zn-modal-secondary pf-tp-auto" title="Revenir au sens du champ">Sens du champ</button>
+          </span>
+        </div>
+        <button type="button" id="btn-grille-draw" class="profile-dock-btn pf-zn-modal-secondary pf-tp-draw" title="Cliquez deux points sur la carte, le début puis la fin d'un rang : la grille s'aligne sur cette ligne">Tracer le sens des rangs sur la carte</button>
+        <p id="grille-spacing" class="pf-zn-modal-help"></p>
+        <p id="grille-note" class="pf-tp-note" aria-live="polite"></p>
+        <div class="pf-zn-modal-actions">
+          <button type="button" id="btn-grille-cancel" class="profile-dock-btn pf-zn-modal-secondary">Annuler</button>
+          <button type="button" id="btn-grille-save" class="pf-zn-run" disabled>Enregistrer dans Mes données</button>
         </div>
       </div>
     </div>
@@ -1784,6 +1828,8 @@
     <script src="js/zones.js"></script>
     <script src="clipper.min.js"></script>
     <script src="js/tampon.js"></script>
+    <script src="js/grille.js"></script>
+    <script src="js/plan-viewer.js"></script>
     <script src="js/app.js"></script>
     <script src="js/regions.js"></script>
     <script src="js/split.js"></script>
