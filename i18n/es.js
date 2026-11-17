@@ -1794,5 +1794,7 @@ window.pfI18n.langue("es", {
   "Dose optimale : dans {0} % des cas, l'essai ne permettrait pas de la trouver.": "Dosis óptima: en el {0} % de los casos, el ensayo no permitiría encontrarla.",
   "Dans {0} % des cas, l'essai ne permettrait pas de trouver la dose optimale.": "En el {0} % de los casos, el ensayo no permitiría encontrar la dosis óptima.",
   "• Nuages à moins de 500 m : {0}% (scène : {1}%) • Cliquez pour afficher la tuile satellite sur la carte": "• Nubes a menos de 500 m: {0}% (escena: {1}%) • Haga clic para mostrar la tesela satelital en el mapa",
-  "Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)": "Pasadas eliminadas por estar bajo una nube, una sombra o nieve, o rodeadas de nubes (más del 25 % en un radio de 500 m)"
+  "Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)": "Pasadas eliminadas por estar bajo una nube, una sombra o nieve, o rodeadas de nubes (más del 25 % en un radio de 500 m)",
+  "Parcelles non affichées à ce niveau de zoom (visibles dès le zoom 13)": "Parcelas no mostradas a este nivel de zoom (visibles desde el zoom 13)",
+  "Sols non affichés à ce niveau de zoom (visibles dès le zoom 12)": "Suelos no mostrados a este nivel de zoom (visibles desde el zoom 12)"
 });

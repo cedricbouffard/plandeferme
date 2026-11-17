@@ -204,6 +204,7 @@
         type: "fill",
         source: "pedologie",
         "source-layer": "pedologie_quebec",
+        minzoom: 12, // sols affichés (et cliquables) à partir du zoom 12 seulement
         filter: ["==", ["geometry-type"], "Polygon"],
         paint: {
           "fill-opacity": 0
@@ -216,6 +217,7 @@
         type: "fill",
         source: "pedologie",
         "source-layer": "pedologie_quebec",
+        minzoom: 12, // sols affichés (et cliquables) à partir du zoom 12 seulement
         filter: ["==", ["geometry-type"], "Polygon"],
         layout: { visibility: "none" },
         paint: {
@@ -230,6 +232,7 @@
         type: "line",
         source: "pedologie",
         "source-layer": "pedologie_quebec",
+        minzoom: 12, // sols affichés (et cliquables) à partir du zoom 12 seulement
         layout: { visibility: "none" },
         paint: {
           "line-color": "#1e293b",
@@ -289,7 +292,7 @@
         "source-layer": "BDPPAD_2026",
         // sous ce zoom, on ne clique pas une parcelle : inutile de charger toutes les parcelles du Québec
         // (plus de 200 000 entités à l'échelle de la province) pour une couche invisible
-        minzoom: 9,
+        minzoom: 13,
         paint: {
           "fill-opacity": 0
         }
@@ -320,6 +323,7 @@
         type: "fill",
         source: "parcelles-source",
         "source-layer": "BDPPAD_2026",
+        minzoom: 13, // parcelles affichées à partir du zoom 13 seulement
         layout: { visibility: "none" },
         paint: {
           "fill-color": "#000000",
@@ -333,6 +337,7 @@
         type: "line",
         source: "parcelles-source",
         "source-layer": "BDPPAD_2026",
+        minzoom: 13, // parcelles affichées à partir du zoom 13 seulement
         layout: { visibility: "none" },
         paint: {
           "line-color": "#ffffff",
@@ -352,6 +357,7 @@
         type: "line",
         source: "parcelles-source",
         "source-layer": "BDPPAD_2026",
+        minzoom: 13, // parcelles affichées à partir du zoom 13 seulement
         layout: { visibility: "none" },
         paint: {
           "line-color": "#000000",
@@ -660,18 +666,18 @@
           {
             id: "card-pedo",
             checkboxId: "toggle-pedo",
-            minZoom: 3,
+            minZoom: 12,
             maxZoom: Infinity,
-            badgeText: "z ≥ 3",
-            title: "Sols non affichés à ce niveau de zoom (visibles dès le zoom 3)"
+            badgeText: "z ≥ 12",
+            title: "Sols non affichés à ce niveau de zoom (visibles dès le zoom 12)"
           },
           {
             id: "card-parcelles",
             checkboxId: "toggle-parcelles",
-            minZoom: 3,
+            minZoom: 13,
             maxZoom: Infinity,
-            badgeText: "z ≥ 3",
-            title: "Parcelles non affichées à ce niveau de zoom (visibles dès le zoom 3)"
+            badgeText: "z ≥ 13",
+            title: "Parcelles non affichées à ce niveau de zoom (visibles dès le zoom 13)"
           }
         ];
 

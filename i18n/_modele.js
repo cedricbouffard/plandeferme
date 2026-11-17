@@ -1794,5 +1794,7 @@ window.pfI18n.langue("xx", {
   "Dose optimale : dans {0} % des cas, l'essai ne permettrait pas de la trouver.": "",
   "Dans {0} % des cas, l'essai ne permettrait pas de trouver la dose optimale.": "",
   "• Nuages à moins de 500 m : {0}% (scène : {1}%) • Cliquez pour afficher la tuile satellite sur la carte": "",
-  "Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)": ""
+  "Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)": "",
+  "Parcelles non affichées à ce niveau de zoom (visibles dès le zoom 13)": "",
+  "Sols non affichés à ce niveau de zoom (visibles dès le zoom 12)": ""
 });
