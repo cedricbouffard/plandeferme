@@ -1266,3 +1266,21 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-tp .pf-tp-auto.pf-on { background: var(--pf-accent-soft); border-color: var(--pf-accent); color: var(--pf-accent-strong); }
 .pf-tp .pf-tp-draw { width: 100%; height: 34px; margin-top: -4px; }
 .pf-tp .pf-tp-draw.pf-on { background: #fff7ed; border-color: #ea580c; color: #9a3412; }
+
+/* Essai à la ferme */
+.pf-es.vector-modal-overlay.active .vector-modal { max-width: 380px; }
+.pf-es .vector-modal-body { max-height: calc(100vh - 150px); overflow-y: auto; }
+.pf-es .pf-tp-row { min-height: 32px; }
+.pf-es .pf-es-text { width: 110px; text-align: left; }
+.pf-es .pf-es-unit { width: 64px; text-align: left; }
+.pf-es .pf-es-sm { width: 58px; }
+.pf-es-block { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+.pf-es .pf-es-wide { width: 100%; text-align: left; box-sizing: border-box; }
+.pf-es .pf-es-off { opacity: 0.45; pointer-events: none; }
+.pf-es #btn-essai-shuffle { margin-top: 0; }
+.pf-es-legend { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.pf-es-legend:empty { display: none; }
+.pf-es-leg { display: flex; align-items: center; gap: 8px; }
+.pf-es-leg i { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(15, 23, 42, 0.25); flex: 0 0 auto; }
+.pf-es-leg-n { margin-left: auto; color: var(--pf-muted); font-variant-numeric: tabular-nums; }
+.pf-es .pf-zn-modal-actions { flex-wrap: wrap; }

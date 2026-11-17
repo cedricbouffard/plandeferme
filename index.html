@@ -780,7 +780,7 @@
         </div>
         <div class="pf-group">
           <div class="pf-group-title">Sur une parcelle</div>
-          <p class="pf-hint">Cliquez une parcelle sur la carte : sa fiche s'ouvre à droite avec toutes les analyses (NDVI, vue 3D, simulation de pluie, comparaison LiDAR, zones de gestion, zone tampon, grille d'échantillonnage, enregistrement de la parcelle, export du MNT).</p>
+          <p class="pf-hint">Cliquez une parcelle sur la carte : sa fiche s'ouvre à droite avec toutes les analyses (NDVI, vue 3D, simulation de pluie, comparaison LiDAR, zones de gestion, zone tampon, grille d'échantillonnage, essai à la ferme, enregistrement de la parcelle, export du MNT).</p>
           <!-- Comparaison LiDAR multidates & Déblais/Remblais (m³/ha) -->
             <details class="topo-sub-accordion pf-tool-card" id="card-cutfill-tool" open>
               <summary class="topo-sub-header">
@@ -1329,6 +1329,99 @@
     </div>
   </div>
 
+<!-- Essai à la ferme : traitements, largeurs d'équipement, marges, longueur des parcelles, angle, aperçu puis enregistrement -->
+  <div id="essai-modal" class="vector-modal-overlay pf-zn pf-zn-modal pf-tp pf-es">
+    <div class="vector-modal" role="dialog" aria-modal="false" aria-labelledby="essai-title">
+      <div class="vector-modal-header">
+        <div class="vector-modal-title"><span id="essai-title">Essai à la ferme</span></div>
+        <button type="button" id="btn-essai-close" class="vector-modal-close" aria-label="Fermer">&times;</button>
+      </div>
+      <div class="vector-modal-body">
+        <p class="pf-zn-modal-help">Dans : <strong id="essai-source" data-no-i18n></strong></p>
+        <div class="pf-tp-row" title="Nom de l'intrant mis à l'essai et unité des doses : repris dans les attributs des parcelles d'essai">
+          <span>Intrant</span>
+          <span>
+            <input type="text" id="essai-input" class="pf-tp-num pf-es-text" value="Azote" maxlength="40" aria-label="Intrant" data-no-i18n />
+            <input type="text" id="essai-rate-unit" class="pf-tp-num pf-es-unit" value="kg/ha" maxlength="20" aria-label="Unité des doses" data-no-i18n />
+          </span>
+        </div>
+        <label class="pf-es-block" title="Doses séparées par des virgules (0, 50, 100) ou traitements nommés séparés par des points-virgules (Témoin; Variété A; Variété B)">
+          <span>Traitements</span>
+          <input type="text" id="essai-treatments" class="pf-tp-num pf-es-wide" value="0, 50, 100, 150, 200" aria-label="Traitements" data-no-i18n />
+        </label>
+        <label class="pf-tp-row" title="Carré latin : chaque traitement revient une fois par groupe de parcelles, le long des passages comme en travers. Blocs aléatoires : chaque bloc contient tous les traitements dans un ordre tiré au sort. Aléatoire : tirage complet, équilibré. Bandes : un traitement par bande sur toute la longueur du champ.">
+          <span>Dispositif</span>
+          <select id="essai-design" class="pf-tp-select">
+            <option value="latin" selected>Carré latin</option>
+            <option value="blocs">Blocs aléatoires</option>
+            <option value="aleatoire">Aléatoire</option>
+            <option value="bandes">Bandes</option>
+          </select>
+        </label>
+        <label class="pf-tp-row">
+          <span>Unités</span>
+          <select id="essai-units" class="pf-tp-select">
+            <option value="m" selected>Mètres</option>
+            <option value="pi">Pieds</option>
+          </select>
+        </label>
+        <div class="pf-tp-row" title="Largeur de travail de l'équipement qui applique les traitements (épandeur, pulvérisateur, semoir)">
+          <span>Applicateur</span>
+          <span><input type="number" id="essai-app" class="pf-tp-num" min="1" step="0.5" value="12" inputmode="decimal" aria-label="Largeur de l'applicateur" /> <span class="pf-es-u" data-no-i18n>m</span></span>
+        </div>
+        <div class="pf-tp-row" title="Largeur de coupe de la récolteuse (capteur de rendement). Laissez vide si la récolte ne se fait pas à la batteuse.">
+          <span>Récolteuse</span>
+          <span><input type="number" id="essai-harv" class="pf-tp-num" min="0" step="0.5" value="6" inputmode="decimal" aria-label="Largeur de la récolteuse" /> <span class="pf-es-u" data-no-i18n>m</span></span>
+        </div>
+        <div class="pf-tp-row" title="Largeur d'une parcelle d'essai. Conseillée : le plus petit nombre de passages d'applicateur qui laisse au moins un passage complet de récolteuse dans la parcelle.">
+          <span>Largeur des parcelles</span>
+          <span>
+            <input type="number" id="essai-width" class="pf-tp-num" min="1" step="0.5" inputmode="decimal" aria-label="Largeur des parcelles" /> <span class="pf-es-u" data-no-i18n>m</span>
+            <button type="button" id="btn-essai-auto-width" class="profile-dock-btn pf-zn-modal-secondary pf-tp-auto" title="Revenir à la largeur conseillée">Auto</button>
+          </span>
+        </div>
+        <p id="essai-width-info" class="pf-zn-modal-help"></p>
+        <div class="pf-tp-row" id="essai-len-row" title="Chaque bande est découpée en parcelles dont la longueur reste entre ce minimum et ce maximum">
+          <span>Longueur des parcelles</span>
+          <span>
+            <input type="number" id="essai-min" class="pf-tp-num pf-es-sm" min="5" step="5" value="70" inputmode="decimal" aria-label="Longueur minimale" /> à
+            <input type="number" id="essai-max" class="pf-tp-num pf-es-sm" min="5" step="5" value="90" inputmode="decimal" aria-label="Longueur maximale" /> <span class="pf-es-u" data-no-i18n>m</span>
+          </span>
+        </div>
+        <div class="pf-tp-row" title="Distance laissée hors essai à chaque bout du champ, pour les tournières. Par défaut : deux fois la plus grande largeur d'équipement.">
+          <span>Bouts de champ</span>
+          <span>
+            <input type="number" id="essai-head" class="pf-tp-num" min="0" step="1" inputmode="decimal" aria-label="Bouts de champ" /> <span class="pf-es-u" data-no-i18n>m</span>
+            <button type="button" id="btn-essai-auto-head" class="profile-dock-btn pf-zn-modal-secondary pf-tp-auto" title="Deux fois la plus grande largeur d'équipement">Auto</button>
+          </span>
+        </div>
+        <div class="pf-tp-row" title="Distance laissée hors essai le long des côtés du champ. Par défaut : un passage d'applicateur.">
+          <span>Côtés</span>
+          <span>
+            <input type="number" id="essai-side" class="pf-tp-num" min="0" step="1" inputmode="decimal" aria-label="Côtés du champ" /> <span class="pf-es-u" data-no-i18n>m</span>
+            <button type="button" id="btn-essai-auto-side" class="profile-dock-btn pf-zn-modal-secondary pf-tp-auto" title="Un passage d'applicateur">Auto</button>
+          </span>
+        </div>
+        <div class="pf-tp-row" title="Sens des passages : 0° = nord, 90° = est. Par défaut, le sens du champ (son grand côté). Vous pouvez aussi tracer un passage sur la carte : les bandes s'alignent sur cette ligne.">
+          <span>Angle</span>
+          <span>
+            <input type="number" id="essai-angle" class="pf-tp-num" min="0" max="180" step="1" inputmode="decimal" aria-label="Angle des passages en degrés" /> °
+            <button type="button" id="btn-essai-auto" class="profile-dock-btn pf-zn-modal-secondary pf-tp-auto" title="Revenir au sens du champ">Sens du champ</button>
+          </span>
+        </div>
+        <button type="button" id="btn-essai-draw" class="profile-dock-btn pf-zn-modal-secondary pf-tp-draw" title="Cliquez deux points sur la carte le long d'une limite de passage : les bandes prennent cet angle et sont calées sur cette ligne">Tracer un passage sur la carte</button>
+        <button type="button" id="btn-essai-shuffle" class="profile-dock-btn pf-zn-modal-secondary pf-tp-draw" title="Refaire le tirage au sort des traitements">Nouveau tirage</button>
+        <div id="essai-legend" class="pf-es-legend"></div>
+        <p id="essai-note" class="pf-tp-note" aria-live="polite"></p>
+        <div class="pf-zn-modal-actions">
+          <button type="button" id="btn-essai-cancel" class="profile-dock-btn pf-zn-modal-secondary">Annuler</button>
+          <button type="button" id="btn-essai-export" class="profile-dock-btn pf-zn-modal-secondary" disabled>Exporter GeoJSON</button>
+          <button type="button" id="btn-essai-save" class="pf-zn-run" disabled>Enregistrer dans Mes données</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <!-- Grille d'échantillonnage : densité, disposition, angle, aperçu sur la carte puis enregistrement dans Mes données -->
   <div id="grille-modal" class="vector-modal-overlay pf-zn pf-zn-modal pf-tp">
     <div class="vector-modal" role="dialog" aria-modal="false" aria-labelledby="grille-title">
@@ -1829,6 +1922,7 @@
     <script src="clipper.min.js"></script>
     <script src="js/tampon.js"></script>
     <script src="js/grille.js"></script>
+    <script src="js/essai.js"></script>
     <script src="js/plan-viewer.js"></script>
     <script src="js/app.js"></script>
     <script src="js/regions.js"></script>

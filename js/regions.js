@@ -848,6 +848,7 @@
             <button type="button" class="btn-popup-parcel-action pf-reg-zoom"><span class="pf-act-name">Cadrer</span><span class="pf-act-desc">Zoom sur la parcelle</span></button>
             <button type="button" class="btn-popup-parcel-action pf-reg-copy"><span class="pf-act-name">Ajouter à Mes données</span><span class="pf-act-desc">Copie dans vos couches</span></button>
             <button type="button" class="btn-popup-parcel-action pf-reg-grid" title="Placer des points d'échantillonnage sur une grille régulière, alignée sur le sens du champ"><span class="pf-act-name">Grille d'échantillonnage</span><span class="pf-act-desc">1 point par hectare ou par acre</span></button>
+            <button type="button" class="btn-popup-parcel-action pf-reg-trial" title="Planifier un essai à la ferme : parcelles d'essai alignées sur les passages, selon les largeurs d'équipement et les traitements"><span class="pf-act-name">Essai à la ferme</span><span class="pf-act-desc">Parcelles et traitements</span></button>
             <button type="button" class="btn-popup-parcel-action pf-reg-buffer" title="Créer une zone tampon autour ou à l'intérieur de la parcelle"><span class="pf-act-name">Zone tampon</span><span class="pf-act-desc">Autour ou à l'intérieur</span></button>
           </div>
         </div>
@@ -862,6 +863,10 @@
       slot.querySelector(".pf-reg-grid").addEventListener("click", () => {
         popup.remove();
         if (window.pfGrille) window.pfGrille.open({ features: [{ type: "Feature", properties: {}, geometry: parcel.geometry }], name: parcel.title });
+      });
+      slot.querySelector(".pf-reg-trial").addEventListener("click", () => {
+        popup.remove();
+        if (window.pfEssai) window.pfEssai.open({ features: [{ type: "Feature", properties: {}, geometry: parcel.geometry }], name: parcel.title });
       });
       slot.querySelector(".pf-reg-buffer").addEventListener("click", () => {
         popup.remove();

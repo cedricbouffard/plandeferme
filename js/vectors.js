@@ -1869,6 +1869,7 @@
             <button type="button" id="btn-popup-edit-attr" class="vector-tool-btn primary" style="font-size: 10.5px;">Éditer attributs</button>
             <button type="button" id="btn-popup-buffer-feat" class="vector-tool-btn" style="font-size: 10.5px;" title="Créer une zone tampon autour de cette entité">Zone tampon</button>
             ${isPolyFeat ? `<button type="button" id="btn-popup-grid-feat" class="vector-tool-btn" style="font-size: 10.5px;" title="Placer des points d'échantillonnage sur une grille régulière dans ce polygone">Grille</button>` : ""}
+            ${isPolyFeat ? `<button type="button" id="btn-popup-trial-feat" class="vector-tool-btn" style="font-size: 10.5px;" title="Planifier un essai à la ferme dans ce polygone">Essai</button>` : ""}
             <button type="button" id="btn-popup-del-feat" class="vector-tool-btn danger" style="font-size: 10.5px;">Supprimer</button>
           </div>
           ${isPolyFeat && window.pfDem && window.pfDem.hasRelief(feat.geometry) ? `<div class="pf-vec-lidar">${window.pfDem.actionsHtml("Analyses LiDAR")}</div>` : ""}
@@ -1898,6 +1899,14 @@
             const target = { type: "Feature", geometry: feat.geometry, properties: {} };
             this.clearFeatureSelection();
             if (window.pfGrille) window.pfGrille.open({ features: [target], name: featName });
+          });
+        }
+        const btnTrial = document.getElementById("btn-popup-trial-feat");
+        if (btnTrial) {
+          btnTrial.addEventListener("click", () => {
+            const target = { type: "Feature", geometry: feat.geometry, properties: {} };
+            this.clearFeatureSelection();
+            if (window.pfEssai) window.pfEssai.open({ features: [target], name: featName });
           });
         }
         const btnBuffer = document.getElementById("btn-popup-buffer-feat");
