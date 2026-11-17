@@ -1796,5 +1796,10 @@ window.pfI18n.langue("en", {
   "• Nuages à moins de 500 m : {0}% (scène : {1}%) • Cliquez pour afficher la tuile satellite sur la carte": "• Clouds within 500 m: {0}% (scene: {1}%) • Click to show the satellite tile on the map",
   "Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)": "Passes removed because under cloud, shadow or snow, or surrounded by clouds (more than 25 % within 500 m)",
   "Parcelles non affichées à ce niveau de zoom (visibles dès le zoom 13)": "Fields not shown at this zoom level (visible from zoom 13)",
-  "Sols non affichés à ce niveau de zoom (visibles dès le zoom 12)": "Soils not shown at this zoom level (visible from zoom 12)"
+  "Sols non affichés à ce niveau de zoom (visibles dès le zoom 12)": "Soils not shown at this zoom level (visible from zoom 12)",
+  "Exporter Shapefile": "Export Shapefile",
+  "Télécharger les zones en Shapefile (fichier .zip)": "Download the zones as a Shapefile (.zip file)",
+  "Télécharger l'essai en Shapefile (fichier .zip)": "Download the trial as a Shapefile (.zip file)",
+  "Export Shapefile impossible.": "Could not export the Shapefile.",
+  "Export Shapefile indisponible.": "Shapefile export unavailable."
 });

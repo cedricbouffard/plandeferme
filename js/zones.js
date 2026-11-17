@@ -747,6 +747,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       on("btn-zones-run", "click", () => this.run());
       on("btn-zones-save", "click", () => this.saveToLibrary());
       on("btn-zones-export", "click", () => this.exportGeoJson());
+      on("btn-zones-export-shp", "click", () => this.exportShapefile());
       on("zones-opacity-slider", "input", (e) => {
         const v = parseInt(e.target.value, 10);
         this.opacity = v / 100;
@@ -985,7 +986,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
 
     showResults(on) {
       const el = $("zones-results"); if (el) el.style.display = on ? "" : "none";
-      ["btn-zones-save", "btn-zones-export"].forEach((id) => { const b = $(id); if (b) b.disabled = !on; });
+      ["btn-zones-save", "btn-zones-export", "btn-zones-export-shp"].forEach((id) => { const b = $(id); if (b) b.disabled = !on; });
       const save = $("btn-zones-save"); if (save) save.textContent = "Enregistrer dans Mes données";
     }
 
@@ -1289,6 +1290,15 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       if (typeof vm.saveLayers === "function") vm.saveLayers();
       if (typeof vm.renderLayersList === "function") vm.renderLayersList();
       if (typeof vm.showToast === "function") vm.showToast(`Zones enregistrées dans Mes données › Zones de gestion › ${name}`);
+    }
+
+    async exportShapefile() {
+      const fc = this.collection(); if (!fc) return;
+      const p = (this.currentParcel && this.currentParcel.properties) || {};
+      const idp = String(p.IDPAR || p.idpar || p.NO_LOT || "parcelle").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const S = window.PfShapefile;
+      const ok = S && typeof S.download === "function" ? await S.download(fc, `zones_gestion_${idp}_${fc.features.length}zones`) : false;
+      if (!ok) this.setAlert("Export Shapefile impossible.");
     }
 
     exportGeoJson() {

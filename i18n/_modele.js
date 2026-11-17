@@ -1796,5 +1796,10 @@ window.pfI18n.langue("xx", {
   "• Nuages à moins de 500 m : {0}% (scène : {1}%) • Cliquez pour afficher la tuile satellite sur la carte": "",
   "Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)": "",
   "Parcelles non affichées à ce niveau de zoom (visibles dès le zoom 13)": "",
-  "Sols non affichés à ce niveau de zoom (visibles dès le zoom 12)": ""
+  "Sols non affichés à ce niveau de zoom (visibles dès le zoom 12)": "",
+  "Exporter Shapefile": "",
+  "Télécharger les zones en Shapefile (fichier .zip)": "",
+  "Télécharger l'essai en Shapefile (fichier .zip)": "",
+  "Export Shapefile impossible.": "",
+  "Export Shapefile indisponible.": ""
 });

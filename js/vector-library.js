@@ -1317,6 +1317,17 @@
   }
   // Exposé pour les tests et pour d'autres modules
   window.PfShapefile = { writeShp, writeDbf, explodeFeatures, addLayerShapefiles };
+  // Téléchargement d'une collection GeoJSON (WGS84) en Shapefile zippé (.shp, .shx, .dbf, .prj, .cpg).
+  // Une collection qui mêle points, lignes et polygones donne un fichier par type de géométrie.
+  window.PfShapefile.download = async function (fc, name) {
+    if (!window.JSZip || !fc || !Array.isArray(fc.features) || !fc.features.length) return false;
+    const zip = new window.JSZip();
+    const files = addLayerShapefiles(zip, { name: name || "export", data: fc }, "", new Set());
+    if (!files) return false;
+    const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    downloadBlobFile(blob, `${safeFileName(name || "export")}_shp.zip`);
+    return true;
+  };
 
   P.exportShapefileZip = async function (layers, zipName, relativeTo) {
     if (!window.JSZip) { this.showToast("Module ZIP indisponible.", true); return; }

@@ -565,10 +565,11 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
   }
 
   function compute() {
-    const save = $("btn-essai-save"), exp = $("btn-essai-export"), o = readOptions(), p4 = getP4(), G = grille();
+    const save = $("btn-essai-save"), exp = $("btn-essai-export"), expShp = $("btn-essai-export-shp"), o = readOptions(), p4 = getP4(), G = grille();
     state.result = null;
     if (save) save.disabled = true;
     if (exp) exp.disabled = true;
+    if (expShp) expShp.disabled = true;
     const baseEl = $("essai-base"); if (baseEl) baseEl.disabled = !o.rest;
     const lenRow = $("essai-len-row"); if (lenRow) lenRow.classList.toggle("pf-es-off", o.design === "bandes");
     if (!p4 || !G) { setNote("Module de projection indisponible.", true); return; }
@@ -598,6 +599,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     setNote(`${nPlots} parcelles d'essai sur ${r.strips} bande(s) · ${fr(r.trialHa, 1)} ha en essai (${fr((100 * r.trialHa) / r.areaHa, 0)} % du champ) · au moins ${reps} répétition(s) par traitement`, reps < 2);
     if (save) save.disabled = false;
     if (exp) exp.disabled = false;
+    if (expShp) expShp.disabled = false;
   }
   function fillCrops() {
     const sel = $("essai-crop"); if (!sel || sel.options.length > 1) return;
@@ -711,6 +713,14 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
+  async function exportShapefile() {
+    if (!state.result || !state.result.features.length) return;
+    const S = window.PfShapefile;
+    if (!S || typeof S.download !== "function") { setNote("Export Shapefile indisponible.", true); return; }
+    const n = state.result.features.length - (state.result.rest ? 1 : 0);
+    const ok = await S.download(collection(), `essai_${state.name.replace(/[^\w\-]+/g, "_").slice(0, 40)}_${n}parcelles`);
+    if (!ok) setNote("Export Shapefile impossible.", true);
+  }
   // changement d'unité (mètres <-> pieds) : les valeurs saisies sont converties
   function switchUnit() {
     const next = ($("essai-units") || {}).value === "pi" ? "pi" : "m";
@@ -729,6 +739,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     on("btn-essai-cancel", "click", close);
     on("btn-essai-save", "click", save);
     on("btn-essai-export", "click", exportGeoJson);
+    on("btn-essai-export-shp", "click", exportShapefile);
     on("btn-essai-auto", "click", () => { stopLine(); state.autoAngle = true; state.line = null; compute(); });
     on("btn-essai-draw", "click", startLine);
     on("btn-essai-shuffle", "click", () => { state.seed = (Math.floor(Math.random() * 1e9) + 1) >>> 0; compute(); });
