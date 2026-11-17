@@ -1402,6 +1402,10 @@
             <button type="button" id="btn-essai-auto-side" class="profile-dock-btn pf-zn-modal-secondary pf-tp-auto" title="Un passage d'applicateur">Auto</button>
           </span>
         </div>
+        <div class="pf-tp-row" title="Ajoute le reste du champ (bouts, côtés, pointes) comme une entité de plus, avec la dose de base à y appliquer : la couche couvre alors tout le champ, comme une carte de prescription.">
+          <label class="pf-es-check"><input type="checkbox" id="essai-rest" /> Reste du champ</label>
+          <span><input type="text" id="essai-base" class="pf-tp-num pf-es-unit" placeholder="Dose de base" aria-label="Dose de base" disabled data-no-i18n /></span>
+        </div>
         <div class="pf-tp-row" title="Sens des passages : 0° = nord, 90° = est. Par défaut, le sens du champ (son grand côté). Vous pouvez aussi tracer un passage sur la carte : les bandes s'alignent sur cette ligne.">
           <span>Angle</span>
           <span>
@@ -1411,6 +1415,26 @@
         </div>
         <button type="button" id="btn-essai-draw" class="profile-dock-btn pf-zn-modal-secondary pf-tp-draw" title="Cliquez deux points sur la carte le long d'une limite de passage : les bandes prennent cet angle et sont calées sur cette ligne">Tracer un passage sur la carte</button>
         <button type="button" id="btn-essai-shuffle" class="profile-dock-btn pf-zn-modal-secondary pf-tp-draw" title="Refaire le tirage au sort des traitements">Nouveau tirage</button>
+        <details class="pf-es-power" open>
+          <summary>Puissance statistique</summary>
+          <label class="pf-tp-row" title="La culture remplit le rendement espéré (médiane des rendements de référence 2024 de La Financière agricole du Québec) et une variabilité de départ. Les deux valeurs se modifient.">
+            <span>Culture</span>
+            <select id="essai-crop" class="pf-tp-select"><option value="" selected>Choisir…</option></select>
+          </label>
+          <div class="pf-tp-row" title="Rendement moyen attendu dans ce champ, en kg/ha. Sert à convertir les différences en kg/ha.">
+            <span>Rendement espéré</span>
+            <span><input type="number" id="essai-yield" class="pf-tp-num pf-es-md" min="0" step="100" inputmode="decimal" aria-label="Rendement espéré" /> kg/ha</span>
+          </div>
+          <div class="pf-tp-row" title="Coefficient de variation du rendement entre des parcelles d'essai qui reçoivent le même traitement dans ce champ. C'est l'hypothèse qui pèse le plus : 5 à 8 % dans un champ uniforme, 12 à 20 % dans un champ variable. Si vous avez des cartes de rendement, utilisez-les.">
+            <span>Variabilité entre parcelles</span>
+            <span><input type="number" id="essai-cv" class="pf-tp-num" min="1" max="60" step="1" inputmode="decimal" aria-label="Variabilité entre parcelles" /> %</span>
+          </div>
+          <label class="pf-tp-row" title="Unilatéral : on sait d'avance dans quel sens le traitement doit agir (plus de rendement, par exemple), ce qui rend l'essai plus sensible. Bilatéral : l'effet peut aller dans un sens ou dans l'autre. Seuil de 5 % dans les deux cas.">
+            <span>Test</span>
+            <select id="essai-sides" class="pf-tp-select"><option value="1" selected>Unilatéral</option><option value="2">Bilatéral</option></select>
+          </label>
+          <p id="essai-power" class="pf-tp-note" aria-live="polite"></p>
+        </details>
         <div id="essai-legend" class="pf-es-legend"></div>
         <p id="essai-note" class="pf-tp-note" aria-live="polite"></p>
         <div class="pf-zn-modal-actions">

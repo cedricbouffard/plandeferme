@@ -153,12 +153,52 @@ const pfEssaiGeom = {
     const plots = serp.map((c) => ({ ring: [toXY(c.a0, c.b0), toXY(c.a1, c.b0), toXY(c.a1, c.b1), toXY(c.a0, c.b1), toXY(c.a0, c.b0)], strip: c.strip + 1, pos: c.pos + 1, block: c.block, t: c.t, w, len: c.len }));
     return { plots, strips: si };
   },
+  // ---- puissance statistique (calcul direct) ------------------------------------------------------------
+  // Rendements : médianes des rendements de référence 2024 de La Financière agricole du Québec (kg/ha).
+  // cv : variabilité habituelle entre parcelles d'essai d'un même champ (%), valeur de départ approximative.
+  CROPS: [
+    { id: "mais-grain", name: "Maïs-grain", yield: 10400, cv: 8 }, { id: "soya", name: "Soya", yield: 3400, cv: 8 },
+    { id: "ble", name: "Blé", yield: 2900, cv: 10 }, { id: "orge", name: "Orge", yield: 2800, cv: 10 }, { id: "avoine", name: "Avoine", yield: 2500, cv: 10 },
+    { id: "seigle", name: "Seigle", yield: 3100, cv: 10 }, { id: "canola", name: "Canola", yield: 2200, cv: 12 },
+    { id: "pois", name: "Pois secs", yield: 1800, cv: 12 }, { id: "haricots", name: "Haricots secs", yield: 1700, cv: 12 }, { id: "sarrasin", name: "Sarrasin", yield: 1200, cv: 12 },
+    { id: "mais-fourrager", name: "Maïs fourrager", yield: 15900, cv: 10 }, { id: "foin", name: "Foin", yield: 5000, cv: 15 },
+    { id: "pdt", name: "Pommes de terre", yield: 37700, cv: 12 }
+  ],
+  normCdf(x) { const t = 1 / (1 + 0.2316419 * Math.abs(x)), d = 0.3989422804014327 * Math.exp((-x * x) / 2); const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429)))); return x >= 0 ? 1 - p : p; },
+  // quantile de Student à partir du quantile normal z (développement de Cornish-Fisher)
+  tFromZ(z, df) { return z + (z * z * z + z) / (4 * df) + (5 * Math.pow(z, 5) + 16 * z * z * z + 3 * z) / (96 * df * df); },
+  /*
+    Comparaison de chaque traitement au premier (référence), test à 5 % unilatéral (sens de l'effet connu d'avance)
+    ou bilatéral (o.sides = 2), analyse de variance classique.
+    o : { counts: répétitions par traitement, design, blocks, cv (%), yield (kg/ha, facultatif), effects: [valeurs],
+          effectUnit: "pct" | "kg" } -> { df, mddPct, mddKg, rows: [{ effectPct, power, mddPct }] }
+  */
+  power(o) {
+    const counts = o.counts || [], t = counts.length, N = counts.reduce((a, b) => a + b, 0), cv = o.cv;
+    if (t < 2 || !(cv > 0) || counts.some((c) => c < 1)) return null;
+    let df = N - t;
+    if (o.design === "latin") df -= 2 * (t - 1); else if ((o.design === "blocs" || o.design === "bandes") && o.blocks > 1) df -= o.blocks - 1;
+    if (df < 1) return { df: 0, rows: [], tooFew: true };
+    const two = o.sides === 2, ta = this.tFromZ(two ? 1.959964 : 1.644854, df), tb = this.tFromZ(0.841621, df), y = o.yield > 0 ? o.yield : NaN;
+    const se = (i) => cv * Math.sqrt(1 / counts[0] + 1 / counts[i]); // erreur type de la différence, en % du rendement
+    const eff = (o.effects || []).filter(Number.isFinite), toPct = (v) => (o.effectUnit === "kg" ? (y > 0 ? (100 * v) / y : NaN) : v);
+    const rows = counts.map((c, i) => {
+      if (i === 0) return { ref: true };
+      // une valeur par traitement comparé ; une seule valeur vaut pour tous
+      const raw = eff.length === 1 ? eff[0] : eff.length >= t ? eff[i] : eff.length === t - 1 ? eff[i - 1] : NaN, e = toPct(raw), s = se(i);
+      const pw = Number.isFinite(e) ? this.normCdf(Math.abs(e) / s - ta) + (two ? this.normCdf(-Math.abs(e) / s - ta) : 0) : NaN;
+      return { effectPct: e, power: pw, mddPct: (ta + tb) * s };
+    });
+    const worst = Math.max(...rows.filter((r) => !r.ref).map((r) => r.mddPct));
+    return { df, rows, mddPct: worst, mddKg: y > 0 ? (worst * y) / 100 : NaN };
+  },
   ringArea(r) { let a = 0; for (let i = 0, n = r.length, j = n - 1; i < n; j = i++) a += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return a / 2; },
   multiArea(mp) { let a = 0; for (const p of mp) { a += Math.abs(this.ringArea(p[0])); for (let i = 1; i < p.length; i++) a -= Math.abs(this.ringArea(p[i])); } return a; },
   /*
     Entités polygonales GeoJSON (WGS84) -> dispositif. grille : pfGrilleGeom (projection, sens du champ).
     opts : { treatments (texte), input, unit, design, appWidth, harvWidth, plotWidth (NaN = conseillée), head, side,
-             minLen, maxLen, azimuth (NaN = sens du champ), seed, line: [[lng, lat], [lng, lat]] | null }
+             minLen, maxLen, azimuth (NaN = sens du champ), seed, line: [[lng, lat], [lng, lat]] | null,
+             rest (ajouter le reste du champ comme entité), baseRate (dose de base du reste) }
   */
   design(p4, grille, features, opts, tools) {
     const polysLL = [];
@@ -188,6 +228,22 @@ const pfEssaiGeom = {
       return { type: "Feature", properties: props, geometry: { type: "Polygon", coordinates: [p.ring.map((c) => { const g = inv.forward(c); return [r1(g[0], 7), r1(g[1], 7)]; })] } };
     });
     base.summary = sum; base.strips = res.strips || 0;
+    // reste du champ (bouts, côtés, pointes) : une seule entité, à la dose de base
+    if (opts.rest && base.features.length && tools && typeof tools.rest === "function") {
+      let rest = [];
+      try { rest = tools.rest(mp, res.plots.map((p) => [p.ring])) || []; } catch (e) { rest = []; }
+      const ha = this.multiArea(rest) / 10000;
+      if (rest.length && ha > 0.0005) {
+        const b = String(opts.baseRate || "").trim().replace(",", "."), isNum = /^-?\d+(\.\d+)?$/.test(b), lab = b ? String(opts.baseRate).trim() : "Hors essai";
+        const props = { no: 0, nom: "Reste du champ", traitement: lab, hors_essai: 1 };
+        if (tr.numeric && isNum) props.dose = parseFloat(b);
+        if (opts.input) props.intrant = opts.input;
+        if (opts.unit) props.unite = opts.unit;
+        Object.assign(props, { superficie_ha: r1(ha, 3), couleur: "#9ca3af" });
+        base.features.push({ type: "Feature", properties: props, geometry: { type: "MultiPolygon", coordinates: rest.map((poly) => poly.map((ring) => ring.map((c) => { const g = inv.forward(c); return [r1(g[0], 7), r1(g[1], 7)]; }))) } });
+        base.rest = { label: lab, color: "#9ca3af", ha };
+      }
+    }
     return base;
   }
 };
@@ -210,6 +266,12 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       const T = window.pfTampon && window.pfTampon.geom, C = window.ClipperLib;
       if (!T || !C || typeof T.bufferMetric !== "function") throw new Error("tampon indisponible");
       return T.bufferMetric(C, { type: "MultiPolygon", coordinates: mp }, d, { side: "in" });
+    },
+    // champ moins les parcelles d'essai
+    rest(mp, plots) {
+      const T = window.pfTampon && window.pfTampon.geom, C = window.ClipperLib;
+      if (!T || !C) throw new Error("tampon indisponible");
+      return T.fromTree(C, T.clip(C, C.ClipType.ctDifference, T.parts(C, { type: "MultiPolygon", coordinates: mp }).rings, T.parts(C, { type: "MultiPolygon", coordinates: plots }).rings));
     }
   };
 
@@ -225,7 +287,8 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       plotWidth: state.autoWidth ? NaN : m("essai-width"),
       head: state.autoHead ? 2 * Math.max(app || 0, harv || 0) : m("essai-head") || 0,
       side: state.autoSide ? app || 0 : m("essai-side") || 0,
-      minLen: m("essai-min"), maxLen: m("essai-max"), azimuth: state.autoAngle || !Number.isFinite(angle) ? NaN : angle, seed: state.seed, line: state.line
+      minLen: m("essai-min"), maxLen: m("essai-max"), azimuth: state.autoAngle || !Number.isFinite(angle) ? NaN : angle, seed: state.seed, line: state.line,
+      rest: !!($("essai-rest") || {}).checked, baseRate: String(($("essai-base") || {}).value || "").trim().slice(0, 30)
     };
   }
   function setNote(text, warn) { const el = $("essai-note"); if (!el) return; el.textContent = text || ""; el.classList.toggle("pf-tp-warn", !!warn); }
@@ -246,14 +309,34 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         paint: { "text-color": "#17211b", "text-halo-color": "#ffffff", "text-halo-width": 1.6 } });
     } catch (e) { /* style sans glyphes : pas d'étiquettes */ }
   }
-  function renderLegend(r) {
+  // puissance : rendement et variabilité de la culture -> plus petite différence détectable
+  function powerOf(r) {
+    if (!r || !r.summary || !r.summary.length) return null;
+    const y = num("essai-yield"), cv = num("essai-cv");
+    if (!(cv > 0)) return null;
+    const o = readOptions(), blocks = o.design === "bandes" ? Math.ceil((r.strips || 0) / r.summary.length) : o.design === "blocs" ? Math.ceil((r.features.length - (r.rest ? 1 : 0)) / r.summary.length) : 0;
+    // en bandes, la répétition est la bande entière
+    return pfEssaiGeom.power({ counts: r.summary.map((s) => s.count), design: o.design, blocks, cv, yield: y, sides: ($("essai-sides") || {}).value === "2" ? 2 : 1 });
+  }
+  function renderPower(r, pw) {
+    const el = $("essai-power"); if (!el) return;
+    el.classList.remove("pf-tp-warn");
+    if (!r || !r.features.length) { el.textContent = ""; return; }
+    if (!pw) { el.textContent = "Choisissez une culture ou entrez la variabilité pour estimer ce que l'essai peut détecter."; return; }
+    if (pw.tooFew) { el.textContent = "Trop peu de répétitions pour estimer la puissance."; el.classList.add("pf-tp-warn"); return; }
+    const kg = Number.isFinite(pw.mddKg) ? ` (${fr(pw.mddKg, 0)} kg/ha)` : "";
+    el.textContent = `Plus petite différence détectable 8 fois sur 10 : ${fr(pw.mddPct, 1)} % du rendement${kg}`;
+  }
+  function renderLegend(r, pw) {
     const el = $("essai-legend"); if (!el) return;
     el.innerHTML = "";
-    (r && r.summary ? r.summary : []).forEach((s) => {
+    const rows = r && r.summary ? r.summary.slice() : [];
+    if (r && r.rest) rows.push({ label: r.rest.label, color: r.rest.color, ha: r.rest.ha, rest: true });
+    rows.forEach((s) => {
       const row = document.createElement("div"); row.className = "pf-es-leg";
       const sw = document.createElement("i"); sw.style.background = s.color;
       const name = document.createElement("span"); name.setAttribute("data-no-i18n", ""); name.textContent = s.label;
-      const val = document.createElement("span"); val.className = "pf-es-leg-n"; val.textContent = `${s.count} × · ${fr(s.ha, 2)} ha`;
+      const val = document.createElement("span"); val.className = "pf-es-leg-n"; val.textContent = s.rest ? `reste du champ · ${fr(s.ha, 2)} ha` : `${s.count} × · ${fr(s.ha, 2)} ha`;
       row.append(sw, name, val); el.appendChild(row);
     });
   }
@@ -263,32 +346,44 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     state.result = null;
     if (save) save.disabled = true;
     if (exp) exp.disabled = true;
+    const baseEl = $("essai-base"); if (baseEl) baseEl.disabled = !o.rest;
     const lenRow = $("essai-len-row"); if (lenRow) lenRow.classList.toggle("pf-es-off", o.design === "bandes");
     if (!p4 || !G) { setNote("Module de projection indisponible.", true); return; }
     // champs en mode automatique : valeurs déduites des largeurs d'équipement
     if (state.autoHead) setVal("essai-head", o.head);
     if (state.autoSide) setVal("essai-side", o.side);
     ["width", "head", "side"].forEach((n) => { const b = $("btn-essai-auto-" + n); if (b) b.classList.toggle("pf-on", state["auto" + n[0].toUpperCase() + n.slice(1)]); });
-    if (!(o.appWidth > 0)) { clearPreview(); renderLegend(null); setNote("Entrez la largeur de l'applicateur.", true); return; }
-    if (!(o.minLen > 0) || !(o.maxLen >= o.minLen)) { clearPreview(); renderLegend(null); setNote("La longueur maximale doit être au moins égale à la longueur minimale.", true); return; }
+    if (!(o.appWidth > 0)) { clearPreview(); renderLegend(null); renderPower(null); setNote("Entrez la largeur de l'applicateur.", true); return; }
+    if (!(o.minLen > 0) || !(o.maxLen >= o.minLen)) { clearPreview(); renderLegend(null); renderPower(null); setNote("La longueur maximale doit être au moins égale à la longueur minimale.", true); return; }
     let r = null;
     try { r = pfEssaiGeom.design(p4, G, state.features, o, tools); } catch (e) { console.error("Essai à la ferme :", e); }
-    if (!r) { clearPreview(); renderLegend(null); setNote("Calcul impossible pour cette géométrie.", true); return; }
+    if (!r) { clearPreview(); renderLegend(null); renderPower(null); setNote("Calcul impossible pour cette géométrie.", true); return; }
     if (state.autoWidth) setVal("essai-width", r.plotWidth);
     const angle = $("essai-angle"), auto = $("btn-essai-auto");
     if (state.autoAngle && angle) angle.value = r.azimuth;
     if (auto) auto.classList.toggle("pf-on", state.autoAngle);
     const wi = $("essai-width-info");
     if (wi) { const passes = r.plotWidth / o.appWidth, hp = o.harvWidth > 0 ? r.plotWidth / o.harvWidth : NaN; wi.textContent = `Parcelles de ${fr(r.plotWidth, 1)} m : ${fr(passes, passes % 1 ? 1 : 0)} passage(s) d'applicateur` + (Number.isFinite(hp) ? `, ${fr(hp, hp % 1 ? 1 : 0)} de récolteuse` : ""); }
-    if (r.treatments.length < 2) { clearPreview(); renderLegend(null); setNote("Entrez au moins deux traitements, séparés par des virgules.", true); return; }
-    if (r.tooMany) { clearPreview(); renderLegend(null); setNote("Trop de parcelles : augmentez la largeur ou la longueur des parcelles.", true); return; }
-    if (!r.features.length) { clearPreview(); renderLegend(null); setNote("Aucune parcelle d'essai ne tient dans le champ avec ces dimensions.", true); return; }
+    if (r.treatments.length < 2) { clearPreview(); renderLegend(null); renderPower(null); setNote("Entrez au moins deux traitements, séparés par des virgules.", true); return; }
+    if (r.tooMany) { clearPreview(); renderLegend(null); renderPower(null); setNote("Trop de parcelles : augmentez la largeur ou la longueur des parcelles.", true); return; }
+    if (!r.features.length) { clearPreview(); renderLegend(null); renderPower(null); setNote("Aucune parcelle d'essai ne tient dans le champ avec ces dimensions.", true); return; }
     state.result = r;
-    showPreview(r.features); renderLegend(r);
+    const pw = powerOf(r);
+    showPreview(r.features); renderLegend(r, pw); renderPower(r, pw);
     const reps = Math.min(...r.summary.map((s) => s.count));
-    setNote(`${r.features.length} parcelles d'essai sur ${r.strips} bande(s) · ${fr(r.trialHa, 1)} ha en essai (${fr((100 * r.trialHa) / r.areaHa, 0)} % du champ) · au moins ${reps} répétition(s) par traitement`, reps < 2);
+    const nPlots = r.features.length - (r.rest ? 1 : 0);
+    setNote(`${nPlots} parcelles d'essai sur ${r.strips} bande(s) · ${fr(r.trialHa, 1)} ha en essai (${fr((100 * r.trialHa) / r.areaHa, 0)} % du champ) · au moins ${reps} répétition(s) par traitement`, reps < 2);
     if (save) save.disabled = false;
     if (exp) exp.disabled = false;
+  }
+  function fillCrops() {
+    const sel = $("essai-crop"); if (!sel || sel.options.length > 1) return;
+    pfEssaiGeom.CROPS.forEach((c) => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
+    const other = document.createElement("option"); other.value = "autre"; other.textContent = "Autre"; sel.appendChild(other);
+  }
+  function pickCrop() {
+    const id = ($("essai-crop") || {}).value, c = pfEssaiGeom.CROPS.find((x) => x.id === id), y = $("essai-yield"), cv = $("essai-cv");
+    if (c) { if (y) y.value = c.yield; if (cv) cv.value = c.cv; } else if (id === "autre") { if (y) y.value = ""; if (cv && !cv.value) cv.value = 10; }
   }
   function schedule() { clearTimeout(state.timer); state.timer = setTimeout(compute, 180); }
 
@@ -376,20 +471,20 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     const folderId = typeof v.ensureFolderPath === "function" ? v.ensureFolderPath(["Essais"], null) : null;
     const folder = folderId && typeof v.getFolder === "function" ? v.getFolder(folderId) : null;
     if (folder) folder.collapsed = false;
-    const fc = collection(), name = label(), fields = Object.keys(fc.features[0].properties).map((n) => ({ name: n, label: n }));
+    const fc = collection(), name = label(), fields = [...new Set(fc.features.flatMap((f) => Object.keys(f.properties)))].map((n) => ({ name: n, label: n }));
     const layer = v.createLayerFromCollection(fc, name, folderId, { geometryType: "Polygon", visible: true, fields,
       style: { fillColor: "#4477AA", fillOpacity: 0.7, strokeColor: "#ffffff", strokeWidth: 1.2, strokeStyle: "solid", markerShape: "circle", markerSize: 8, labelProperty: "traitement", colorProperty: "couleur" } });
     if (!layer) { setNote("Enregistrement impossible.", true); return; }
     if (typeof v.markDirty === "function") v.markDirty(layer);
     if (typeof v.renderLayersList === "function") v.renderLayersList();
-    const count = r.features.length;
+    const count = r.features.length - (r.rest ? 1 : 0);
     close();
     toast(`Essai de ${count} parcelles enregistré dans Mes données › Essais › ${name}`);
   }
   function exportGeoJson() {
     if (!state.result || !state.result.features.length) return;
     const blob = new Blob([JSON.stringify(collection())], { type: "application/geo+json" }), url = URL.createObjectURL(blob), a = document.createElement("a");
-    a.href = url; a.download = `essai_${state.name.replace(/[^\w\-]+/g, "_").slice(0, 40)}_${state.result.features.length}parcelles.geojson`;
+    a.href = url; a.download = `essai_${state.name.replace(/[^\w\-]+/g, "_").slice(0, 40)}_${state.result.features.length - (state.result.rest ? 1 : 0)}parcelles.geojson`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
@@ -422,6 +517,8 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     on("btn-essai-auto-head", "click", () => { state.autoHead = true; compute(); });
     on("btn-essai-auto-side", "click", () => { state.autoSide = true; compute(); });
     on("essai-units", "change", switchUnit);
+    fillCrops();
+    on("essai-crop", "change", pickCrop);
     modal.addEventListener("input", schedule);
     modal.addEventListener("change", schedule);
     modal.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); if (draw.on) { stopLine(); compute(); } else close(); } });
