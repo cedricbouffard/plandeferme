@@ -1792,5 +1792,7 @@ window.pfI18n.langue("xx", {
   "Écart entre deux traitements : l'essai le détecte 8 fois sur 10 s'il atteint {0} % du rendement.": "",
   "Dose optimale : si la vraie valeur est {0}, l'essai l'estimerait entre {1} et {2}, 8 fois sur 10.": "",
   "Dose optimale : dans {0} % des cas, l'essai ne permettrait pas de la trouver.": "",
-  "Dans {0} % des cas, l'essai ne permettrait pas de trouver la dose optimale.": ""
+  "Dans {0} % des cas, l'essai ne permettrait pas de trouver la dose optimale.": "",
+  "• Nuages à moins de 500 m : {0}% (scène : {1}%) • Cliquez pour afficher la tuile satellite sur la carte": "",
+  "Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)": ""
 });

@@ -1792,5 +1792,7 @@ window.pfI18n.langue("es", {
   "Écart entre deux traitements : l'essai le détecte 8 fois sur 10 s'il atteint {0} % du rendement.": "Diferencia entre dos tratamientos: el ensayo la detecta 8 de cada 10 veces si alcanza el {0} % del rendimiento.",
   "Dose optimale : si la vraie valeur est {0}, l'essai l'estimerait entre {1} et {2}, 8 fois sur 10.": "Dosis óptima: si el valor real es {0}, el ensayo la estimaría entre {1} y {2}, 8 de cada 10 veces.",
   "Dose optimale : dans {0} % des cas, l'essai ne permettrait pas de la trouver.": "Dosis óptima: en el {0} % de los casos, el ensayo no permitiría encontrarla.",
-  "Dans {0} % des cas, l'essai ne permettrait pas de trouver la dose optimale.": "En el {0} % de los casos, el ensayo no permitiría encontrar la dosis óptima."
+  "Dans {0} % des cas, l'essai ne permettrait pas de trouver la dose optimale.": "En el {0} % de los casos, el ensayo no permitiría encontrar la dosis óptima.",
+  "• Nuages à moins de 500 m : {0}% (scène : {1}%) • Cliquez pour afficher la tuile satellite sur la carte": "• Nubes a menos de 500 m: {0}% (escena: {1}%) • Haga clic para mostrar la tesela satelital en el mapa",
+  "Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)": "Pasadas eliminadas por estar bajo una nube, una sombra o nieve, o rodeadas de nubes (más del 25 % en un radio de 500 m)"
 });

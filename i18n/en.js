@@ -1792,5 +1792,7 @@ window.pfI18n.langue("en", {
   "Écart entre deux traitements : l'essai le détecte 8 fois sur 10 s'il atteint {0} % du rendement.": "Difference between two treatments: the trial detects it 8 times out of 10 if it reaches {0} % of yield.",
   "Dose optimale : si la vraie valeur est {0}, l'essai l'estimerait entre {1} et {2}, 8 fois sur 10.": "Optimal rate: if the true value is {0}, the trial would estimate it between {1} and {2}, 8 times out of 10.",
   "Dose optimale : dans {0} % des cas, l'essai ne permettrait pas de la trouver.": "Optimal rate: in {0} % of cases, the trial would not be able to find it.",
-  "Dans {0} % des cas, l'essai ne permettrait pas de trouver la dose optimale.": "In {0} % of cases, the trial would not be able to find the optimal rate."
+  "Dans {0} % des cas, l'essai ne permettrait pas de trouver la dose optimale.": "In {0} % of cases, the trial would not be able to find the optimal rate.",
+  "• Nuages à moins de 500 m : {0}% (scène : {1}%) • Cliquez pour afficher la tuile satellite sur la carte": "• Clouds within 500 m: {0}% (scene: {1}%) • Click to show the satellite tile on the map",
+  "Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)": "Passes removed because under cloud, shadow or snow, or surrounded by clouds (more than 25 % within 500 m)"
 });

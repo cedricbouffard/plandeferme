@@ -10,7 +10,9 @@
         tileQueryOffset: "assets=B08&assets=B04&asset_as_band=True&expression=" + encodeURIComponent("(B08-B04)/(B08+B04-2000)"),
         offsetOf: (scene) => (parseFloat(scene.properties["s2:processing_baseline"]) >= 4 ? 1000 : 0),
         ndvi: (red, nir, off = 0) => (nir + red - 2 * off > 0 ? (nir - red) / (nir + red - 2 * off) : NaN),
-        bad: (q) => [0, 1, 3, 8, 9, 10, 11].includes(Math.round(q))
+        bad: (q) => [0, 1, 3, 8, 9, 10, 11].includes(Math.round(q)),
+        // autour du point : SCL à 20 m ; ombre de nuage, nuage probable et nuage très probable
+        qaAsset: "SCL", qaRes: 20, nodata: (q) => Math.round(q) === 0, cloudy: (q) => [3, 8, 9].includes(Math.round(q))
       },
       landsat: {
         key: "landsat", name: "Landsat", res: 30, label: "Landsat · 30 m", firstYear: 1984,
@@ -20,10 +22,49 @@
         tileQuery: "assets=nir08&assets=red&asset_as_band=True&expression=" + encodeURIComponent("(nir08-red)/(nir08+red-14545.4545)") + "&nodata=0",
         ndvi: (red, nir) => (red > 0 && nir > 0 && nir + red - 14545.4545 > 0 ? (nir - red) / (nir + red - 14545.4545) : NaN),
         // qa_pixel : bit 0 sans donnée, 1 nuage dilaté, 2 cirrus, 3 nuage, 4 ombre, 5 neige
-        bad: (q) => (Math.round(q) & 0b111111) !== 0
+        bad: (q) => (Math.round(q) & 0b111111) !== 0,
+        // autour du point : nuage dilaté, nuage, ombre
+        qaAsset: "qa_pixel", qaRes: 30, nodata: (q) => (Math.round(q) & 1) !== 0 || Math.round(q) === 0, cloudy: (q) => (Math.round(q) & 0b11010) !== 0
       }
     };
     window.NDVI_SENSORS = NDVI_SENSORS;
+    // Un passage est écarté si plus de cette part du voisinage du point est sous les nuages ou leur ombre :
+    // un NDVI lu dans un trou entre deux nuages est rarement fiable (brume, ombres, bords de nuages).
+    const NDVI_CLOUD_RADIUS_M = 500, NDVI_CLOUD_MAX = 0.25;
+    // Tableau NumPy (.npy) de forme (bandes, hauteur, largeur) renvoyé par Planetary Computer
+    function ndviParseNpy(buf) {
+      const dv = new DataView(buf), u8 = new Uint8Array(buf);
+      if (u8[0] !== 0x93 || String.fromCharCode(u8[1], u8[2], u8[3], u8[4], u8[5]) !== "NUMPY") throw new Error("réponse inattendue");
+      const v2 = u8[6] >= 2, hl = v2 ? dv.getUint32(8, true) : dv.getUint16(8, true), off = (v2 ? 12 : 10) + hl;
+      const head = new TextDecoder("latin1").decode(u8.subarray(v2 ? 12 : 10, off));
+      const shape = (/'shape':\s*\(([^)]*)\)/.exec(head) || [])[1], descr = (/'descr':\s*'([^']+)'/.exec(head) || [])[1];
+      const dims = String(shape || "").split(",").map((t) => parseInt(t, 10)).filter(Number.isFinite);
+      const T = { "<f8": Float64Array, "<f4": Float32Array, "<i2": Int16Array, "<u2": Uint16Array, "<i4": Int32Array, "|u1": Uint8Array, "|i1": Int8Array }[descr];
+      if (!T || dims.length !== 3) throw new Error("format non pris en charge (" + descr + ")");
+      return { data: new T(buf.slice(off)), bands: dims[0], h: dims[1], w: dims[2] };
+    }
+    // Part (0 à 1) des pixels sous nuage ou ombre dans un tableau de qualité ; null si trop peu de pixels valides
+    function ndviCloudShare(sn, npy) {
+      const n = npy.w * npy.h; let valid = 0, cloudy = 0;
+      for (let i = 0; i < n; i++) {
+        const q = npy.data[i];
+        if (npy.bands > 1 && npy.data[(npy.bands - 1) * n + i] === 0) continue; // hors de la scène
+        if (!Number.isFinite(q) || sn.nodata(q)) continue;
+        valid++; if (sn.cloudy(q)) cloudy++;
+      }
+      return valid >= n * 0.2 ? cloudy / valid : null;
+    }
+    // Requête avec une seconde tentative si le service est saturé (429) ou en erreur passagère (5xx)
+    async function ndviFetch(url, signal) {
+      let resp = await fetch(url, { signal });
+      if (resp.status === 429 || resp.status >= 500) {
+        await new Promise((r) => setTimeout(r, 500 + Math.random() * 700));
+        if (signal && signal.aborted) throw new DOMException("Aborted", "AbortError");
+        resp = await fetch(url, { signal });
+      }
+      return resp;
+    }
+    window.pfNdviCloud = { parseNpy: ndviParseNpy, share: ndviCloudShare, RADIUS_M: NDVI_CLOUD_RADIUS_M, MAX: NDVI_CLOUD_MAX };
 
     class NdviManager {
       constructor(mapInstance) {
@@ -137,6 +178,23 @@
         });
       }
 
+      // Couverture nuageuse dans un carré de 500 m de demi-côté autour du point (bande de qualité de la scène).
+      // null si la lecture échoue : le passage est alors gardé sur la seule foi du pixel du point.
+      async localCloud(sn, scene, lngLat, signal) {
+        const r = NDVI_CLOUD_RADIUS_M, dLat = r / 111132, dLng = r / (111320 * Math.max(0.1, Math.cos((lngLat.lat * Math.PI) / 180)));
+        const bbox = [lngLat.lng - dLng, lngLat.lat - dLat, lngLat.lng + dLng, lngLat.lat + dLat].map((v) => v.toFixed(6)).join(",");
+        const px = Math.max(8, Math.round((2 * r) / sn.qaRes));
+        const url = `https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/${bbox}/${px}x${px}.npy?collection=${sn.collection}&item=${encodeURIComponent(scene.id)}&assets=${sn.qaAsset}&asset_as_band=True&expression=${sn.qaAsset}&resampling=nearest`;
+        try {
+          const resp = await ndviFetch(url, signal);
+          if (!resp.ok) return null;
+          return ndviCloudShare(sn, ndviParseNpy(await resp.arrayBuffer()));
+        } catch (e) {
+          if (e.name === "AbortError") throw e;
+          return null;
+        }
+      }
+
       // Scènes d'une saison pour un capteur, échantillonnées au point et filtrées des nuages
       async fetchSeries(sensorKey, lngLat, yr, dtStr, signal, statsBar) {
         const sn = NDVI_SENSORS[sensorKey];
@@ -166,13 +224,16 @@
         let cloudFilteredCount = 0, completed = 0;
         const progress = () => { if (statsBar) statsBar.innerHTML = `<span class="stat-chip">${sn.name} : filtrage des nuages (${Math.min(completed, uniqueItems.length)}/${uniqueItems.length}) • ${sampled.length} retenus, ${cloudFilteredCount} nuageux...</span>`; };
         progress();
-        for (let i = 0; i < uniqueItems.length; i += 6) {
+        // 48 passages à la fois (une saison entière tient le plus souvent en un seul lot) ; pour chacun, le pixel
+        // du point et les nuages du voisinage sont lus en même temps
+        const PAR = 48;
+        for (let i = 0; i < uniqueItems.length; i += PAR) {
           if (signal.aborted) return null;
-          const batch = uniqueItems.slice(i, i + 6);
+          const batch = uniqueItems.slice(i, i + PAR);
           const results = await Promise.all(batch.map(async (scene) => {
             const pUrl = `https://planetarycomputer.microsoft.com/api/data/v1/item/point/${lngLat.lng.toFixed(5)},${lngLat.lat.toFixed(5)}?collection=${sn.collection}&item=${scene.id}&${sn.pointAssets.map((a) => "assets=" + a).join("&")}`;
             try {
-              const pResp = await fetch(pUrl, { signal });
+              const [pResp, cloudLocal] = await Promise.all([ndviFetch(pUrl, signal), this.localCloud(sn, scene, lngLat, signal)]);
               if (!pResp.ok) return null;
               const vals = (await pResp.json()).values || [];
               if (vals.length < 3) return null;
@@ -181,7 +242,10 @@
               const offset = typeof sn.offsetOf === "function" ? sn.offsetOf(scene) : 0;
               const ndvi = sn.ndvi(red, nir, offset);
               if (!Number.isFinite(ndvi) || ndvi < -0.15 || ndvi > 1.0) return null;
+              // le pixel est clair : on vérifie qu'il n'est pas dans un simple trou entre les nuages
+              if (cloudLocal !== null && cloudLocal > NDVI_CLOUD_MAX) return { isCloud: true };
               return {
+                cloudLocal,
                 id: scene.id, sensor: sn.key, offset, datetime: scene.properties.datetime, dateKey: scene.properties.datetime.split("T")[0],
                 bbox: scene.bbox || null, ndvi, b4: red, b8: nir, scl: qa,
                 cloud: scene.properties["eo:cloud_cover"] || 0, platform: scene.properties["platform"] || sn.name
@@ -450,7 +514,7 @@
               <span class="stat-chip" style="background:#dcfce7; border-color:#86efac; color:#14532d;">Pic estival : <strong>${maxNdvi.toFixed(2)}</strong> (${peakStr})</span>
               <span class="stat-chip">Dernier NDVI : <strong>${latest.ndvi.toFixed(2)}</strong></span>
               <span class="stat-chip">Observations claires : <strong>${this.series.length} dates</strong></span>
-              ${cloudFilteredCount > 0 ? `<span class="stat-chip" style="color:#64748b;" title="Passages éliminés car sous un nuage, une ombre ou de la neige">${cloudFilteredCount} nuageux filtrés</span>` : ''}
+              ${cloudFilteredCount > 0 ? `<span class="stat-chip" style="color:#64748b;" title="Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)">${cloudFilteredCount} nuageux filtrés</span>` : ''}
             `;
           }
 
@@ -724,7 +788,7 @@
             const idx = parseInt(circle.dataset.idx, 10);
             const item = this.series[idx];
             if (hoverInfo) {
-              hoverInfo.innerHTML = `<strong>${item.dateKey}</strong> &bull; NDVI : <strong>${item.ndvi.toFixed(3)}</strong> &bull; Qualité : <strong>${this.getSclLabel(item.scl)}</strong> &bull; Nuages scène : ${item.cloud.toFixed(1)}% &bull; Cliquez pour afficher la tuile satellite sur la carte`;
+              hoverInfo.innerHTML = `<strong>${item.dateKey}</strong> &bull; NDVI : <strong>${item.ndvi.toFixed(3)}</strong> &bull; Qualité : <strong>${this.getSclLabel(item.scl)}</strong> &bull; ${Number.isFinite(item.cloudLocal) ? `Nuages à moins de 500 m : ${(100 * item.cloudLocal).toFixed(0)}% (scène : ${item.cloud.toFixed(0)}%)` : `Nuages scène : ${item.cloud.toFixed(1)}%`} &bull; Cliquez pour afficher la tuile satellite sur la carte`;
             }
           });
 
