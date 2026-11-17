@@ -301,6 +301,8 @@
     // Calcul hydrologique de remplissage des cuvettes (Priority Flood)
     smoothed.zf = fillDepressions(smoothed.z, smoothed.W, smoothed.H, 1e-4);
 
+    // quelques parcelles seulement en mémoire : chaque grille pèse plusieurs mégaoctets
+    while (DEM_CACHE.size >= 4) DEM_CACHE.delete(DEM_CACHE.keys().next().value);
     DEM_CACHE.set(cacheKey, smoothed);
     return smoothed;
   }

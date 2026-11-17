@@ -801,10 +801,12 @@
 
         if (!this._resizeAttached) {
           this._resizeAttached = true;
+          // le graphique n'est redessiné qu'une fois le redimensionnement terminé
           window.addEventListener("resize", () => {
-            if (this.series && this.series.length && !this.isCollapsed) {
-              this.renderChart(this.selectedIndex);
-            }
+            clearTimeout(this._resizeTimer);
+            this._resizeTimer = setTimeout(() => {
+              if (this.series && this.series.length && !this.isCollapsed) this.renderChart(this.selectedIndex);
+            }, 150);
           });
         }
       }

@@ -11977,9 +11977,15 @@ class ContourManager {
   bringContoursToFront() {
     if (!this.map) return;
     const beforeId = this.map.getLayer("parcelles-fill") ? "parcelles-fill" : (this.map.getLayer("parcelles-line-bg") ? "parcelles-line-bg" : undefined);
-    for (const layerId of [MINOR_LAYER_ID, MAJOR_LAYER_ID, LABEL_LAYER_ID]) {
-      if (this.map.getLayer(layerId)) this.map.moveLayer(layerId, beforeId);
+    // Plan de Ferme : ne rien déplacer si les courbes sont déjà à leur place (sinon chaque « styledata »
+    // redéplace les couches, ce qui relance « styledata » : la carte se redessinait en boucle)
+    const ids = [MINOR_LAYER_ID, MAJOR_LAYER_ID, LABEL_LAYER_ID].filter((id) => this.map.getLayer(id));
+    const order = typeof this.map.getLayersOrder === "function" ? this.map.getLayersOrder() : (this.map.style && this.map.style._order) || null;
+    if (order && ids.length) {
+      const end = beforeId === undefined ? order.length : order.indexOf(beforeId);
+      if (end >= ids.length && ids.every((id, i) => order[end - ids.length + i] === id)) return;
     }
+    for (const layerId of ids) this.map.moveLayer(layerId, beforeId);
   }
   addMapLayers() {
     var _a, _b;

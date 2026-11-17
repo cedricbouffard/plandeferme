@@ -198,6 +198,8 @@
     if (!COG_CACHE.has(url)) {
       const p = fromUrl(url, {}, AbortSignal.timeout(30000));
       p.catch(() => COG_CACHE.delete(url));
+      // au plus 80 fichiers ouverts : les dalles (1 km en Suisse, 10 km aux États-Unis) s'accumulent en se déplaçant
+      while (COG_CACHE.size >= 80) COG_CACHE.delete(COG_CACHE.keys().next().value);
       COG_CACHE.set(url, p);
     }
     return COG_CACHE.get(url);
@@ -374,7 +376,7 @@
   const chCache = new Map();
   async function chItems(bbox, signal) {
     const key = bbox.map((v) => v.toFixed(3)).join(",");
-    if (chCache.has(key)) return chCache.get(key);
+    if (chCache.has(key)) return chCache.get(key); if (chCache.size > 200) chCache.clear();
     const items = [];
     let url = `${STAC_CH}?bbox=${key}&limit=100`;
     for (let page = 0; url && page < 8; page++) {
@@ -430,7 +432,7 @@
   const tnmCache = new Map();
   async function tnmProjects(bbox, signal) {
     const key = bbox.map((v) => v.toFixed(3)).join(",");
-    if (tnmCache.has(key)) return tnmCache.get(key);
+    if (tnmCache.has(key)) return tnmCache.get(key); if (tnmCache.size > 200) tnmCache.clear();
     const groups = new Map();
     let offset = 0;
     for (let page = 0; page < 4; page++) {

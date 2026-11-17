@@ -1368,6 +1368,16 @@
     bringToFront() {
       if (!this.map || !this.map.style) return;
 
+      // Déjà au sommet dans le bon ordre : ne rien déplacer. Chaque moveLayer marque le style comme modifié
+      // et relance « styledata » ; sans ce garde-fou, la carte se redessinait en boucle sans jamais être au repos.
+      const wanted = [];
+      this.layers.forEach(layer => {
+        ["fill", "stroke", "line", "point", "label"].forEach(k => { const id = `vector-${k}-${layer.id}`; if (this.map.getLayer(id)) wanted.push(id); });
+      });
+      ["vector-draw-fill", "vector-draw-line", "vector-draw-vertices"].forEach(id => { if (this.map.getLayer(id)) wanted.push(id); });
+      const order = typeof this.map.getLayersOrder === "function" ? this.map.getLayersOrder() : (this.map.style._order || null);
+      if (order && wanted.length <= order.length && wanted.every((id, i) => order[order.length - wanted.length + i] === id)) return;
+
       this.layers.forEach(layer => {
         const layerIds = [
           `vector-fill-${layer.id}`,

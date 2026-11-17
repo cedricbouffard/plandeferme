@@ -287,6 +287,9 @@
         type: "fill",
         source: "parcelles-source",
         "source-layer": "BDPPAD_2026",
+        // sous ce zoom, on ne clique pas une parcelle : inutile de charger toutes les parcelles du Québec
+        // (plus de 200 000 entités à l'échelle de la province) pour une couche invisible
+        minzoom: 9,
         paint: {
           "fill-opacity": 0
         }
@@ -306,6 +309,7 @@
           type: "fill",
           source: "drainage-source",
           "source-layer": "plans_drainage",
+          minzoom: 9,
           paint: { "fill-opacity": 0 }
         });
       }
@@ -718,7 +722,9 @@
       window.updateLayersZoomState = updateLayersZoomState;
 
       // Camera zoom & move listeners
-      map.on('zoom', updateLayersZoomState);
+      // pendant un zoom animé, l'état des cartes de couches n'est recalculé que si le zoom a bougé d'un dixième
+      let lastZoomTenth = null;
+      map.on('zoom', () => { const z = Math.round(map.getZoom() * 10); if (z !== lastZoomTenth) { lastZoomTenth = z; updateLayersZoomState(); } });
       map.on('zoomend', updateLayersZoomState);
       updateLayersZoomState();
 

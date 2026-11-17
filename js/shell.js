@@ -139,7 +139,7 @@
   if (lt) lt.addEventListener("click", () => { legendMin = !legendMin; store.set("pf-legend-min", legendMin ? "1" : "0"); syncLegend(); });
   document.addEventListener("change", (e) => { if (e.target && e.target.type === "checkbox") syncLegend(); });
   // Certaines couches sont activées par programme (lien partagé, RUSLE…) : vérification légère périodique.
-  setInterval(syncLegend, 800);
+  setInterval(() => { if (!document.hidden) syncLegend(); }, 800); // rien à faire quand l'onglet n'est pas affiché
 
   /* ---------------- 3. Tiroir des résultats à onglets ---------------- */
   const DOCKS = [
