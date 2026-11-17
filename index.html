@@ -1434,6 +1434,42 @@
             <select id="essai-sides" class="pf-tp-select"><option value="1" selected>Unilatéral</option><option value="2">Bilatéral</option></select>
           </label>
           <p id="essai-power" class="pf-tp-note" aria-live="polite"></p>
+          <div class="pf-es-sub">Simulation de l'essai</div>
+          <label class="pf-tp-row" title="D'où vient la structure spatiale de la variabilité. Aléatoire : des taches tirées au hasard, de la taille donnée par la portée. Relief ou NDVI enregistré : la couche sert de carte de la variabilité du champ, et la simulation retire les traitements au sort à chaque tirage pour voir comment le dispositif s'en sort sur ce champ. Les tuiles NDVI viennent de l'outil NDVI satellite (bouton Enregistrer).">
+            <span>Structure spatiale</span>
+            <select id="essai-pattern" class="pf-tp-select"><option value="" selected>Aléatoire (portée)</option><option value="relief">Relief (altitude)</option></select>
+          </label>
+          <div class="pf-tp-row" title="Distance au-delà de laquelle deux endroits du champ n'ont plus de lien entre leurs rendements. Petite portée : variations en taches serrées. Grande portée : grandes zones homogènes. La simulation suppose que 60 % de la variabilité entre parcelles suit cette structure spatiale.">
+            <span>Portée des variations</span>
+            <span><input type="number" id="essai-range" class="pf-tp-num" min="5" step="10" value="80" inputmode="decimal" aria-label="Portée des variations" /> <span class="pf-es-u" data-no-i18n>m</span></span>
+          </div>
+          <div id="essai-curve-box" hidden>
+            <label class="pf-tp-row" title="Avec des doses, la simulation ajuste une courbe de réponse à chaque tirage et mesure avec quelle précision l'essai retrouve la dose optimale. Quadratique-plateau : le rendement monte en courbe puis reste stable. Quadratique : il redescend après l'optimum. Linéaire-plateau : il monte en ligne droite puis reste stable.">
+              <span>Courbe de réponse</span>
+              <select id="essai-curve" class="pf-tp-select">
+                <option value="quad-plateau" selected>Quadratique-plateau</option>
+                <option value="quad">Quadratique</option>
+                <option value="lin-plateau">Linéaire-plateau</option>
+                <option value="none">Aucune</option>
+              </select>
+            </label>
+            <div class="pf-tp-row pf-es-curve-row" title="Dose à laquelle vous pensez que le rendement plafonne, dans l'unité des traitements. Par défaut : 70 % de la plus forte dose testée.">
+              <span>Dose optimale attendue</span>
+              <span>
+                <input type="number" id="essai-opt" class="pf-tp-num" min="0" step="1" inputmode="decimal" aria-label="Dose optimale attendue" />
+                <button type="button" id="btn-essai-auto-opt" class="profile-dock-btn pf-zn-modal-secondary pf-tp-auto" title="70 % de la plus forte dose testée">Auto</button>
+              </span>
+            </div>
+            <div class="pf-tp-row pf-es-curve-row" title="Écart de rendement attendu entre la dose zéro et la dose optimale">
+              <span>Gain de rendement</span>
+              <span>
+                <input type="number" id="essai-gain" class="pf-tp-num" min="0" step="1" value="25" inputmode="decimal" aria-label="Gain de rendement" />
+                <select id="essai-gain-unit" class="pf-tp-select" aria-label="Unité du gain"><option value="pct" selected>%</option><option value="kg">kg/ha</option></select>
+              </span>
+            </div>
+          </div>
+          <button type="button" id="btn-essai-sim" class="profile-dock-btn pf-zn-modal-secondary pf-tp-draw" title="Tire 500 fois les rendements de l'essai sur le dispositif affiché, avec une variabilité spatiale, et mesure ce que l'essai peut détecter">Simuler l'essai (500 tirages)</button>
+          <p id="essai-sim" class="pf-tp-note" aria-live="polite"></p>
         </details>
         <div id="essai-legend" class="pf-es-legend"></div>
         <p id="essai-note" class="pf-tp-note" aria-live="polite"></p>

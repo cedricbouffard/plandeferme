@@ -81,6 +81,26 @@ const pfEssaiGeom = {
     for (const lv of levels) { const iv = this.intervals(rings, lv); runs = runs ? this.intersect(runs, iv) : iv; if (!runs.length) break; }
     return runs || [];
   },
+  // Répartition des traitements. strip, pos : bande et rang (à partir de 0) de chaque parcelle, en serpentin.
+  assign(design, nT, strip, pos, rnd) {
+    const N = strip.length, t = new Array(N), block = new Array(N).fill(null), ids = Array.from({ length: nT }, (_, i) => i);
+    if (design === "bandes") {
+      let perm = [], last = -1, s = -1;
+      for (let i = 0; i < N; i++) { if (strip[i] !== last) { last = strip[i]; s++; if (s % nT === 0) perm = this.shuffle(ids, rnd); } t[i] = perm[s % nT]; block[i] = Math.floor(s / nT) + 1; }
+    } else if (design === "blocs") {
+      let perm = [];
+      for (let i = 0; i < N; i++) { if (i % nT === 0) perm = this.shuffle(ids, rnd); t[i] = perm[i % nT]; block[i] = Math.floor(i / nT) + 1; }
+    } else if (design === "aleatoire") {
+      const bag = []; for (let i = 0; i < N; i++) bag.push(i % nT);
+      const sh = this.shuffle(bag, rnd); for (let i = 0; i < N; i++) t[i] = sh[i];
+    } else { // carré latin : chaque traitement une fois par groupe de n parcelles, le long comme en travers
+      const perm = this.shuffle(ids, rnd), cop = []; for (let s = 1; s < nT; s++) if (this.gcd(s, nT) === 1) cop.push(s);
+      const good = cop.filter((s) => s !== 1 && s !== nT - 1), pool = good.length ? good : cop.length ? cop : [1];
+      const shift = pool[Math.floor(rnd() * pool.length)], off = Math.floor(rnd() * nT);
+      for (let i = 0; i < N; i++) t[i] = perm[(((strip[i] * shift + pos[i] + off) % nT) + nT) % nT];
+    }
+    return { t, block };
+  },
   /*
     Dispositif en mètres. mp : multipolygone ; o : { azimuth, plotWidth, appWidth, head, side, minLen, maxLen,
     design: "latin" | "blocs" | "aleatoire" | "bandes", n (nombre de traitements), seed, anchor: [x, y] | null }
@@ -132,24 +152,10 @@ const pfEssaiGeom = {
     }
     if (!cells.length) return { plots: [] };
     // ---- répartition des traitements -------------------------------------------------------------------
-    const rnd = this.rng(o.seed || 1), ids = Array.from({ length: nT }, (_, i) => i);
     const serp = []; // ordre en serpentin, bande par bande
     for (let s = 0; s < si; s++) { const row = cells.filter((c) => c.strip === s); (s % 2 ? row.reverse() : row).forEach((c) => serp.push(c)); }
-    if (strip) {
-      let perm = [];
-      for (let s = 0; s < si; s++) { if (s % nT === 0) perm = this.shuffle(ids, rnd); const tr = perm[s % nT], bl = Math.floor(s / nT) + 1; cells.forEach((c) => { if (c.strip === s) { c.t = tr; c.block = bl; } }); }
-    } else if (o.design === "blocs") {
-      let perm = [];
-      serp.forEach((c, i) => { if (i % nT === 0) perm = this.shuffle(ids, rnd); c.t = perm[i % nT]; c.block = Math.floor(i / nT) + 1; });
-    } else if (o.design === "aleatoire") {
-      const bag = []; for (let i = 0; i < serp.length; i++) bag.push(i % nT);
-      const sh = this.shuffle(bag, rnd); serp.forEach((c, i) => { c.t = sh[i]; c.block = null; });
-    } else { // carré latin : chaque traitement une fois par groupe de n parcelles, le long comme en travers
-      const perm = this.shuffle(ids, rnd), cop = []; for (let s = 1; s < nT; s++) if (this.gcd(s, nT) === 1) cop.push(s);
-      const good = cop.filter((s) => s !== 1 && s !== nT - 1), pool = good.length ? good : cop.length ? cop : [1];
-      const shift = pool[Math.floor(rnd() * pool.length)], off = Math.floor(rnd() * nT);
-      cells.forEach((c) => { c.t = perm[(((c.strip * shift + c.pos + off) % nT) + nT) % nT]; c.block = null; });
-    }
+    const as = this.assign(o.design, nT, serp.map((c) => c.strip), serp.map((c) => c.pos), this.rng(o.seed || 1));
+    serp.forEach((c, i) => { c.t = as.t[i]; c.block = as.block[i]; });
     const plots = serp.map((c) => ({ ring: [toXY(c.a0, c.b0), toXY(c.a1, c.b0), toXY(c.a1, c.b1), toXY(c.a0, c.b1), toXY(c.a0, c.b0)], strip: c.strip + 1, pos: c.pos + 1, block: c.block, t: c.t, w, len: c.len }));
     return { plots, strips: si };
   },
@@ -192,6 +198,104 @@ const pfEssaiGeom = {
     const worst = Math.max(...rows.filter((r) => !r.ref).map((r) => r.mddPct));
     return { df, rows, mddPct: worst, mddKg: y > 0 ? (worst * y) / 100 : NaN };
   },
+  // ---- simulation de l'essai (variabilité spatiale, courbe de réponse) -----------------------------------
+  // Courbe de réponse en % du rendement au plateau. x0 : dose optimale ; gain : écart entre la dose 0 et l'optimum.
+  curveAt(model, x, x0, gain) {
+    if (model === "quad") return -gain * Math.pow((x - x0) / x0, 2);            // parabole, redescend après l'optimum
+    const u = Math.min(x, x0);
+    if (model === "lin-plateau") return -gain * (1 - u / x0);
+    return -gain * Math.pow((u - x0) / x0, 2);                                   // quadratique-plateau
+  },
+  // Ajustement par moindres carrés pondérés sur les moyennes par dose -> { x0, gain } ou null (non concluant)
+  fitCurve(model, doses, means, counts) {
+    const n = doses.length, dmax = Math.max(...doses), dmin = Math.min(...doses);
+    if (model === "quad") {
+      let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, t0 = 0, t1 = 0, t2 = 0;
+      for (let i = 0; i < n; i++) { const w = counts[i], x = doses[i], y = means[i]; s0 += w; s1 += w * x; s2 += w * x * x; s3 += w * x * x * x; s4 += w * x * x * x * x; t0 += w * y; t1 += w * x * y; t2 += w * x * x * y; }
+      const det = s0 * (s2 * s4 - s3 * s3) - s1 * (s1 * s4 - s3 * s2) + s2 * (s1 * s3 - s2 * s2);
+      if (Math.abs(det) < 1e-12) return null;
+      const b = (s0 * (t1 * s4 - s3 * t2) - t0 * (s1 * s4 - s3 * s2) + s2 * (s1 * t2 - t1 * s2)) / det, c = (s0 * (s2 * t2 - t1 * s3) - s1 * (s1 * t2 - t1 * s2) + t0 * (s1 * s3 - s2 * s2)) / det;
+      if (!(c < 0)) return null;
+      const x0 = -b / (2 * c);
+      return x0 > 0 && x0 <= dmax * 1.5 ? { x0, gain: -c * x0 * x0 } : null;
+    }
+    const lin = model === "lin-plateau", steps = 120, lo = dmin + (dmax - dmin) * 0.05, hi = dmax * 1.5;
+    let best = null;
+    for (let k = 0; k <= steps; k++) {
+      const x0 = lo + ((hi - lo) * k) / steps;
+      let sw = 0, sz = 0, szz = 0, sy = 0, szy = 0, syy = 0;
+      for (let i = 0; i < n; i++) { const d = Math.min(doses[i], x0) - x0, z = lin ? d : d * d, w = counts[i], y = means[i]; sw += w; sz += w * z; szz += w * z * z; sy += w * y; szy += w * z * y; syy += w * y * y; }
+      const den = sw * szz - sz * sz; if (den < 1e-12) continue;
+      const slope = (sw * szy - sz * sy) / den, icpt = (sy - slope * sz) / sw, sse = syy - icpt * sy - slope * szy;
+      if (!best || sse < best.sse) best = { sse, x0, slope, k };
+    }
+    if (!best || best.k === steps) return null;                 // optimum au-delà des doses testées
+    if (lin ? !(best.slope > 0) : !(best.slope < 0)) return null; // pas de réponse
+    return { x0: best.x0, gain: lin ? best.slope * best.x0 : -best.slope * best.x0 * best.x0 };
+  },
+  /*
+    Tirages de l'essai sur le dispositif réel. sim : { x, y (centres en m), t, strip, block } par parcelle.
+    o : { n, cv (%), range (m), frac (part structurée de la variance), design, nT, sides, seed,
+          curve: { model, doses, x0, gain (%) } | null }
+    Chaque tirage : rendement = [courbe] + variabilité (champ gaussien à corrélation spatiale + bruit de parcelle).
+    Avec o.pattern (valeur centrée réduite d'une couche raster par parcelle, NDVI ou relief), la structure
+    spatiale est celle de la couche, fixe, et ce sont les traitements qui sont retirés au sort à chaque tirage
+    (sim.pos requis), comme on superpose un dispositif à une carte de rendement uniforme.
+    -> { n, mddPct, curve: { p10, p50, p90, x0, inconclusive, gain10, gain90 } | null }
+  */
+  simulate(sim, o) {
+    const N = sim.t.length, nT = o.nT, n = Math.max(20, o.n || 500), cv = o.cv, frac = Math.max(0, Math.min(1, o.frac == null ? 0.6 : o.frac));
+    if (!N || !(cv > 0) || nT < 2) return null;
+    const rnd = this.rng(o.seed || 12345);
+    const gauss = () => { let u = 0; while (u < 1e-12) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); };
+    // grille du champ aléatoire : bruit blanc lissé par un noyau gaussien (corrélation ~ 5 % à la portée)
+    const range = Math.max(5, o.range || 80);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let i = 0; i < N; i++) { if (sim.x[i] < x0) x0 = sim.x[i]; if (sim.x[i] > x1) x1 = sim.x[i]; if (sim.y[i] < y0) y0 = sim.y[i]; if (sim.y[i] > y1) y1 = sim.y[i]; }
+    const g = Math.max(range / 6, Math.max(x1 - x0, y1 - y0) / 160), sd = (range / (2 * Math.sqrt(3))) / g, rad = Math.max(1, Math.ceil(3 * sd));
+    const nx = Math.ceil((x1 - x0) / g) + 1 + 2 * rad, ny = Math.ceil((y1 - y0) / g) + 1 + 2 * rad;
+    const ker = []; let k2 = 0; for (let d = -rad; d <= rad; d++) { const v = Math.exp((-d * d) / (2 * sd * sd)); ker.push(v); k2 += v * v; }
+    const cell = new Int32Array(N); for (let i = 0; i < N; i++) cell[i] = (Math.round((sim.y[i] - y0) / g) + rad) * nx + Math.round((sim.x[i] - x0) / g) + rad;
+    const A = new Float64Array(nx * ny), B = new Float64Array(nx * ny), e = new Float64Array(N);
+    // groupes servant à retirer l'effet de bloc (bande pour le carré latin)
+    const grp = o.design === "blocs" || o.design === "bandes" ? sim.block : o.design === "latin" ? sim.strip : null;
+    let nG = 0; if (grp) for (let i = 0; i < N; i++) if (grp[i] > nG) nG = grp[i];
+    const gs = new Float64Array(nG + 1), gc = new Float64Array(nG + 1), ts = new Float64Array(nT), tc = new Float64Array(nT);
+    for (let i = 0; i < N; i++) tc[sim.t[i]]++;
+    const dS = new Float64Array(nT), dSS = new Float64Array(nT), cur = o.curve && o.curve.doses && o.curve.doses.length === nT ? o.curve : null;
+    const base = cur ? cur.doses.map((d) => this.curveAt(cur.model, d, cur.x0, cur.gain)) : null, est = [], gains = [];
+    const sf = Math.sqrt(frac), sn = Math.sqrt(1 - frac);
+    const pat = o.pattern && o.pattern.length === N && sim.pos ? o.pattern : null, strip0 = pat ? sim.strip.map((v) => v - 1) : null, pos0 = pat ? sim.pos.map((v) => v - 1) : null;
+    let T = sim.t;
+    for (let it = 0; it < n; it++) {
+      if (pat) {
+        T = this.assign(o.design, nT, strip0, pos0, rnd).t; tc.fill(0);
+        for (let i = 0; i < N; i++) { tc[T[i]]++; e[i] = cv * (sf * pat[i] + sn * gauss()); }
+      } else if (frac > 0) {
+        for (let i = 0; i < A.length; i++) A[i] = gauss();
+        for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) { let v = 0; for (let d = -rad; d <= rad; d++) { const xx = x + d; if (xx >= 0 && xx < nx) v += A[y * nx + xx] * ker[d + rad]; } B[y * nx + x] = v; }
+        for (let i = 0; i < N; i++) { const c = cell[i], cx = c % nx, cy = (c - cx) / nx; let v = 0; for (let d = -rad; d <= rad; d++) { const yy = cy + d; if (yy >= 0 && yy < ny) v += B[yy * nx + cx] * ker[d + rad]; } e[i] = cv * (sf * (v / k2) + sn * gauss()); }
+      } else for (let i = 0; i < N; i++) e[i] = cv * gauss();
+      // différences entre traitements sans effet réel : leur dispersion donne la différence détectable
+      if (grp) { gs.fill(0); gc.fill(0); for (let i = 0; i < N; i++) { gs[grp[i]] += e[i]; gc[grp[i]]++; } }
+      ts.fill(0);
+      for (let i = 0; i < N; i++) ts[T[i]] += grp ? e[i] - gs[grp[i]] / gc[grp[i]] : e[i];
+      for (let t = 1; t < nT; t++) { const d = ts[t] / tc[t] - ts[0] / tc[0]; dS[t] += d; dSS[t] += d * d; }
+      if (cur) {
+        ts.fill(0); for (let i = 0; i < N; i++) ts[T[i]] += e[i];
+        const f = this.fitCurve(cur.model, cur.doses, Array.from(ts, (v, t) => base[t] + v / tc[t]), Array.from(tc));
+        if (f) { est.push(f.x0); gains.push(f.gain); }
+      }
+    }
+    let worst = 0; for (let t = 1; t < nT; t++) { const m = dS[t] / n, v = Math.max(0, dSS[t] / n - m * m); if (Math.sqrt(v) > worst) worst = Math.sqrt(v); }
+    const out = { n, pattern: !!pat, mddPct: ((o.sides === 2 ? 1.959964 : 1.644854) + 0.841621) * worst, curve: null };
+    if (cur) {
+      est.sort((a, b) => a - b); gains.sort((a, b) => a - b);
+      const q = (arr, p) => (arr.length ? arr[Math.min(arr.length - 1, Math.floor(p * arr.length))] : NaN);
+      out.curve = { x0: cur.x0, p10: q(est, 0.1), p50: q(est, 0.5), p90: q(est, 0.9), gain10: q(gains, 0.1), gain90: q(gains, 0.9), inconclusive: 1 - est.length / n };
+    }
+    return out;
+  },
   ringArea(r) { let a = 0; for (let i = 0, n = r.length, j = n - 1; i < n; j = i++) a += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return a / 2; },
   multiArea(mp) { let a = 0; for (const p of mp) { a += Math.abs(this.ringArea(p[0])); for (let i = 1; i < p.length; i++) a -= Math.abs(this.ringArea(p[i])); } return a; },
   /*
@@ -228,6 +332,8 @@ const pfEssaiGeom = {
       return { type: "Feature", properties: props, geometry: { type: "Polygon", coordinates: [p.ring.map((c) => { const g = inv.forward(c); return [r1(g[0], 7), r1(g[1], 7)]; })] } };
     });
     base.summary = sum; base.strips = res.strips || 0;
+    // centres des parcelles (m) pour la simulation ; en carré latin, la bande sert de bloc
+    base.sim = { x: res.plots.map((p) => (p.ring[0][0] + p.ring[2][0]) / 2), y: res.plots.map((p) => (p.ring[0][1] + p.ring[2][1]) / 2), t: res.plots.map((p) => p.t), strip: res.plots.map((p) => p.strip), pos: res.plots.map((p) => p.pos), block: res.plots.map((p) => p.block || 0) };
     // reste du champ (bouts, côtés, pointes) : une seule entité, à la dose de base
     if (opts.rest && base.features.length && tools && typeof tools.rest === "function") {
       let rest = [];
@@ -260,7 +366,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
   const grille = () => (window.pfGrille && window.pfGrille.geom) || null;
   const vm = () => window.vectorManager || null;
   const toast = (msg, err) => { const v = vm(); if (v && typeof v.showToast === "function") v.showToast(msg, err); };
-  const state = { features: [], name: "", result: null, timer: null, bound: false, autoAngle: true, autoWidth: true, autoHead: true, autoSide: true, line: null, seed: 1, unit: "m" };
+  const state = { features: [], name: "", result: null, timer: null, bound: false, autoAngle: true, autoWidth: true, autoHead: true, autoSide: true, autoOpt: true, line: null, seed: 1, unit: "m" };
   const tools = {
     inward(mp, d) {
       const T = window.pfTampon && window.pfTampon.geom, C = window.ClipperLib;
@@ -327,6 +433,123 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     const kg = Number.isFinite(pw.mddKg) ? ` (${fr(pw.mddKg, 0)} kg/ha)` : "";
     el.textContent = `Plus petite différence détectable 8 fois sur 10 : ${fr(pw.mddPct, 1)} % du rendement${kg}`;
   }
+  // ---- simulation (niveau 2) et courbe de réponse ----------------------------------------------------------
+  function curveOptions(r) {
+    const model = ($("essai-curve") || {}).value || "none";
+    if (!r || !r.numeric || r.treatments.length < 3 || model === "none") return null;
+    const doses = r.treatments.map((t) => t.value), dmax = Math.max(...doses), y = num("essai-yield");
+    let x0 = num("essai-opt"); if (state.autoOpt || !(x0 > 0)) x0 = Math.round(dmax * 0.7 * 10) / 10;
+    let gain = num("essai-gain"); if (!(gain > 0)) return null;
+    if (($("essai-gain-unit") || {}).value === "kg") { if (!(y > 0)) return null; gain = (100 * gain) / y; }
+    return { model, doses, x0, gain };
+  }
+  function updateCurveUi(r) {
+    const box = $("essai-curve-box"), ok = !!(r && r.numeric && r.treatments.length >= 3);
+    if (box) box.hidden = !ok;
+    const on = ok && ($("essai-curve") || {}).value !== "none";
+    document.querySelectorAll("#essai-modal .pf-es-curve-row").forEach((el) => { el.hidden = !on; });
+    if (on && state.autoOpt) { const o = $("essai-opt"); if (o) o.value = Math.round(Math.max(...r.treatments.map((t) => t.value)) * 0.7 * 10) / 10; }
+    const b = $("btn-essai-auto-opt"); if (b) b.classList.toggle("pf-on", state.autoOpt);
+    const rg = $("essai-range"); if (rg) rg.disabled = !!($("essai-pattern") || {}).value;
+  }
+  // ---- structure spatiale tirée d'une couche raster (NDVI enregistré, relief) --------------------------------
+  const pat = { cache: new Map(), ctl: null };
+  function featBbox() {
+    let b = null;
+    const scan = (c) => { if (typeof c[0] === "number") { b = b ? [Math.min(b[0], c[0]), Math.min(b[1], c[1]), Math.max(b[2], c[0]), Math.max(b[3], c[1])] : [c[0], c[1], c[0], c[1]]; } else c.forEach(scan); };
+    state.features.forEach((f) => scan(f.geometry.coordinates));
+    return b;
+  }
+  function ndviDefs() {
+    const zm = window.zonesManager; if (!zm || typeof zm.savedNdvi !== "function") return [];
+    const keep = zm.geomBbox; let list = [];
+    try { zm.geomBbox = featBbox(); list = zm.savedNdvi() || []; } catch (e) { list = []; }
+    zm.geomBbox = keep;
+    return list;
+  }
+  function fillPatterns() {
+    const sel = $("essai-pattern"); if (!sel) return;
+    const cur = sel.value; state.ndvi = ndviDefs();
+    sel.innerHTML = "";
+    const add = (v, t, raw) => { const o = document.createElement("option"); o.value = v; o.textContent = t; if (raw) o.setAttribute("data-no-i18n", ""); sel.appendChild(o); };
+    add("", "Aléatoire (portée)"); add("relief", "Relief (altitude)");
+    state.ndvi.forEach((d) => add(d.key, d.label + (d.landsat ? " · Landsat" : ""), true));
+    sel.value = Array.from(sel.options).some((o) => o.value === cur) ? cur : "";
+  }
+  // valeur d'une grille (nord en haut) au point x, y de son emprise
+  const gridAt = (g, bb, x, y) => { const c = Math.floor(((x - bb[0]) / (bb[2] - bb[0])) * g.w), r = Math.floor(((bb[3] - y) / (bb[3] - bb[1])) * g.h); return c >= 0 && c < g.w && r >= 0 && r < g.h ? g.data[r * g.w + c] : NaN; };
+  // Moyenne de la couche dans chaque parcelle d'essai (5 points le long de la parcelle), centrée réduite
+  async function loadPattern(key, r) {
+    const zm = window.zonesManager, b = featBbox(); if (!b) throw new Error("emprise");
+    const mx = (b[2] - b[0]) * 0.03, my = (b[3] - b[1]) * 0.03, bbox = [b[0] - mx, b[1] - my, b[2] + mx, b[3] + my], ck = key + "|" + bbox.map((v) => v.toFixed(5)).join(",");
+    let src = pat.cache.get(ck);
+    if (!src) {
+      if (pat.ctl) pat.ctl.abort();
+      pat.ctl = new AbortController();
+      if (key === "relief") {
+        const reg = zm && typeof zm.readDem === "function" ? await zm.readDem(bbox, 512, pat.ctl.signal) : null;
+        if (!reg) throw new Error("Pas de relief lisible pour cette parcelle.");
+        const p4 = getP4(), fwd = p4("EPSG:4326", reg.projection);
+        src = { at: (lng, lat) => { const q = fwd.forward([lng, lat]), v = gridAt({ data: reg.data, w: reg.width, h: reg.height }, reg.sourceBBox, q[0], q[1]); return v > -1000 && v < 9000 ? v : NaN; } };
+      } else {
+        const def = (state.ndvi || []).find((d) => d.key === key);
+        if (!def || !zm || typeof zm.fetchNdvi !== "function") throw new Error("Cette tuile NDVI n'est plus disponible.");
+        const lat = (bbox[1] + bbox[3]) / 2, wM = (bbox[2] - bbox[0]) * 111320 * Math.cos((lat * Math.PI) / 180), hM = (bbox[3] - bbox[1]) * 111132;
+        const g = await zm.fetchNdvi(def, bbox, wM, hM, pat.ctl.signal);
+        src = { at: (lng, lat2) => gridAt(g, bbox, lng, lat2) };
+      }
+      pat.cache.set(ck, src); if (pat.cache.size > 6) pat.cache.delete(pat.cache.keys().next().value);
+    }
+    const plots = r.features.filter((f) => !f.properties.hors_essai), vals = new Float64Array(plots.length); let sum = 0, cnt = 0;
+    plots.forEach((f, i) => {
+      const c = f.geometry.coordinates[0], a = [(c[0][0] + c[3][0]) / 2, (c[0][1] + c[3][1]) / 2], e = [(c[1][0] + c[2][0]) / 2, (c[1][1] + c[2][1]) / 2];
+      let s = 0, n = 0;
+      [0.1, 0.3, 0.5, 0.7, 0.9].forEach((t) => { const v = src.at(a[0] + (e[0] - a[0]) * t, a[1] + (e[1] - a[1]) * t); if (Number.isFinite(v)) { s += v; n++; } });
+      vals[i] = n ? s / n : NaN; if (n) { sum += vals[i]; cnt++; }
+    });
+    if (cnt < plots.length * 0.5 || cnt < 4) throw new Error("La couche ne couvre pas assez de parcelles d'essai (nuages ou absence de données).");
+    const mean = sum / cnt; let ss = 0; vals.forEach((v) => { if (Number.isFinite(v)) ss += (v - mean) * (v - mean); });
+    const sd = Math.sqrt(ss / cnt); if (!(sd > 1e-9)) throw new Error("La couche est uniforme dans cet essai : elle ne peut pas servir de structure spatiale.");
+    return Array.from(vals, (v) => (Number.isFinite(v) ? (v - mean) / sd : 0));
+  }
+  function clearSim() { const el = $("essai-sim"); if (el) { el.textContent = ""; el.classList.remove("pf-tp-warn"); } }
+  async function runSim() {
+    const r = state.result, el = $("essai-sim"); if (!el) return;
+    el.classList.remove("pf-tp-warn");
+    const cv = num("essai-cv"), y = num("essai-yield"), range = num("essai-range");
+    if (!r || !r.sim || !r.features.length) { el.textContent = ""; return; }
+    if (!(cv > 0)) { el.textContent = "Choisissez une culture ou entrez la variabilité avant de simuler."; el.classList.add("pf-tp-warn"); return; }
+    const o = readOptions(), cur = curveOptions(r), wantCurve = r.numeric && r.treatments.length >= 3 && ($("essai-curve") || {}).value !== "none";
+    if (wantCurve && !cur) { el.textContent = "Entrez le gain de rendement attendu (et le rendement espéré s'il est en kg/ha) pour simuler la courbe de réponse."; el.classList.add("pf-tp-warn"); return; }
+    const pkey = ($("essai-pattern") || {}).value || "", psel = $("essai-pattern"), plabel = pkey && psel ? psel.options[psel.selectedIndex].textContent : "";
+    let pattern = null;
+    if (pkey) {
+      const btn = $("btn-essai-sim"); if (btn) btn.disabled = true;
+      el.textContent = "Lecture de la couche…";
+      try { pattern = await loadPattern(pkey, r); }
+      catch (e) { if (btn) btn.disabled = false; if (state.result !== r) return; el.textContent = (e && e.message) || "Lecture de la couche impossible."; el.classList.add("pf-tp-warn"); return; }
+      if (btn) btn.disabled = false;
+      if (state.result !== r) { el.textContent = ""; return; } // le dispositif a changé pendant la lecture
+    }
+    let res = null;
+    try { res = pfEssaiGeom.simulate(r.sim, { n: 500, cv, range: range > 0 ? range * k() : 80, frac: 0.6, design: o.design, nT: r.treatments.length, sides: ($("essai-sides") || {}).value === "2" ? 2 : 1, seed: (state.seed * 7919 + 13) >>> 0, curve: cur, pattern }); } catch (e) { console.error("Simulation de l'essai :", e); }
+    if (!res) { el.textContent = "Simulation impossible."; el.classList.add("pf-tp-warn"); return; }
+    // résultat en lignes courtes : un titre, d'où vient la variabilité, puis une ligne par question
+    const line = (t, cls, raw) => { const sp = document.createElement("span"); sp.className = "pf-es-sim-line" + (cls ? " " + cls : ""); sp.textContent = t; if (raw) { const nm = document.createElement("span"); nm.setAttribute("data-no-i18n", ""); nm.textContent = " " + raw; sp.appendChild(nm); } el.appendChild(sp); };
+    el.textContent = "";
+    line(`Résultat de ${res.n} essais simulés sur ce champ`, "pf-es-sim-title");
+    if (res.pattern) line("Variabilité du champ selon la couche :", "pf-es-sim-sub", plabel);
+    else line(`Variabilité du champ tirée au hasard, en taches d'environ ${fr(range > 0 ? range : 80, 0)} ${state.unit === "pi" ? "pi" : "m"}`, "pf-es-sim-sub");
+    line(y > 0 ? `Écart entre deux traitements : l'essai le détecte 8 fois sur 10 s'il atteint ${fr((res.mddPct * y) / 100, 0)} kg/ha (${fr(res.mddPct, 1)} % du rendement).` : `Écart entre deux traitements : l'essai le détecte 8 fois sur 10 s'il atteint ${fr(res.mddPct, 1)} % du rendement.`, "pf-es-sim-item");
+    if (res.curve) {
+      const c = res.curve, u = o.unit ? " " + o.unit : "", d = (v) => fr(v, Math.abs(c.x0) < 20 ? 1 : 0) + u;
+      if (c.inconclusive > 0.5 || !Number.isFinite(c.p50)) { line(`Dose optimale : dans ${fr(100 * c.inconclusive, 0)} % des cas, l'essai ne permettrait pas de la trouver.`, "pf-es-sim-item pf-es-low"); }
+      else {
+        line(`Dose optimale : si la vraie valeur est ${d(c.x0)}, l'essai l'estimerait entre ${d(c.p10)} et ${d(c.p90)}, 8 fois sur 10.`, "pf-es-sim-item");
+        if (c.inconclusive >= 0.05) line(`Dans ${fr(100 * c.inconclusive, 0)} % des cas, l'essai ne permettrait pas de trouver la dose optimale.`, "pf-es-sim-item pf-es-low");
+      }
+    }
+  }
   function renderLegend(r, pw) {
     const el = $("essai-legend"); if (!el) return;
     el.innerHTML = "";
@@ -353,23 +576,23 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     if (state.autoHead) setVal("essai-head", o.head);
     if (state.autoSide) setVal("essai-side", o.side);
     ["width", "head", "side"].forEach((n) => { const b = $("btn-essai-auto-" + n); if (b) b.classList.toggle("pf-on", state["auto" + n[0].toUpperCase() + n.slice(1)]); });
-    if (!(o.appWidth > 0)) { clearPreview(); renderLegend(null); renderPower(null); setNote("Entrez la largeur de l'applicateur.", true); return; }
-    if (!(o.minLen > 0) || !(o.maxLen >= o.minLen)) { clearPreview(); renderLegend(null); renderPower(null); setNote("La longueur maximale doit être au moins égale à la longueur minimale.", true); return; }
+    if (!(o.appWidth > 0)) { clearPreview(); renderLegend(null); renderPower(null); updateCurveUi(null); clearSim(); setNote("Entrez la largeur de l'applicateur.", true); return; }
+    if (!(o.minLen > 0) || !(o.maxLen >= o.minLen)) { clearPreview(); renderLegend(null); renderPower(null); updateCurveUi(null); clearSim(); setNote("La longueur maximale doit être au moins égale à la longueur minimale.", true); return; }
     let r = null;
     try { r = pfEssaiGeom.design(p4, G, state.features, o, tools); } catch (e) { console.error("Essai à la ferme :", e); }
-    if (!r) { clearPreview(); renderLegend(null); renderPower(null); setNote("Calcul impossible pour cette géométrie.", true); return; }
+    if (!r) { clearPreview(); renderLegend(null); renderPower(null); updateCurveUi(null); clearSim(); setNote("Calcul impossible pour cette géométrie.", true); return; }
     if (state.autoWidth) setVal("essai-width", r.plotWidth);
     const angle = $("essai-angle"), auto = $("btn-essai-auto");
     if (state.autoAngle && angle) angle.value = r.azimuth;
     if (auto) auto.classList.toggle("pf-on", state.autoAngle);
     const wi = $("essai-width-info");
     if (wi) { const passes = r.plotWidth / o.appWidth, hp = o.harvWidth > 0 ? r.plotWidth / o.harvWidth : NaN; wi.textContent = `Parcelles de ${fr(r.plotWidth, 1)} m : ${fr(passes, passes % 1 ? 1 : 0)} passage(s) d'applicateur` + (Number.isFinite(hp) ? `, ${fr(hp, hp % 1 ? 1 : 0)} de récolteuse` : ""); }
-    if (r.treatments.length < 2) { clearPreview(); renderLegend(null); renderPower(null); setNote("Entrez au moins deux traitements, séparés par des virgules.", true); return; }
-    if (r.tooMany) { clearPreview(); renderLegend(null); renderPower(null); setNote("Trop de parcelles : augmentez la largeur ou la longueur des parcelles.", true); return; }
-    if (!r.features.length) { clearPreview(); renderLegend(null); renderPower(null); setNote("Aucune parcelle d'essai ne tient dans le champ avec ces dimensions.", true); return; }
+    if (r.treatments.length < 2) { clearPreview(); renderLegend(null); renderPower(null); updateCurveUi(null); clearSim(); setNote("Entrez au moins deux traitements, séparés par des virgules.", true); return; }
+    if (r.tooMany) { clearPreview(); renderLegend(null); renderPower(null); updateCurveUi(null); clearSim(); setNote("Trop de parcelles : augmentez la largeur ou la longueur des parcelles.", true); return; }
+    if (!r.features.length) { clearPreview(); renderLegend(null); renderPower(null); updateCurveUi(null); clearSim(); setNote("Aucune parcelle d'essai ne tient dans le champ avec ces dimensions.", true); return; }
     state.result = r;
     const pw = powerOf(r);
-    showPreview(r.features); renderLegend(r, pw); renderPower(r, pw);
+    showPreview(r.features); renderLegend(r, pw); renderPower(r, pw); updateCurveUi(r); clearSim();
     const reps = Math.min(...r.summary.map((s) => s.count));
     const nPlots = r.features.length - (r.rest ? 1 : 0);
     setNote(`${nPlots} parcelles d'essai sur ${r.strips} bande(s) · ${fr(r.trialHa, 1)} ha en essai (${fr((100 * r.trialHa) / r.areaHa, 0)} % du champ) · au moins ${reps} répétition(s) par traitement`, reps < 2);
@@ -493,7 +716,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     const next = ($("essai-units") || {}).value === "pi" ? "pi" : "m";
     if (next === state.unit) return;
     const f = next === "pi" ? 1 / pfEssaiGeom.FT : pfEssaiGeom.FT;
-    ["essai-app", "essai-harv", "essai-width", "essai-head", "essai-side", "essai-min", "essai-max"].forEach((id) => { const el = $(id), v = num(id); if (el && Number.isFinite(v)) el.value = Math.round(v * f * (next === "pi" ? 1 : 100)) / (next === "pi" ? 1 : 100); });
+    ["essai-app", "essai-harv", "essai-width", "essai-head", "essai-side", "essai-min", "essai-max", "essai-range"].forEach((id) => { const el = $(id), v = num(id); if (el && Number.isFinite(v)) el.value = Math.round(v * f * (next === "pi" ? 1 : 100)) / (next === "pi" ? 1 : 100); });
     state.unit = next;
     document.querySelectorAll("#essai-modal .pf-es-u").forEach((el) => { el.textContent = next === "pi" ? "pi" : "m"; });
   }
@@ -519,6 +742,9 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     on("essai-units", "change", switchUnit);
     fillCrops();
     on("essai-crop", "change", pickCrop);
+    on("essai-opt", "input", () => { state.autoOpt = false; });
+    on("btn-essai-auto-opt", "click", () => { state.autoOpt = true; compute(); });
+    on("btn-essai-sim", "click", () => { clearTimeout(state.timer); compute(); runSim(); });
     modal.addEventListener("input", schedule);
     modal.addEventListener("change", schedule);
     modal.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); if (draw.on) { stopLine(); compute(); } else close(); } });
@@ -533,6 +759,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     state.features = feats; state.name = String((opts && opts.name) || "Parcelle").slice(0, 80); state.result = null; state.autoAngle = true; state.line = null;
     const src = $("essai-source"); if (src) src.textContent = state.name;
     modal.classList.add("active");
+    fillPatterns();
     compute();
   }
   function openForParcel(feature) {
