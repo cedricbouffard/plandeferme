@@ -1303,3 +1303,33 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-es-sim-item { position: relative; padding-left: 12px; margin-top: 3px; color: var(--pf-ink); }
 .pf-es-sim-item::before { content: "•"; position: absolute; left: 0; color: var(--pf-accent-strong); }
 .pf-es-sim-item.pf-es-low { color: #9a3412; }
+
+/* NDVI sur téléphone : panneau compact (environ 40 % de l'écran au lieu de 60 %), graphique visible sans défiler */
+@media (max-width: 768px) {
+  .ndvi-dock { max-height: 52vh !important; padding: 10px 12px 10px !important; }
+  .ndvi-dock .profile-dock-header { top: -10px; margin: -10px -12px 4px; padding: 10px 12px 6px; align-items: center; flex-wrap: nowrap; }
+  /* le titre long (année, coordonnées) répète les menus et les pastilles : masqué */
+  .ndvi-dock #ndvi-dock-title { display: none; }
+  .ndvi-dock .profile-dock-title { flex: 0 0 auto; flex-wrap: nowrap; }
+  .ndvi-dock .profile-dock-header-right { flex: 1 1 auto; min-width: 0; justify-content: flex-end; gap: 5px; flex-wrap: nowrap; }
+  .ndvi-dock #ndvi-sensor-select { min-width: 0; flex: 0 1 auto; max-width: 118px; }
+  .ndvi-dock-body { gap: 4px; }
+  /* pastilles sur une seule ligne, à faire glisser */
+  .ndvi-dock #ndvi-stats-bar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -12px; padding: 0 12px 4px; }
+  .ndvi-dock #ndvi-stats-bar::-webkit-scrollbar { display: none; }
+  .ndvi-dock #ndvi-stats-bar .stat-chip { flex: 0 0 auto; white-space: nowrap; }
+  /* ligne d'aide au survol : sans objet au doigt */
+  .ndvi-dock #ndvi-hover-info { display: none; }
+  .ndvi-dock .ndvi-active-controls { padding: 6px 8px; gap: 4px; }
+  /* date sur une ligne ; opacité, nuancier et légende sur une seconde ligne à faire glisser */
+  .ndvi-dock .ndvi-controls-main-bar { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 6px; }
+  .ndvi-dock .ndvi-controls-main-bar > div:first-child { min-width: 0; }
+  .ndvi-dock .ndvi-controls-main-bar > div:first-child .ndvi-date-badge { flex: 1 1 auto; }
+  .ndvi-dock .ndvi-controls-main-bar > div:nth-child(n+2) { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; gap: 12px !important; overflow-x: auto; scrollbar-width: none; }
+  .ndvi-dock .ndvi-controls-main-bar > div:nth-child(n+2)::-webkit-scrollbar { display: none; }
+  .ndvi-dock .ndvi-controls-main-bar > div:nth-child(n+2) > * { flex: 0 0 auto; }
+  .ndvi-dock .ndvi-opacity-wrap, .ndvi-dock .ndvi-stretch-group, .ndvi-dock .ndvi-legend-mini { flex-wrap: nowrap; white-space: nowrap; }
+  .ndvi-dock .ndvi-date-badge { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 12px; }
+  .ndvi-dock .ndvi-date-badge > span[title] { display: none; }
+  .ndvi-dock .profile-chart-container { height: 130px !important; min-height: 130px !important; }
+}
