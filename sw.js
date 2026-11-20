@@ -1,4 +1,4 @@
-const CACHE_NAME = "plandeferme-v54";
+const CACHE_NAME = "plandeferme-v55";
 
 const ASSETS = [
   "/",
@@ -32,6 +32,9 @@ const ASSETS = [
   "/js/composer.js",
   "/js/vectors.js",
   "/js/vector-library.js",
+  "/fzstd.min.js",
+  "/js/blosc.js",
+  "/js/tessera.js",
   "/js/zones.js",
   "/clipper.min.js",
   "/js/tampon.js",
