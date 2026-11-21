@@ -24,6 +24,16 @@ const pfStabGeom = {
     { code: "generalement-mauvais", label: "Généralement mauvais", color: "#fdae61" },
     { code: "toujours-mauvais", label: "Toujours mauvais", color: "#d73027" }
   ],
+  // Retire `steps` pixels le long du bord d'un masque (les 8 voisins doivent être dans le masque)
+  erode(mask, W, H, steps) {
+    let cur = mask;
+    for (let s = 0; s < steps; s++) {
+      const nx = new Uint8Array(W * H);
+      for (let r = 1; r < H - 1; r++) for (let c = 1; c < W - 1; c++) { const i = r * W + c; if (cur[i] && cur[i - 1] && cur[i + 1] && cur[i - W] && cur[i + W] && cur[i - W - 1] && cur[i - W + 1] && cur[i + W - 1] && cur[i + W + 1]) nx[i] = 1; }
+      cur = nx;
+    }
+    return cur;
+  },
   // Statistiques d'un passage dans la parcelle. mask : 1 dans la parcelle ; near : 1 dans la parcelle et sa bordure
   sceneStats(data, scl, mask, near) {
     const n = mask.length; let inN = 0, bad = 0, s = 0, ss = 0, c = 0;
@@ -96,7 +106,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
   const FIRST_YEAR = 2017, STAC = "https://planetarycomputer.microsoft.com/api/stac/v1/search", STATS = "https://planetarycomputer.microsoft.com/api/data/v1/item/statistics";
   const vm = () => window.vectorManager || null;
   const toast = (msg, err) => { const v = vm(); if (v && typeof v.showToast === "function") v.showToast(msg, err); };
-  const state = { features: [], name: "", bound: false, ctl: null, grid: null, years: [], result: null, running: false };
+  const state = { features: [], name: "", bound: false, ctl: null, grid: null, years: [], result: null, running: false, autoAlways: true, autoUsually: true };
 
   function setNote(text, warn) { const el = $("stab-note"); if (!el) return; el.textContent = text || ""; el.classList.toggle("pf-tp-warn", !!warn); }
   function clearPreview() {
@@ -114,8 +124,20 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
   }
   const numOf = (id, def) => { const v = parseFloat(String(($(id) || {}).value || "").replace(",", ".")); return Number.isFinite(v) ? v : def; };
   const minMean = () => Math.max(0, Math.min(0.95, numOf("stab-min", 0.5)));
-  const share = () => Math.max(0.55, Math.min(1, numOf("stab-share", 85) / 100));
-  const shareGen = () => Math.max(0.51, Math.min(share(), numOf("stab-share2", 65) / 100));
+  // Seuils en nombre d'années sur le total retenu. Tant qu'on n'y touche pas : environ 85 % et 65 % des années.
+  // « Généralement » demande toujours plus de la moitié des années, et jamais plus que « toujours ».
+  function thresholds(T) {
+    const half = Math.floor(T / 2) + 1;
+    let a = state.autoAlways ? Math.ceil(0.85 * T) : Math.round(numOf("stab-share", T));
+    a = Math.max(half, Math.min(T, a));
+    let u = state.autoUsually ? Math.ceil(0.65 * T) : Math.round(numOf("stab-share2", half));
+    u = Math.max(half, Math.min(a, u));
+    const ia = $("stab-share"), iu = $("stab-share2");
+    if (ia) { ia.value = a; ia.max = T; ia.min = half; }
+    if (iu) { iu.value = u; iu.max = T; iu.min = half; }
+    document.querySelectorAll("#stab-modal .pf-st-total").forEach((el) => { el.textContent = String(T); });
+    return { always: a, usually: u };
+  }
 
   // ---- grille de travail : emprise de la parcelle (avec marge), pixels de 10 m, masque de la parcelle ------
   function buildGrid() {
@@ -136,7 +158,23 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     }
     const near = new Uint8Array(mask); // parcelle + un pixel de bordure
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (mask[y * W + x]) { if (x > 0) near[y * W + x - 1] = 1; if (x < W - 1) near[y * W + x + 1] = 1; if (y > 0) near[(y - 1) * W + x] = 1; if (y < H - 1) near[(y + 1) * W + x] = 1; }
-    return { bbox, W, H, wM, hM, mask, near, inside, polys, cellHa: ((wM / W) * (hM / H)) / 10000 };
+    // marge intérieure : les pixels du bord (arbres, fossé, champ voisin) ne servent ni au choix des dates ni au
+    // classement ; le résultat est ensuite prolongé jusqu'au contour
+    const bufM = Math.max(0, Math.min(50, numOf("stab-buffer", 10))), steps = Math.round(bufM / 10);
+    let inner = mask, innerN = inside, statPolys = polys, margin = 0;
+    if (steps > 0) {
+      const er = pfStabGeom.erode(mask, W, H, steps); let kept = 0; for (let i = 0; i < er.length; i++) kept += er[i];
+      if (kept >= Math.max(20, 0.35 * inside)) {
+        inner = er; innerN = kept; margin = bufM;
+        try { // même retrait sur le contour envoyé au serveur pour les statistiques
+          const T = window.pfTampon && window.pfTampon.geom, C = window.ClipperLib, p4 = window.proj4 || (window.GeoLibreContour && window.GeoLibreContour.proj4);
+          const out = T && C && p4 ? T.buffer(C, p4, [{ type: "Feature", properties: {}, geometry: { type: "MultiPolygon", coordinates: polys } }], bufM, { side: "in" }) : [];
+          const sp = []; (out || []).forEach((f) => { const g = f.geometry; if (g.type === "Polygon") sp.push(g.coordinates); else if (g.type === "MultiPolygon") g.coordinates.forEach((p) => sp.push(p)); });
+          if (sp.length) statPolys = sp;
+        } catch (e) { statPolys = polys; }
+      }
+    }
+    return { bbox, W, H, wM, hM, mask, near, inner, innerN, statPolys, margin, marginAsked: bufM, inside, polys, cellHa: ((wM / W) * (hM / H)) / 10000 };
   }
 
   // ---- passages de l'été pour une année ------------------------------------------------------------------
@@ -157,7 +195,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
   // Statistiques d'un passage dans le contour de la parcelle, calculées par le serveur (aucune image téléchargée)
   async function remoteStats(sc, grid, signal) {
     const q = `collection=sentinel-2-l2a&item=${encodeURIComponent(sc.id)}&assets=B08&assets=B04&assets=SCL&asset_as_band=True&expression=${encodeURIComponent(sc.offset ? "(B08-B04)/(B08+B04-2000);SCL" : "(B08-B04)/(B08+B04);SCL")}&histogram_bins=12&histogram_range=0,12`;
-    const resp = await fetch(`${STATS}?${q}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "Feature", properties: {}, geometry: { type: "MultiPolygon", coordinates: grid.polys } }), signal });
+    const resp = await fetch(`${STATS}?${q}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "Feature", properties: {}, geometry: { type: "MultiPolygon", coordinates: grid.statPolys } }), signal });
     if (!resp.ok) return null;
     return pfStabGeom.remoteStats(await resp.json());
   }
@@ -208,7 +246,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
             if (!stats) { // service de statistiques indisponible pour ce passage : lecture de l'image
               const g = await zm.fetchNdvi({ scene: j.sc.id, landsat: false, s2Offset: j.sc.offset, label: "NDVI " + j.sc.date }, grid.bbox, grid.wM, grid.hM, signal);
               if (g.w !== grid.W || g.h !== grid.H) return;
-              stats = pfStabGeom.sceneStats(g.data, g.scl, grid.mask, grid.near);
+              stats = pfStabGeom.sceneStats(g.data, g.scl, grid.inner, grid.margin ? grid.inner : grid.near);
               for (let k = 0; k < g.data.length; k++) if (pfStabGeom.STRICT.includes(g.scl[k])) g.data[k] = NaN;
               cand.data = g.data;
             }
@@ -255,12 +293,13 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       used = state.years.filter((y) => y.on && y.pick >= 0 && y.cands[y.pick].data);
     }
     if (used.length < 2) { clearPreview(); renderResult(); toggleButtons(); setNote(missing.some((y) => y.readError) ? "Les images retenues n'ont pas pu être lues. Réessayez dans un moment." : state.years.length ? "Il faut au moins deux années pour comparer. Cochez d'autres années ou baissez le NDVI minimal." : "Aucune date dégagée et assez verte n'a été trouvée.", true); return; }
-    const { W, H } = grid, cl = pfStabGeom.classify(used.map((y) => y.cands[y.pick].data), grid.mask, share(), shareGen());
+    const T = used.length, th = thresholds(T);
+    const { W, H } = grid, cl = pfStabGeom.classify(used.map((y) => y.cands[y.pick].data), grid.inner, th.always / T - 1e-9, th.usually / T - 1e-9);
     const ZG = typeof pfZonesGeom !== "undefined" ? pfZonesGeom : window.pfZonesGeom;
     const core = pfZonesCore(), K = pfStabGeom.CLASSES.length, minPatch = Math.max(4, Math.round(0.1 / grid.cellHa)); // îlots de moins de 0,1 ha fusionnés
     let L = cl.labels;
     try { L = core.enforceContiguity(core.modeFilter(L, W, H, K, 1, 2), W, H, K, minPatch); } catch (e) { L = cl.labels; }
-    const rings = core.traceRings(core.dilate(L, W, H, 3), W, H, K, 6);
+    const rings = core.traceRings(core.dilate(L, W, H, 3 + Math.round(grid.margin / 10) + 1), W, H, K, 6); // prolongé au-delà du contour, puis découpé
     const pc = window.polygonClipping || null, bb = grid.bbox, toLL = (c) => [Math.round((bb[0] + (c[0] / W) * (bb[2] - bb[0])) * 1e7) / 1e7, Math.round((bb[3] + (c[1] / H) * (bb[3] - bb[1])) * 1e7) / 1e7];
     const lat = (bb[1] + bb[3]) / 2, mx = 111320 * Math.cos((lat * Math.PI) / 180), my = 111132;
     const areaHa = (multi) => { let a = 0; multi.forEach((poly) => poly.forEach((ring, k) => { let s = 0; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) s += ring[j][0] * mx * ring[i][1] * my - ring[i][0] * mx * ring[j][1] * my; a += (k === 0 ? 1 : -1) * Math.abs(s / 2); })); return a / 10000; };
@@ -274,13 +313,13 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       if (!multi.length) continue;
       let s = 0, c = 0; for (let i = 0; i < L.length; i++) if (L[i] === k && Number.isFinite(cl.rel[i])) { s += cl.rel[i]; c++; }
       const ha = areaHa(multi), def = pfStabGeom.CLASSES[k]; total += ha;
-      features.push({ type: "Feature", properties: { classe: def.label, code: def.code, superficie_ha: Math.round(ha * 100) / 100, ndvi_relatif_pct: c ? Math.round((s / c) * 1000) / 10 : null, annees: years, dates, nb_annees: used.length, parcelle: state.name, couleur: def.color },
+      features.push({ type: "Feature", properties: { classe: def.label, code: def.code, superficie_ha: Math.round(ha * 100) / 100, ndvi_relatif_pct: c ? Math.round((s / c) * 1000) / 10 : null, annees: years, dates, nb_annees: used.length, seuil_toujours: th.always, seuil_generalement: th.usually, marge_m: grid.margin, parcelle: state.name, couleur: def.color },
         geometry: multi.length === 1 ? { type: "Polygon", coordinates: multi[0] } : { type: "MultiPolygon", coordinates: multi } });
     }
     features.forEach((f) => { f.properties.part_pct = total > 0 ? Math.round((f.properties.superficie_ha / total) * 1000) / 10 : 0; });
     state.result = { features, years: used.length, totalHa: total };
     showPreview(features); renderResult(); toggleButtons();
-    setNote(`Classement sur ${used.length} années, ${fr(total, 1)} ha. « Toujours » : au moins ${fr(share() * 100, 0)} % des années ; « généralement » : au moins ${fr(shareGen() * 100, 0)} %.`, used.length < 3);
+    setNote(`Classement sur ${T} années, ${fr(total, 1)} ha. « Toujours » : au moins ${th.always} années sur ${T} ; « généralement » : au moins ${th.usually}.` + (grid.marginAsked > 0 && !grid.margin ? " Marge intérieure ignorée : la parcelle est trop étroite." : ""), T < 3);
   }
 
   // ---- interface -----------------------------------------------------------------------------------------------
@@ -364,9 +403,10 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     on("btn-stab-export", "click", exportGeoJson);
     on("btn-stab-export-shp", "click", exportShapefile);
     // seuils : pas de relecture, seulement un nouveau choix des dates et un nouveau classement
+    on("stab-buffer", "change", () => { if (state.features.length) run(); }); // le contour d'analyse change : tout est relu
     on("stab-min", "change", () => { if (!state.years.length) return; pickAll(); renderYears(); classify(); });
-    on("stab-share", "change", () => { if (state.years.length) classify(); });
-    on("stab-share2", "change", () => { if (state.years.length) classify(); });
+    on("stab-share", "change", () => { state.autoAlways = false; if (state.years.length) classify(); });
+    on("stab-share2", "change", () => { state.autoUsually = false; if (state.years.length) classify(); });
     modal.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } });
   }
   function open(opts) {
@@ -375,7 +415,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     const modal = $("stab-modal"); if (!modal) return;
     bind();
     if (state.ctl) state.ctl.abort();
-    state.features = feats; state.name = String((opts && opts.name) || "Parcelle").slice(0, 80); state.years = []; state.grid = null; state.result = null; state.running = false;
+    state.features = feats; state.name = String((opts && opts.name) || "Parcelle").slice(0, 80); state.years = []; state.grid = null; state.result = null; state.running = false; state.autoAlways = true; state.autoUsually = true;
     const src = $("stab-source"); if (src) src.textContent = state.name;
     modal.classList.add("active");
     clearPreview(); renderYears(); renderResult(); toggleButtons();

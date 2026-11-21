@@ -1251,6 +1251,9 @@
           <option value="3">Fort</option>
         </select>
       </label>
+      <label class="pf-cf-field" title="Bande le long du contour qui ne sert pas au calcul : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Les zones sont ensuite prolongées jusqu'au contour. 0 pour utiliser tout le champ.">Marge intérieure
+        <input type="number" id="zones-buffer" min="0" max="50" step="5" value="10" inputmode="decimal" /> m
+      </label>
       <button type="button" id="btn-zones-run" class="pf-zn-run">Calculer les zones</button>
       <span class="pf-cf-sep"></span>
       <label class="pf-cf-field pf-cf-opacity">Opacité
@@ -1500,13 +1503,17 @@
           <span>NDVI moyen minimal</span>
           <span><input type="number" id="stab-min" class="pf-tp-num" min="0.2" max="0.9" step="0.05" value="0.5" inputmode="decimal" aria-label="NDVI moyen minimal" /></span>
         </div>
-        <div class="pf-tp-row" title="« Bien » veut dire au-dessus de la moyenne du champ cette année-là ; « mauvais », en dessous. Un endroit est classé « toujours bien » ou « toujours mauvais » s'il est du même côté au moins cette part des années.">
-          <span>« Toujours » veut dire</span>
-          <span><input type="number" id="stab-share" class="pf-tp-num" min="55" max="100" step="5" value="85" inputmode="decimal" aria-label="Part des années pour « toujours »" /> % des années</span>
+        <div class="pf-tp-row" title="« Bien » veut dire au-dessus de la moyenne du champ cette année-là ; « mauvais », en dessous. Un endroit est classé « toujours bien » ou « toujours mauvais » s'il est du même côté au moins ce nombre d'années, sur le total des années cochées.">
+          <span>« Toujours » : au moins</span>
+          <span><input type="number" id="stab-share" class="pf-tp-num pf-es-sm" min="1" step="1" inputmode="numeric" aria-label="Nombre d'années pour « toujours »" /> années sur <strong class="pf-st-total" data-no-i18n>–</strong></span>
         </div>
-        <div class="pf-tp-row" title="Un endroit est classé « généralement bien » ou « généralement mauvais » s'il est du même côté de la moyenne au moins cette part des années, sans atteindre le seuil de « toujours ». Le reste est classé variable.">
-          <span>« Généralement » veut dire</span>
-          <span><input type="number" id="stab-share2" class="pf-tp-num" min="51" max="100" step="5" value="65" inputmode="decimal" aria-label="Part des années pour « généralement »" /> % des années</span>
+        <div class="pf-tp-row" title="Un endroit est classé « généralement bien » ou « généralement mauvais » s'il est du même côté de la moyenne au moins ce nombre d'années, sans atteindre le seuil de « toujours ». Il faut plus de la moitié des années. Le reste est classé variable.">
+          <span>« Généralement » : au moins</span>
+          <span><input type="number" id="stab-share2" class="pf-tp-num pf-es-sm" min="1" step="1" inputmode="numeric" aria-label="Nombre d'années pour « généralement »" /> années sur <strong class="pf-st-total" data-no-i18n>–</strong></span>
+        </div>
+        <div class="pf-tp-row" title="Bande le long du contour qui ne sert pas à l'analyse : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Le résultat est ensuite prolongé jusqu'au contour. 0 pour utiliser tout le champ.">
+          <span>Marge intérieure</span>
+          <span><input type="number" id="stab-buffer" class="pf-tp-num pf-es-sm" min="0" max="50" step="5" value="10" inputmode="decimal" aria-label="Marge intérieure" /> m</span>
         </div>
         <div class="pf-es-sub">Années et dates retenues</div>
         <p class="pf-zn-modal-help">Décochez une année pour la retirer de l'analyse, ou choisissez une autre date dégagée. Chaque date indique le NDVI moyen et sa variation (±) dans le champ.</p>

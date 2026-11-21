@@ -1051,7 +1051,10 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         const resSel = ($("zones-res") || {}).value || "auto";
         let res = resSel === "auto" ? [2, 3, 5, 10].find((r) => r >= Math.sqrt(this.areaM2 / 60000)) || 10 : parseFloat(resSel);
         let notice = "";
-        const marginCells = (r) => Math.max(6 + (smooth > 0 ? 2 * smooth : 0), Math.ceil(30 / r));
+        // marge intérieure (m) : les cellules trop près du contour ne servent pas au calcul (arbres, fossés,
+        // pixels satellites à cheval sur le voisin) ; les zones sont ensuite prolongées jusqu'au contour
+        const bufM = Math.max(0, Math.min(50, parseFloat(String(($("zones-buffer") || {}).value || "0").replace(",", ".")) || 0));
+        const marginCells = (r) => Math.max(6 + (smooth > 0 ? 2 * smooth : 0), Math.ceil(30 / r)) + Math.ceil(bufM / r);
         while (res < 50 && ((maxX - minX) / res + 2 * marginCells(res)) * ((maxY - minY) / res + 2 * marginCells(res)) > MAX_CELLS) {
           res = res < 10 ? [3, 5, 10].find((r) => r > res) : res * 2;
           notice = `Parcelle très grande : résolution ramenée à ${res} m.`;
@@ -1125,7 +1128,23 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
           if (doubt.reduce((a, x) => a + x.part, 0) > 0.05) cloudy.push(`${d.label} : toutes les valeurs sont utilisées, mais le masque de qualité du satellite classe une partie de la parcelle en ${doubt.map((x) => `${x.name} (${fr(x.part * 100, 0)} %)`).join(", ")}. Ce classement se trompe souvent sur un sol nu ou foncé ; si la tuile montre un vrai nuage ou son ombre, décochez cette date.`);
         });
         const cellHa = (res * res) / 10000;
-        const input = { dem, W, H, res, inside, layers, extra, weights, method, k, smooth, margin: mc - 2, minCells: Math.ceil(minHa / cellHa), maxCells: maxHa ? Math.floor(maxHa / cellHa) : 0 };
+        // retrait de la bordure : érosion du masque de la parcelle, cellule par cellule
+        let calc = inside, ratio = 1;
+        const erodeSteps = Math.round(bufM / res);
+        if (erodeSteps > 0) {
+          let cur = inside, total = 0; for (let i = 0; i < cur.length; i++) total += cur[i];
+          for (let st = 0; st < erodeSteps; st++) {
+            const nx = new Uint8Array(W * H);
+            for (let r = 1; r < H - 1; r++) for (let c = 1; c < W - 1; c++) { const i = r * W + c; if (cur[i] && cur[i - 1] && cur[i + 1] && cur[i - W] && cur[i + W] && cur[i - W - 1] && cur[i - W + 1] && cur[i + W - 1] && cur[i + W + 1]) nx[i] = 1; }
+            cur = nx;
+          }
+          let kept = 0; for (let i = 0; i < cur.length; i++) kept += cur[i];
+          // parcelle trop étroite pour cette marge : on garde tout le champ et on le dit
+          if (kept >= Math.max(60, 0.35 * total)) { calc = cur; ratio = kept / total; }
+          else cloudy.push(`Marge intérieure de ${fr(bufM, 0)} m ignorée : la parcelle est trop étroite pour la retirer.`);
+        }
+        // les superficies demandées valent pour la parcelle entière : ramenées à la partie utilisée pour le calcul
+        const input = { dem, W, H, res, inside: calc, layers, extra, weights, method, k, smooth, margin: mc - 2, minCells: Math.max(1, Math.ceil((minHa / cellHa) * ratio)), maxCells: maxHa ? Math.max(1, Math.floor((maxHa / cellHa) * ratio)) : 0 };
         const out = await this.computeInWorker(input, (text) => { if (myRun === this.runId) this.setLoading(true, text); });
         if (myRun !== this.runId) return;
 

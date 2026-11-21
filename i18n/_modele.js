@@ -1854,5 +1854,17 @@ window.pfI18n.langue("xx", {
   "Un endroit est classé « généralement bien » ou « généralement mauvais » s'il est du même côté de la moyenne au moins cette part des années, sans atteindre le seuil de « toujours ». Le reste est classé variable.": "",
   "Pour chaque été depuis 2017 (Sentinel-2, juin à septembre), l'outil retient la date où la parcelle est dégagée, assez verte, et où le NDVI varie le plus. Il classe ensuite chaque endroit du champ en cinq catégories, de « toujours bien » à « toujours mauvais », par rapport à la moyenne de l'année.": "",
   "Classement sur {0} années, {1} ha. « Toujours » : au moins {2} % des années ; « généralement » : au moins {3} %.": "",
-  "Comparer le NDVI de plusieurs étés : zones toujours bonnes, généralement bonnes, variables, généralement mauvaises ou toujours mauvaises": ""
+  "Comparer le NDVI de plusieurs étés : zones toujours bonnes, généralement bonnes, variables, généralement mauvaises ou toujours mauvaises": "",
+  "« Toujours » : au moins": "",
+  "« Généralement » : au moins": "",
+  "années sur": "",
+  "Nombre d'années pour « toujours »": "",
+  "Nombre d'années pour « généralement »": "",
+  "« Bien » veut dire au-dessus de la moyenne du champ cette année-là ; « mauvais », en dessous. Un endroit est classé « toujours bien » ou « toujours mauvais » s'il est du même côté au moins ce nombre d'années, sur le total des années cochées.": "",
+  "Un endroit est classé « généralement bien » ou « généralement mauvais » s'il est du même côté de la moyenne au moins ce nombre d'années, sans atteindre le seuil de « toujours ». Il faut plus de la moitié des années. Le reste est classé variable.": "",
+  "Classement sur {0} années, {1} ha. « Toujours » : au moins {2} années sur {3} ; « généralement » : au moins {4}.": "",
+  "Marge intérieure": "",
+  "Bande le long du contour qui ne sert pas au calcul : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Les zones sont ensuite prolongées jusqu'au contour. 0 pour utiliser tout le champ.": "",
+  "Bande le long du contour qui ne sert pas à l'analyse : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Le résultat est ensuite prolongé jusqu'au contour. 0 pour utiliser tout le champ.": "",
+  "Marge intérieure de {0} m ignorée : la parcelle est trop étroite pour la retirer.": ""
 });
