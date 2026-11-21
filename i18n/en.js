@@ -1866,5 +1866,10 @@ window.pfI18n.langue("en", {
   "Marge intérieure": "Inner margin",
   "Bande le long du contour qui ne sert pas au calcul : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Les zones sont ensuite prolongées jusqu'au contour. 0 pour utiliser tout le champ.": "Strip along the boundary left out of the calculation: pixels there often pick up trees, a ditch or the neighbouring field. The zones are then extended to the boundary. 0 to use the whole field.",
   "Bande le long du contour qui ne sert pas à l'analyse : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Le résultat est ensuite prolongé jusqu'au contour. 0 pour utiliser tout le champ.": "Strip along the boundary left out of the analysis: pixels there often pick up trees, a ditch or the neighbouring field. The result is then extended to the boundary. 0 to use the whole field.",
-  "Marge intérieure de {0} m ignorée : la parcelle est trop étroite pour la retirer.": "Inner margin of {0} m ignored: the field is too narrow to remove it."
+  "Marge intérieure de {0} m ignorée : la parcelle est trop étroite pour la retirer.": "Inner margin of {0} m ignored: the field is too narrow to remove it.",
+  "Voir": "View",
+  "Afficher l'image NDVI de cette date sur la carte": "Show the NDVI image of this date on the map",
+  "Retirer l'image de la carte": "Remove the image from the map",
+  "Image du {0} affichée : du rouge (NDVI {1}) au vert (NDVI {2}). Les couleurs des zones sont masquées pendant ce temps.": "Image of {0} shown: from red (NDVI {1}) to green (NDVI {2}). The zone colours are hidden meanwhile.",
+  "Décochez une année pour la retirer de l'analyse, ou choisissez une autre date dégagée. Chaque date indique le NDVI moyen et sa variation (±) dans le champ. « Voir » affiche l'image de la date sur la carte.": "Uncheck a year to remove it from the analysis, or choose another cloud-free date. Each date shows the mean NDVI and its variation (±) within the field. “View” shows the image of that date on the map."
 });

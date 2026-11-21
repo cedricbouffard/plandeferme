@@ -1866,5 +1866,10 @@ window.pfI18n.langue("xx", {
   "Marge intérieure": "",
   "Bande le long du contour qui ne sert pas au calcul : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Les zones sont ensuite prolongées jusqu'au contour. 0 pour utiliser tout le champ.": "",
   "Bande le long du contour qui ne sert pas à l'analyse : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Le résultat est ensuite prolongé jusqu'au contour. 0 pour utiliser tout le champ.": "",
-  "Marge intérieure de {0} m ignorée : la parcelle est trop étroite pour la retirer.": ""
+  "Marge intérieure de {0} m ignorée : la parcelle est trop étroite pour la retirer.": "",
+  "Voir": "",
+  "Afficher l'image NDVI de cette date sur la carte": "",
+  "Retirer l'image de la carte": "",
+  "Image du {0} affichée : du rouge (NDVI {1}) au vert (NDVI {2}). Les couleurs des zones sont masquées pendant ce temps.": "",
+  "Décochez une année pour la retirer de l'analyse, ou choisissez une autre date dégagée. Chaque date indique le NDVI moyen et sa variation (±) dans le champ. « Voir » affiche l'image de la date sur la carte.": ""
 });

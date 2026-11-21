@@ -1866,5 +1866,10 @@ window.pfI18n.langue("es", {
   "Marge intérieure": "Margen interior",
   "Bande le long du contour qui ne sert pas au calcul : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Les zones sont ensuite prolongées jusqu'au contour. 0 pour utiliser tout le champ.": "Franja a lo largo del contorno que no se usa en el cálculo: allí los píxeles suelen captar árboles, una zanja o el campo vecino. Las zonas se prolongan luego hasta el contorno. 0 para usar todo el campo.",
   "Bande le long du contour qui ne sert pas à l'analyse : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Le résultat est ensuite prolongé jusqu'au contour. 0 pour utiliser tout le champ.": "Franja a lo largo del contorno que no se usa en el análisis: allí los píxeles suelen captar árboles, una zanja o el campo vecino. El resultado se prolonga luego hasta el contorno. 0 para usar todo el campo.",
-  "Marge intérieure de {0} m ignorée : la parcelle est trop étroite pour la retirer.": "Margen interior de {0} m ignorado: la parcela es demasiado estrecha para quitarlo."
+  "Marge intérieure de {0} m ignorée : la parcelle est trop étroite pour la retirer.": "Margen interior de {0} m ignorado: la parcela es demasiado estrecha para quitarlo.",
+  "Voir": "Ver",
+  "Afficher l'image NDVI de cette date sur la carte": "Mostrar la imagen NDVI de esta fecha en el mapa",
+  "Retirer l'image de la carte": "Quitar la imagen del mapa",
+  "Image du {0} affichée : du rouge (NDVI {1}) au vert (NDVI {2}). Les couleurs des zones sont masquées pendant ce temps.": "Imagen del {0} mostrada: del rojo (NDVI {1}) al verde (NDVI {2}). Los colores de las zonas se ocultan mientras tanto.",
+  "Décochez une année pour la retirer de l'analyse, ou choisissez une autre date dégagée. Chaque date indique le NDVI moyen et sa variation (±) dans le champ. « Voir » affiche l'image de la date sur la carte.": "Desmarque un año para quitarlo del análisis, o elija otra fecha despejada. Cada fecha indica el NDVI medio y su variación (±) en el campo. «Ver» muestra la imagen de esa fecha en el mapa."
 });

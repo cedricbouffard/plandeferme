@@ -103,10 +103,11 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
   const $ = (id) => document.getElementById(id);
   const fr = (v, d) => (Number.isFinite(v) ? v.toLocaleString("fr-CA", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–");
   const SRC = "stab-preview-source", FILL = "stab-preview-fill", LINE = "stab-preview-line";
+  const IMG_SRC = "stab-ndvi-source", IMG = "stab-ndvi-layer";
   const FIRST_YEAR = 2017, STAC = "https://planetarycomputer.microsoft.com/api/stac/v1/search", STATS = "https://planetarycomputer.microsoft.com/api/data/v1/item/statistics";
   const vm = () => window.vectorManager || null;
   const toast = (msg, err) => { const v = vm(); if (v && typeof v.showToast === "function") v.showToast(msg, err); };
-  const state = { features: [], name: "", bound: false, ctl: null, grid: null, years: [], result: null, running: false, autoAlways: true, autoUsually: true };
+  const state = { features: [], name: "", bound: false, ctl: null, grid: null, years: [], result: null, running: false, autoAlways: true, autoUsually: true, view: null };
 
   function setNote(text, warn) { const el = $("stab-note"); if (!el) return; el.textContent = text || ""; el.classList.toggle("pf-tp-warn", !!warn); }
   function clearPreview() {
@@ -114,12 +115,39 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     [LINE, FILL].forEach((id) => { if (map.getLayer(id)) map.removeLayer(id); });
     if (map.getSource(SRC)) map.removeSource(SRC);
   }
+  // ---- image NDVI d'une date sur la carte (une seule à la fois ; le remplissage des zones est masqué pendant ce temps)
+  function hideImage() {
+    const map = window.map;
+    if (map && typeof map.getLayer === "function") {
+      if (map.getLayer(IMG)) map.removeLayer(IMG);
+      if (map.getSource(IMG_SRC)) map.removeSource(IMG_SRC);
+      if (map.getLayer(FILL)) map.setLayoutProperty(FILL, "visibility", "visible");
+    }
+    state.view = null;
+    const el = $("stab-view"); if (el) el.textContent = "";
+  }
+  function showImage(y) {
+    const map = window.map, c = y && y.pick >= 0 ? y.cands[y.pick] : null;
+    if (!map || typeof map.addSource !== "function" || !c) return;
+    const sn = (window.NDVI_SENSORS && window.NDVI_SENSORS.s2) || null;
+    const query = sn ? (c.offset && sn.tileQueryOffset ? sn.tileQueryOffset : sn.tileQuery) : "assets=B08&assets=B04&asset_as_band=True&expression=" + encodeURIComponent(c.offset ? "(B08-B04)/(B08+B04-2000)" : "(B08-B04)/(B08+B04)");
+    // couleurs étirées autour de la moyenne du champ ce jour-là, pour faire ressortir les écarts dans la parcelle
+    const lo = Math.max(-0.2, Math.round((c.stats.mean - 2.5 * c.stats.sd) * 100) / 100), hi = Math.min(1, Math.max(lo + 0.1, Math.round((c.stats.mean + 2.5 * c.stats.sd) * 100) / 100));
+    if (map.getLayer(IMG)) map.removeLayer(IMG);
+    if (map.getSource(IMG_SRC)) map.removeSource(IMG_SRC);
+    map.addSource(IMG_SRC, { type: "raster", tileSize: 256, attribution: sn ? sn.attribution : "Sentinel-2 L2A © ESA / Copernicus",
+      tiles: [`https://planetarycomputer.microsoft.com/api/data/v1/item/tiles/WebMercatorQuad/{z}/{x}/{y}@1x?collection=sentinel-2-l2a&item=${encodeURIComponent(c.id)}&${query}&rescale=${encodeURIComponent(lo.toFixed(2) + "," + hi.toFixed(2))}&colormap_name=rdylgn`] });
+    map.addLayer({ id: IMG, type: "raster", source: IMG_SRC, paint: { "raster-opacity": 0.95, "raster-fade-duration": 150 } }, map.getLayer(FILL) ? FILL : undefined);
+    if (map.getLayer(FILL)) map.setLayoutProperty(FILL, "visibility", "none"); // les contours des zones restent visibles
+    state.view = { year: y.year, date: c.date };
+    const el = $("stab-view"); if (el) el.textContent = `Image du ${c.date} affichée : du rouge (NDVI ${fr(lo, 2)}) au vert (NDVI ${fr(hi, 2)}). Les couleurs des zones sont masquées pendant ce temps.`;
+  }
   function showPreview(features) {
     const map = window.map; if (!map || typeof map.addSource !== "function") return;
     const data = { type: "FeatureCollection", features };
     if (map.getSource(SRC)) { map.getSource(SRC).setData(data); return; }
     map.addSource(SRC, { type: "geojson", data });
-    map.addLayer({ id: FILL, type: "fill", source: SRC, paint: { "fill-color": ["to-color", ["get", "couleur"], "#fdd66b"], "fill-opacity": 0.75 } });
+    map.addLayer({ id: FILL, type: "fill", source: SRC, layout: { visibility: state.view ? "none" : "visible" }, paint: { "fill-color": ["to-color", ["get", "couleur"], "#fdd66b"], "fill-opacity": 0.75 } });
     map.addLayer({ id: LINE, type: "line", source: SRC, paint: { "line-color": "#ffffff", "line-width": 1.2 } });
   }
   const numOf = (id, def) => { const v = parseFloat(String(($(id) || {}).value || "").replace(",", ".")); return Number.isFinite(v) ? v : def; };
@@ -192,12 +220,12 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     return Array.from(by.values()).sort((a, b) => (a.date < b.date ? -1 : 1));
   }
 
-  // Statistiques d'un passage dans le contour de la parcelle, calculées par le serveur (aucune image téléchargée)
+  // Statistiques d'un passage calculées par le serveur (aucune image téléchargée) : nuages, moyenne et variation
+  // du NDVI dans le contour rétréci de la marge intérieure (une seule demande par passage)
   async function remoteStats(sc, grid, signal) {
     const q = `collection=sentinel-2-l2a&item=${encodeURIComponent(sc.id)}&assets=B08&assets=B04&assets=SCL&asset_as_band=True&expression=${encodeURIComponent(sc.offset ? "(B08-B04)/(B08+B04-2000);SCL" : "(B08-B04)/(B08+B04);SCL")}&histogram_bins=12&histogram_range=0,12`;
     const resp = await fetch(`${STATS}?${q}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "Feature", properties: {}, geometry: { type: "MultiPolygon", coordinates: grid.statPolys } }), signal });
-    if (!resp.ok) return null;
-    return pfStabGeom.remoteStats(await resp.json());
+    return resp.ok ? pfStabGeom.remoteStats(await resp.json()) : null;
   }
   // Image d'une date retenue (lue une seule fois, puis gardée en mémoire)
   function loadData(c, grid, signal) {
@@ -224,7 +252,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     if (state.ctl) state.ctl.abort();
     state.ctl = new AbortController(); const signal = state.ctl.signal;
     state.running = true; state.grid = grid; state.years = []; state.result = null;
-    clearPreview(); renderYears(); renderResult(); toggleButtons();
+    hideImage(); clearPreview(); renderYears(); renderResult(); toggleButtons();
     const btn = $("btn-stab-run"); if (btn) btn.disabled = true;
     try {
       const last = new Date().getFullYear(), yrs = []; for (let y = FIRST_YEAR; y <= last; y++) yrs.push(y);
@@ -338,8 +366,15 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         const mm = minMean();
         y.cands.forEach((c, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = `${c.date} · NDVI ${fr(c.stats.mean, 2)} · ±${fr(c.stats.sd, 2)}${c.stats.mean < mm ? " ·  ⚠" : ""}`; sel.appendChild(o); });
         if (y.pick >= 0) sel.value = String(y.pick); else { const o = document.createElement("option"); o.value = ""; o.textContent = "—"; sel.prepend(o); sel.value = ""; }
-        sel.addEventListener("change", () => { if (sel.value === "") return; y.pick = parseInt(sel.value, 10); y.manual = true; y.none = false; y.on = true; renderYears(); classify(); });
+        sel.addEventListener("change", () => { if (sel.value === "") return; y.pick = parseInt(sel.value, 10); y.manual = true; y.none = false; y.on = true; if (state.view && state.view.year === y.year) showImage(y); renderYears(); classify(); });
         row.appendChild(sel);
+      }
+      if (y.pick >= 0) {
+        const on = !!(state.view && state.view.year === y.year), bt = document.createElement("button");
+        bt.type = "button"; bt.className = "profile-dock-btn pf-zn-modal-secondary pf-st-see" + (on ? " pf-on" : ""); bt.textContent = on ? "Masquer" : "Voir";
+        bt.title = on ? "Retirer l'image de la carte" : "Afficher l'image NDVI de cette date sur la carte"; bt.setAttribute("aria-pressed", on ? "true" : "false");
+        bt.addEventListener("click", () => { if (state.view && state.view.year === y.year) hideImage(); else showImage(y); renderYears(); });
+        row.appendChild(bt);
       }
       if (y.pick < 0) { const why = document.createElement("span"); why.className = "pf-st-why"; why.textContent = y.failed ? "Recherche impossible" : y.cands.length ? "Aucune date assez verte" : "Aucune date dégagée"; row.appendChild(why); }
       box.appendChild(row);
@@ -388,7 +423,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
   }
   function close() {
     if (state.ctl) state.ctl.abort();
-    clearPreview();
+    hideImage(); clearPreview();
     const modal = $("stab-modal"); if (modal) modal.classList.remove("active");
     state.features = []; state.years = []; state.grid = null; state.result = null; state.running = false;
   }
