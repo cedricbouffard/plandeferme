@@ -84,6 +84,7 @@
     document.addEventListener("change", (e) => {
       const t = e.target;
       if (t && t.type === "checkbox" && t.checked && /^toggle-/.test(t.id || "")) count("couche/" + t.id.slice(7));
+      else if (t && t.type === "checkbox" && t.checked && t.classList && t.classList.contains("pf-reg-toggle") && t.dataset.reg) count("couche/" + t.dataset.reg);
       else if (t && t.classList && t.classList.contains("pf-lang-select")) count("langue-choisie/" + String(t.value).slice(0, 2));
     }, true);
     document.addEventListener("click", (e) => {
@@ -101,10 +102,18 @@
       else if ((m = /^btn-(\w+)-save$/.exec(id))) count("enregistrer/" + m[1]);
       else if ((m = /^btn-(\w+)-export(-shp)?$/.exec(id))) count(`exporter/${m[1]}${m[2] ? "-shapefile" : "-geojson"}`);
       else if (id === "btn-essai-sim") count("outil/essai-simulation");
+      else if ((m = /^btn-basemap-(\w+)$/.exec(id))) count("fond/" + m[1]);
       else if (/^btn-quick-/.test(id)) count("outil/" + id.slice(10));
     }, true);
     // territoire regardé, une fois par visite : code de pays ou de province seulement, jamais de coordonnées
     setTimeout(() => {
+      try {
+        // couches déjà affichées à l'arrivée (lien partagé ou réglages retrouvés), comptées à part des couches cochées à la main
+        document.querySelectorAll('input[type="checkbox"][id^="toggle-"]:checked, input.pf-reg-toggle:checked').forEach((t) => {
+          const name = t.classList.contains("pf-reg-toggle") ? t.dataset.reg : t.id.slice(7);
+          if (name && name !== "topo-hillshade" && name !== "contour-labels") count("couche-au-depart/" + name);
+        });
+      } catch (e) { /* sans importance */ }
       try {
         const map = window.map; if (!map || typeof map.getCenter !== "function" || map.getZoom() < 7) return;
         const c = map.getCenter(), k = window.pfDem && typeof window.pfDem.regionAt === "function" ? window.pfDem.regionAt(c.lng, c.lat) : null;
