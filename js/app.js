@@ -1316,6 +1316,9 @@
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-grid" title="Placer des points d'échantillonnage sur une grille régulière, alignée sur le sens du champ">
                   <span class="pf-act-name">Grille d'échantillonnage</span><span class="pf-act-desc">1 point par hectare ou par acre</span>
                 </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-stab" title="Comparer le NDVI de plusieurs étés : zones toujours bonnes, généralement bonnes, variables, généralement mauvaises ou toujours mauvaises">
+                  <span class="pf-act-name">Stabilité du NDVI</span><span class="pf-act-desc">Zones stables sur plusieurs années</span>
+                </button>
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-trial" title="Planifier un essai à la ferme : parcelles d'essai alignées sur les passages, selon les largeurs d'équipement et les traitements">
                   <span class="pf-act-name">Essai à la ferme</span><span class="pf-act-desc">Parcelles et traitements</span>
                 </button>
@@ -1466,6 +1469,13 @@
             btnActionGrid.addEventListener("click", () => {
               popup.remove();
               if (window.pfGrille) window.pfGrille.openForParcel(targetP);
+            });
+          }
+          const btnActionStab = popupDom.querySelector(".btn-popup-action-stab");
+          if (btnActionStab) {
+            btnActionStab.addEventListener("click", () => {
+              popup.remove();
+              if (window.pfStabilite) window.pfStabilite.openForParcel(targetP);
             });
           }
           const btnActionTrial = popupDom.querySelector(".btn-popup-action-trial");

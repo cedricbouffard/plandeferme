@@ -900,6 +900,8 @@
           </div>
           <button type="button" class="pf-list-btn" id="pf-install-entry" data-pf-click="pwa-install-btn"><span class="pf-list-name">Installer l'application</span><span class="pf-list-desc">Plan de Ferme sur votre appareil</span></button>
           <label class="pf-list-btn pf-lang-row" title="Choisir la langue de l'interface"><span class="pf-list-name">Langue</span><select class="pf-lang-select" aria-label="Langue"></select></label>
+          <label class="pf-list-btn pf-lang-row" title="Plan de Ferme compte les visites, la durée d'utilisation et les outils ouverts. Aucun témoin, aucun identifiant, aucune position sur la carte, aucun nom de parcelle. Décochez pour ne rien envoyer depuis cet appareil."><span class="pf-list-name">Statistiques anonymes</span><input type="checkbox" class="pf-stats-toggle" checked aria-label="Statistiques anonymes" /></label>
+          <p class="pf-hint pf-stats-hint">Le site compte les visites et les outils utilisés, sans témoin, sans identifiant et sans position. Décochez pour ne rien envoyer.</p>
         </div>
         <div class="pf-group pf-actions-group">
           <!-- Boutons d'action : Mise en page PDF, Partager la vue & GitHub -->
@@ -1484,6 +1486,44 @@
     </div>
   </div>
 
+<!-- Stabilité du NDVI : meilleure date par été, classement des pixels au-dessus / en dessous / variables, années à cocher -->
+  <div id="stab-modal" class="vector-modal-overlay pf-zn pf-zn-modal pf-tp pf-es pf-st">
+    <div class="vector-modal" role="dialog" aria-modal="false" aria-labelledby="stab-title">
+      <div class="vector-modal-header">
+        <div class="vector-modal-title"><span id="stab-title">Stabilité du NDVI</span></div>
+        <button type="button" id="btn-stab-close" class="vector-modal-close" aria-label="Fermer">&times;</button>
+      </div>
+      <div class="vector-modal-body">
+        <p class="pf-zn-modal-help">Dans : <strong id="stab-source" data-no-i18n></strong></p>
+        <p class="pf-zn-modal-help">Pour chaque été depuis 2017 (Sentinel-2, juin à septembre), l'outil retient la date où la parcelle est dégagée, assez verte, et où le NDVI varie le plus. Il classe ensuite chaque endroit du champ en cinq catégories, de « toujours bien » à « toujours mauvais », par rapport à la moyenne de l'année.</p>
+        <div class="pf-tp-row" title="NDVI moyen de la parcelle exigé pour qu'une date soit retenue. Plus bas : des dates de début ou de fin de saison deviennent admissibles.">
+          <span>NDVI moyen minimal</span>
+          <span><input type="number" id="stab-min" class="pf-tp-num" min="0.2" max="0.9" step="0.05" value="0.5" inputmode="decimal" aria-label="NDVI moyen minimal" /></span>
+        </div>
+        <div class="pf-tp-row" title="« Bien » veut dire au-dessus de la moyenne du champ cette année-là ; « mauvais », en dessous. Un endroit est classé « toujours bien » ou « toujours mauvais » s'il est du même côté au moins cette part des années.">
+          <span>« Toujours » veut dire</span>
+          <span><input type="number" id="stab-share" class="pf-tp-num" min="55" max="100" step="5" value="85" inputmode="decimal" aria-label="Part des années pour « toujours »" /> % des années</span>
+        </div>
+        <div class="pf-tp-row" title="Un endroit est classé « généralement bien » ou « généralement mauvais » s'il est du même côté de la moyenne au moins cette part des années, sans atteindre le seuil de « toujours ». Le reste est classé variable.">
+          <span>« Généralement » veut dire</span>
+          <span><input type="number" id="stab-share2" class="pf-tp-num" min="51" max="100" step="5" value="65" inputmode="decimal" aria-label="Part des années pour « généralement »" /> % des années</span>
+        </div>
+        <div class="pf-es-sub">Années et dates retenues</div>
+        <p class="pf-zn-modal-help">Décochez une année pour la retirer de l'analyse, ou choisissez une autre date dégagée. Chaque date indique le NDVI moyen et sa variation (±) dans le champ.</p>
+        <div id="stab-years" class="pf-st-years"></div>
+        <button type="button" id="btn-stab-run" class="profile-dock-btn pf-zn-modal-secondary pf-tp-draw" title="Relire tous les passages satellites pour cette parcelle">Relancer la lecture des images</button>
+        <div id="stab-legend" class="pf-es-legend"></div>
+        <p id="stab-note" class="pf-tp-note" aria-live="polite"></p>
+        <div class="pf-zn-modal-actions">
+          <button type="button" id="btn-stab-cancel" class="profile-dock-btn pf-zn-modal-secondary">Annuler</button>
+          <button type="button" id="btn-stab-export" class="profile-dock-btn pf-zn-modal-secondary" disabled>Exporter GeoJSON</button>
+          <button type="button" id="btn-stab-export-shp" class="profile-dock-btn pf-zn-modal-secondary" title="Télécharger les zones en Shapefile (fichier .zip)" disabled>Exporter Shapefile</button>
+          <button type="button" id="btn-stab-save" class="pf-zn-run" disabled>Enregistrer dans Mes données</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <!-- Grille d'échantillonnage : densité, disposition, angle, aperçu sur la carte puis enregistrement dans Mes données -->
   <div id="grille-modal" class="vector-modal-overlay pf-zn pf-zn-modal pf-tp">
     <div class="vector-modal" role="dialog" aria-modal="false" aria-labelledby="grille-title">
@@ -1989,6 +2029,8 @@
     <script src="js/tampon.js"></script>
     <script src="js/grille.js"></script>
     <script src="js/essai.js"></script>
+    <script src="js/stabilite.js"></script>
+    <script src="js/stats.js"></script>
     <script src="js/plan-viewer.js"></script>
     <script src="js/app.js"></script>
     <script src="js/regions.js"></script>

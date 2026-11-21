@@ -1880,6 +1880,7 @@
             <button type="button" id="btn-popup-edit-attr" class="vector-tool-btn primary" style="font-size: 10.5px;">Éditer attributs</button>
             <button type="button" id="btn-popup-buffer-feat" class="vector-tool-btn" style="font-size: 10.5px;" title="Créer une zone tampon autour de cette entité">Zone tampon</button>
             ${isPolyFeat ? `<button type="button" id="btn-popup-grid-feat" class="vector-tool-btn" style="font-size: 10.5px;" title="Placer des points d'échantillonnage sur une grille régulière dans ce polygone">Grille</button>` : ""}
+            ${isPolyFeat ? `<button type="button" id="btn-popup-stab-feat" class="vector-tool-btn" style="font-size: 10.5px;" title="Comparer le NDVI de plusieurs étés dans ce polygone">Stabilité</button>` : ""}
             ${isPolyFeat ? `<button type="button" id="btn-popup-trial-feat" class="vector-tool-btn" style="font-size: 10.5px;" title="Planifier un essai à la ferme dans ce polygone">Essai</button>` : ""}
             <button type="button" id="btn-popup-del-feat" class="vector-tool-btn danger" style="font-size: 10.5px;">Supprimer</button>
           </div>
@@ -1910,6 +1911,14 @@
             const target = { type: "Feature", geometry: feat.geometry, properties: {} };
             this.clearFeatureSelection();
             if (window.pfGrille) window.pfGrille.open({ features: [target], name: featName });
+          });
+        }
+        const btnStab = document.getElementById("btn-popup-stab-feat");
+        if (btnStab) {
+          btnStab.addEventListener("click", () => {
+            const target = { type: "Feature", geometry: feat.geometry, properties: {} };
+            this.clearFeatureSelection();
+            if (window.pfStabilite) window.pfStabilite.open({ features: [target], name: featName });
           });
         }
         const btnTrial = document.getElementById("btn-popup-trial-feat");
