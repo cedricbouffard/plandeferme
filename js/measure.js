@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /**
  * Plan de Ferme — Outil de Mesure Géodésique (Distances & Superficies)
  * Supporte le Système Métrique (m, km, ha, m²) et le Système Impérial (pi, mi, acres, arpents)
@@ -1062,3 +1063,4 @@
   window.MeasureManager = MeasureManager;
   window.measureManager = new MeasureManager();
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["measure"] = "0122c114";

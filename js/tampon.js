@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /*
   Zones tampons et enregistrement de parcelles
   --------------------------------------------
@@ -177,7 +178,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     setNote(`Superficie du tampon : ${fr(ha, 2)} ha`);
     if (save) save.disabled = false;
   }
-  function schedule() { clearTimeout(state.timer); state.timer = setTimeout(compute, 200); }
+  function schedule() { clearTimeout(state.timer); state.timer = setTimeout(compute, 191); }
 
   function close() {
     clearTimeout(state.timer);
@@ -288,3 +289,4 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
 
   window.pfTampon = { open, openForParcel, close, saveParcel, geom: pfTamponGeom };
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["tampon"] = "438ff937";

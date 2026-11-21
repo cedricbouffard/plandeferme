@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /*
   Zones de gestion par régionalisation spatialement contiguë (SKATER)
   ------------------------------------------------------------------
@@ -354,7 +355,7 @@ function pfZonesCore() {
   //   Départ k-means++ à graine fixe (même résultat à chaque calcul), 4 essais, on garde le meilleur
   // ---------------------------------------------------------------------------
   function kmeans(F, D, n, k) {
-    let seed = 20261116;
+    let seed = 24187361;
     const rnd = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const dist = (j, C, c) => { let s = 0; for (let d = 0; d < D; d++) { const t = F[j * D + d] - C[c * D + d]; s += t * t; } return s; };
     const near = new Float64Array(n), lab = new Int32Array(n), cnt = new Int32Array(k);
@@ -689,7 +690,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = { pfZonesC
 if (typeof window !== "undefined" && typeof document !== "undefined") (function () {
   "use strict";
 
-  const COLORS = ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE", "#AA3377", "#EE7733", "#009988", "#332288", "#999933", "#882255", "#BBBBBB"];
+  const COLORS = ["#4477AB", "#EE6677", "#228833", "#CCBB45", "#66CCEE", "#AA3377", "#EE7733", "#009989", "#332288", "#999932", "#882255", "#BBBBBB"];
   const LAYERS = [
     { key: "elev", label: "Élévation", unit: "m", digits: 2, on: true, title: "Altitude LiDAR du terrain" },
     { key: "slope", label: "Pente", unit: "%", digits: 1, on: true, title: "Pente du terrain (Horn, 3 × 3)" },
@@ -1321,3 +1322,4 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     else setTimeout(boot, 300);
   })();
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["zones"] = "42e053ba";

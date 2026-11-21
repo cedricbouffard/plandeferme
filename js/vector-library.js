@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /**
  * Plan de Ferme — Bibliothèque de couches personnelles
  *
@@ -1543,3 +1544,4 @@
     return row;
   };
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["vector-library"] = "ae96661c";

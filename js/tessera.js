@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /*
   Embeddings TESSERA (Université de Cambridge) lus par petits blocs depuis le dépôt Zarr public
   ----------------------------------------------------------------------------------------------
@@ -138,3 +139,4 @@ const pfTessera = {
 };
 if (typeof module !== "undefined" && module.exports) module.exports = { pfTessera };
 if (typeof window !== "undefined") window.pfTessera = pfTessera;
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["tessera"] = "53800260";

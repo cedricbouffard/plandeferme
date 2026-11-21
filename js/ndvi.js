@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
     // Capteurs offerts pour le NDVI (Planetary Computer). Landsat remonte à 1984, Sentinel-2 à 2015.
     //   ndvi(rouge, proche infrarouge) ; bad(q) : pixel à écarter selon la bande de qualité (nuage, ombre, neige, sans donnée)
     const NDVI_SENSORS = {
@@ -961,3 +962,4 @@
     }
 
     // Gestionnaire de l'hydrologie (écoulement à la volée & raster des zones plates par pente < 0.1%)
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["ndvi"] = "5f50dbce";

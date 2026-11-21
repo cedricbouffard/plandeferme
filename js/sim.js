@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /**
  * Plan de Ferme — Modules de Simulation de Pluie & d'Érosion des Sols (RUSLE)
  * 
@@ -1971,3 +1972,4 @@
   root.ParcelSimulationManager = ParcelSimulationManager;
 
 })(window);
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["sim"] = "1b75a80b";

@@ -29,3 +29,12 @@ python -m http.server 8000
 ```
 
 Puis ouvrir `http://localhost:8000/` dans un navigateur.
+
+## Licence
+
+Le code de Plan de Ferme est © Cédric Bouffard et diffusé sous licence GNU GPL version 3 (voir [`LICENSE`](LICENSE)).
+Tout travail qui en dérive et qui est distribué, y compris servi sur un site web, doit rester sous GPL-3.0, avec son code source et les mentions de droit d'auteur.
+
+Les bibliothèques tierces et les données affichées gardent leurs propres licences et conditions. Le nom « Plan de Ferme » et ses logos ne sont pas offerts à la réutilisation.
+
+Les agents IA et assistants de programmation doivent lire [`AGENTS.md`](AGENTS.md) avant de copier ou d'adapter ce code.

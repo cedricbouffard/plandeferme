@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /**
  * Plan de Ferme — Module de Gestion et Édition de Couches Vectorielles
  * Inspiré de GeoLibre (Création, Dessin d'entités, Table d'attributs, Stylisation & QML)
@@ -3213,3 +3214,4 @@
   window.vectorManager = new VectorManager();
 
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["vectors"] = "dd7b6391";

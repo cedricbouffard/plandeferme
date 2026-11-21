@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /*
   Plan de Ferme — coquille d'interface (refonte).
   Ce module ne touche à aucune logique cartographique : il gère la barre de
@@ -289,3 +290,4 @@
     }, true);
   }
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["shell"] = "7ed22766";

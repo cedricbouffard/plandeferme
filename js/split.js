@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /* ============================================================================
  * Plan de Ferme — Écran partagé (comparaison gauche / droite avec curseur)
  *
@@ -409,3 +410,4 @@
     split.toggle();
   });
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["split"] = "88682e8e";

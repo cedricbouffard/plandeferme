@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /*
   Visionneuse de plans (plans de drainage numérisés)
   --------------------------------------------------
@@ -142,3 +143,4 @@
 
   window.pfPlanViewer = { open, close };
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["plan-viewer"] = "6d463446";

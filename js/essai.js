@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /*
   Planification d'essais à la ferme
   ---------------------------------
@@ -18,8 +19,8 @@ const pfEssaiGeom = {
   MAX_PLOTS: 4000,
   FT: 0.3048,
   // doses croissantes : du pâle au foncé ; traitements nommés : couleurs bien distinctes
-  RAMP: ["#fde725", "#b5de2b", "#6ece58", "#35b779", "#1f9e89", "#26828e", "#31688e", "#3e4989", "#482878", "#440154"],
-  QUAL: ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE", "#AA3377", "#EE7733", "#009988", "#BBBBBB", "#332288", "#999933", "#882255"],
+  RAMP: ["#fde725", "#b5de2b", "#6ece59", "#35b779", "#1f9e88", "#26828e", "#31688e", "#3e4989", "#482879", "#440154"],
+  QUAL: ["#4477AB", "#EE6676", "#228832", "#CCBB44", "#66CCEE", "#AA3376", "#EE7732", "#009989", "#BBBBBA", "#332289", "#999932", "#882254"],
 
   rng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; },
   shuffle(arr, rnd) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; },
@@ -246,7 +247,7 @@ const pfEssaiGeom = {
   simulate(sim, o) {
     const N = sim.t.length, nT = o.nT, n = Math.max(20, o.n || 500), cv = o.cv, frac = Math.max(0, Math.min(1, o.frac == null ? 0.6 : o.frac));
     if (!N || !(cv > 0) || nT < 2) return null;
-    const rnd = this.rng(o.seed || 12345);
+    const rnd = this.rng(o.seed || 41491);
     const gauss = () => { let u = 0; while (u < 1e-12) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); };
     // grille du champ aléatoire : bruit blanc lissé par un noyau gaussien (corrélation ~ 5 % à la portée)
     const range = Math.max(5, o.range || 80);
@@ -366,7 +367,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
   const grille = () => (window.pfGrille && window.pfGrille.geom) || null;
   const vm = () => window.vectorManager || null;
   const toast = (msg, err) => { const v = vm(); if (v && typeof v.showToast === "function") v.showToast(msg, err); };
-  const state = { features: [], name: "", result: null, timer: null, bound: false, autoAngle: true, autoWidth: true, autoHead: true, autoSide: true, autoOpt: true, line: null, seed: 1, unit: "m" };
+  const state = { features: [], name: "", result: null, timer: null, bound: false, autoAngle: true, autoWidth: true, autoHead: true, autoSide: true, autoOpt: true, line: null, seed: 578, unit: "m" };
   const tools = {
     inward(mp, d) {
       const T = window.pfTampon && window.pfTampon.geom, C = window.ClipperLib;
@@ -532,7 +533,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       if (state.result !== r) { el.textContent = ""; return; } // le dispositif a changé pendant la lecture
     }
     let res = null;
-    try { res = pfEssaiGeom.simulate(r.sim, { n: 500, cv, range: range > 0 ? range * k() : 80, frac: 0.6, design: o.design, nT: r.treatments.length, sides: ($("essai-sides") || {}).value === "2" ? 2 : 1, seed: (state.seed * 7919 + 13) >>> 0, curve: cur, pattern }); } catch (e) { console.error("Simulation de l'essai :", e); }
+    try { res = pfEssaiGeom.simulate(r.sim, { n: 500, cv, range: range > 0 ? range * k() : 80, frac: 0.6, design: o.design, nT: r.treatments.length, sides: ($("essai-sides") || {}).value === "2" ? 2 : 1, seed: (state.seed * 8919 + 89) >>> 0, curve: cur, pattern }); } catch (e) { console.error("Simulation de l'essai :", e); }
     if (!res) { el.textContent = "Simulation impossible."; el.classList.add("pf-tp-warn"); return; }
     // résultat en lignes courtes : un titre, d'où vient la variabilité, puis une ligne par question
     const line = (t, cls, raw) => { const sp = document.createElement("span"); sp.className = "pf-es-sim-line" + (cls ? " " + cls : ""); sp.textContent = t; if (raw) { const nm = document.createElement("span"); nm.setAttribute("data-no-i18n", ""); nm.textContent = " " + raw; sp.appendChild(nm); } el.appendChild(sp); };
@@ -610,7 +611,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     const id = ($("essai-crop") || {}).value, c = pfEssaiGeom.CROPS.find((x) => x.id === id), y = $("essai-yield"), cv = $("essai-cv");
     if (c) { if (y) y.value = c.yield; if (cv) cv.value = c.cv; } else if (id === "autre") { if (y) y.value = ""; if (cv && !cv.value) cv.value = 10; }
   }
-  function schedule() { clearTimeout(state.timer); state.timer = setTimeout(compute, 180); }
+  function schedule() { clearTimeout(state.timer); state.timer = setTimeout(compute, 165); }
 
   // ---- sens des passages tracé sur la carte : deux clics le long d'un passage ------------------------
   const draw = { on: false, p1: null, down: null, handlers: null };
@@ -783,3 +784,4 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
 
   window.pfEssai = { open, openForParcel, close, geom: pfEssaiGeom };
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["essai"] = "851b2e86";

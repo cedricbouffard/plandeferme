@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /* ==========================================================================
    Plan de Ferme — Module de Compositeur Cartographique & Export PDF
    Format Lettre (8,5 × 11 po) — Modes Portrait et Paysage
@@ -3507,3 +3508,4 @@ ${logoItemXml}
   // Exposition globale
   window.PlanDeFermeComposer = PlanDeFermeComposer;
 })(window, document);
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["composer"] = "b693aa71";

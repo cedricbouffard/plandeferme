@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
     class TopoManager {
       constructor(mapInstance) {
         this.map = mapInstance;
@@ -1677,4 +1678,5 @@
       }
     }
 
-    // Sentinel-2 L2A NDVI Time Series & Layer Manager via Microsoft Planetary Computer
+    // Sentinel-2 L2A NDVI Time Series & Layer Manager via Microsoft Planetary Computer
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["topo"] = "feaf7939";

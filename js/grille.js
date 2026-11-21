@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /*
   Grille d'échantillonnage régulière
   ----------------------------------
@@ -173,7 +174,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     setNote(`${r.features.length} point${r.features.length > 1 ? "s" : ""} sur ${fr(r.areaHa, 1)} ha, soit 1 point pour ${fr(r.areaHa / r.features.length, 2)} ha`);
     if (save) save.disabled = false;
   }
-  function schedule() { clearTimeout(state.timer); state.timer = setTimeout(compute, 150); }
+  function schedule() { clearTimeout(state.timer); state.timer = setTimeout(compute, 157); }
 
   // ---- sens des rangs tracé sur la carte : deux clics, le début puis la fin d'un rang ----------------
   // Pendant le tracé, les clics sont interceptés avant la carte : aucune fiche ne s'ouvre.
@@ -316,3 +317,4 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
 
   window.pfGrille = { open, openForParcel, close, startLine, stopLine, azimuthOf, geom: pfGrilleGeom };
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["grille"] = "05e8d7fd";

@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /* ============================================================================
  * Plan de Ferme — MNT LiDAR hors Canada
  *
@@ -1011,3 +1012,4 @@
   window.pfDem = { GEM, gemUrl, regionAt, sourceForBbox, sourceAt: (lng, lat) => { const k = regionAt(lng, lat); return k ? SOURCES[k] : null; }, read: (bbox, size, signal) => { const s = sourceForBbox(bbox); return s ? sharedRead(s, bbox, size, signal) : Promise.resolve(null); }, surveys, SOURCES, REG, readWith, hasRelief, actionsHtml, bindActions };
   watch();
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["dem-world"] = "c2b58c64";

@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /**
  * Plan de Ferme — Données régionales hors Québec
  *
@@ -911,3 +912,4 @@
 
   window.PfRegions = { JURIS, LAYERS, jurisdictionAt, state };
 })();
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["regions"] = "8af0cdbb";

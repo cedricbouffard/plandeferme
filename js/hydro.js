@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
     class ParcelHydrologyManager {
       constructor(mapInstance) {
         this.map = mapInstance;
@@ -637,4 +638,5 @@
       }
     }
 
-    // Conversational Soil AI Assistant (Identification Guidée du Sol)
+    // Conversational Soil AI Assistant (Identification Guidée du Sol)
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["hydro"] = "008b37f1";

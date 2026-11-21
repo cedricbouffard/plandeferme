@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
     class SoilAiAssistant {
       constructor(mapInstance) {
         this.map = mapInstance;
@@ -745,4 +746,4 @@ OPTIONS: [Choix 1 | Choix 2 | Choix 3]
         this.dock.classList.toggle("expanded", this.isExpanded);
       }
     }
-
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["soil-ai"] = "d83a06a7";

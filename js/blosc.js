@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /*
   Lecture d'un tampon Blosc 1 (format des blocs Zarr « blosc ») compressé en Zstandard.
   pfBlosc.decode(Uint8Array, zstdDecompress) -> Uint8Array
@@ -65,3 +66,4 @@ const pfBlosc = {
 };
 if (typeof module !== "undefined" && module.exports) module.exports = { pfBlosc };
 if (typeof window !== "undefined") window.pfBlosc = pfBlosc;
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["blosc"] = "87077dba";

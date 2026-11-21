@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /**
  * ==============================================================================
  * LIDAR CUT & FILL COMPARISON MANAGER (PLAN DE FERME)
@@ -1162,3 +1163,4 @@
 
   root.LidarCutFillManager = LidarCutFillManager;
 })(window);
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["cutfill"] = "c05d74cd";

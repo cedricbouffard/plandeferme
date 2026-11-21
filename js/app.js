@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
     // ContourManager, readCogRegion, fromUrl, proj4 are declared in js/config.js
 
     // Initialize PMTiles protocol
@@ -3034,3 +3035,4 @@
         }, 3000);
       }
     }
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["app"] = "0254bc4b";

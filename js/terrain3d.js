@@ -1,3 +1,4 @@
+/* Plan de Ferme — © 2026 Cédric Bouffard — GPL-3.0 (voir LICENSE) — https://plandeferme.ca */
 /**
  * ==============================================================================
  * TERRAIN 3D MANAGER (PLAN DE FERME)
@@ -1699,3 +1700,4 @@ class Terrain3DManager {
 
 window.Terrain3DManager = Terrain3DManager;
 window.buildUtmGeoTiffBuffer = Terrain3DManager.prototype.buildUtmGeoTiffBuffer;
+if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["terrain3d"] = "c66be6ce";
