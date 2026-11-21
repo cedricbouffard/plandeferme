@@ -1349,3 +1349,66 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-st #stab-view:empty { display: none; }
 .pf-st-late { color: #9a3412; font-weight: 600; cursor: help; }
 .pf-st .pf-st-date { max-width: 168px; }
+
+/* ---------- Climat : tableau de bord des stations météo ---------- */
+.pf-cl .vector-modal { max-width: 1040px; font-size: 13px; color: var(--pf-ink); }
+.pf-cl .vector-modal-body { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+.pf-cl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.pf-cl-where { flex: 1 1 200px; color: var(--pf-muted); }
+.pf-cl-where strong { color: var(--pf-ink); }
+.pf-cl-bar label { display: flex; align-items: center; gap: 6px; color: var(--pf-muted); font-weight: 500; }
+.pf-cl-select { font: inherit; color: var(--pf-ink); padding: 6px 8px; border: 1px solid var(--pf-line); border-radius: 8px; background: #fff; max-width: 260px; }
+.pf-cl-info { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 0 12px; font-size: 12px; color: var(--pf-muted); }
+.pf-cl-info span:empty { display: none; }
+.pf-cl-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.pf-cl-tile { background: var(--pf-ground); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.pf-cl-tile-label { font-size: 11px; font-weight: 500; color: var(--pf-muted); }
+.pf-cl-tile-value { margin-top: 2px; font-size: 22px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--pf-ink); }
+.pf-cl-tile-value small { font-size: 12px; font-weight: 600; color: var(--pf-muted); }
+.pf-cl-tile-sub { margin-top: 3px; font-size: 11px; line-height: 1.35; color: var(--pf-muted); }
+.pf-cl-tile.pf-cl-warn { box-shadow: inset 3px 0 0 #c2410c; }
+.pf-cl-legend { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 16px 0 6px; font-size: 12px; color: var(--pf-muted); }
+.pf-cl-legend span, .pf-cl-tip-row { display: flex; align-items: center; gap: 6px; }
+.pf-cl-sw-cur, .pf-cl-sw-ref, .pf-cl-sw-band { display: inline-block; width: 18px; flex: none; }
+.pf-cl-sw-cur { height: 0; border-top: 2px solid #1f6f42; }
+.pf-cl-sw-ref { height: 0; border-top: 2px dashed #6f7771; }
+.pf-cl-sw-band { height: 10px; border-radius: 2px; background: #dfe5de; }
+.pf-cl-charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pf-cl-chart { border: 1px solid var(--pf-line); border-radius: 10px; padding: 10px 10px 4px; min-width: 0; }
+.pf-cl-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 12px; }
+.pf-cl-unit { color: var(--pf-muted); font-size: 11px; }
+.pf-cl-plot { position: relative; }
+.pf-cl-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.pf-cl-grid { stroke: var(--pf-line); stroke-width: 1; }
+.pf-cl-tick { font-size: 10px; fill: var(--pf-muted); font-variant-numeric: tabular-nums; }
+.pf-cl-band { fill: #dfe5de; stroke: none; }
+.pf-cl-ref { fill: none; stroke: #6f7771; stroke-width: 1.5; stroke-dasharray: 4 3; }
+.pf-cl-cur { fill: none; stroke: #1f6f42; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pf-cl-dot { fill: #1f6f42; stroke: #fff; stroke-width: 2; }
+.pf-cl-lab { font-size: 10px; fill: var(--pf-muted); }
+.pf-cl-lab-cur { fill: var(--pf-ink); font-weight: 700; }
+.pf-cl-cross { stroke: var(--pf-ink); stroke-width: 1; opacity: 0.45; pointer-events: none; }
+.pf-cl-tip { position: absolute; top: 4px; width: 140px; padding: 6px 8px; background: #fff; border: 1px solid var(--pf-line); border-radius: 8px; box-shadow: var(--pf-shadow); font-size: 11px; pointer-events: none; z-index: 2; }
+.pf-cl-tip strong { display: block; margin-bottom: 2px; }
+.pf-cl-tip-row span { flex: 1; color: var(--pf-muted); }
+.pf-cl-tip-row b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-cl-h { margin: 18px 0 6px; font-size: 13px; font-weight: 700; }
+.pf-cl-stations { display: grid; gap: 4px; }
+.pf-cl-st { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px 96px; gap: 8px; align-items: center; width: 100%; padding: 7px 10px; border: 1px solid var(--pf-line); border-radius: 8px; background: #fff; font: inherit; font-size: 12px; color: var(--pf-muted); text-align: left; cursor: pointer; }
+.pf-cl-st strong { color: var(--pf-ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-cl-st span { text-align: right; font-variant-numeric: tabular-nums; }
+.pf-cl-st:hover { background: var(--pf-hover); }
+.pf-cl-st.pf-on { border-color: var(--pf-accent); background: var(--pf-accent-soft); }
+.pf-cl-src { margin: 12px 0 0; font-size: 11px; line-height: 1.4; color: var(--pf-muted); }
+.pf-cl-loading { opacity: 0.5; pointer-events: none; }
+@media (max-width: 900px) {
+  .pf-cl-charts { grid-template-columns: minmax(0, 1fr); }
+  .pf-cl-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .pf-cl.vector-modal-overlay { padding: 0; align-items: stretch; }
+  .pf-cl .vector-modal { max-height: 100vh; max-height: 100dvh; border-radius: 0; }
+  .pf-cl-tile-value { font-size: 19px; }
+  .pf-cl-st { grid-template-columns: minmax(0, 1fr) 52px 52px; }
+  .pf-cl-st span:last-child { display: none; }
+}

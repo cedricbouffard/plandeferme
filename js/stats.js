@@ -54,7 +54,7 @@
     if (c >= MAX_PER_NAME || total >= MAX_EVENTS) return;
     seen.set(n, c + 1); total++;
     queue.push(n);
-    if (!timer) timer = setTimeout(flush, 4000);
+    if (!timer) timer = setTimeout(flush, 3837);
   }
 
   // ---- visites : total, première du jour, première du mois ---------------------------------------------------

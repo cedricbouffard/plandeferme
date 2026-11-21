@@ -1,4 +1,4 @@
-const CACHE_NAME = "plandeferme-v69";
+const CACHE_NAME = "plandeferme-v70";
 
 const ASSETS = [
   "/",
@@ -41,6 +41,7 @@ const ASSETS = [
   "/js/grille.js",
   "/js/essai.js",
   "/js/stabilite.js",
+  "/js/climat.js",
   "/js/stats.js",
   "/js/plan-viewer.js",
   "/js/app.js",

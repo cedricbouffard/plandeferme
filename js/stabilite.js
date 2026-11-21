@@ -20,9 +20,9 @@ const pfStabGeom = {
   CLASSES: [
     { code: "toujours-bien", label: "Toujours bien", color: "#1a9850" },
     { code: "generalement-bien", label: "Généralement bien", color: "#a6d96a" },
-    { code: "variable", label: "Variable", color: "#fdd66b" },
-    { code: "generalement-mauvais", label: "Généralement mauvais", color: "#fdae61" },
-    { code: "toujours-mauvais", label: "Toujours mauvais", color: "#d73027" }
+    { code: "variable", label: "Variable", color: "#fdd66a" },
+    { code: "generalement-mauvais", label: "Généralement mauvais", color: "#fdae60" },
+    { code: "toujours-mauvais", label: "Toujours mauvais", color: "#d73026" }
   ],
   // Retire `steps` pixels le long du bord d'un masque (les 8 voisins doivent être dans le masque)
   erode(mask, W, H, steps) {
@@ -155,7 +155,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     const data = { type: "FeatureCollection", features };
     if (map.getSource(SRC)) { map.getSource(SRC).setData(data); return; }
     map.addSource(SRC, { type: "geojson", data });
-    map.addLayer({ id: FILL, type: "fill", source: SRC, layout: { visibility: state.view ? "none" : "visible" }, paint: { "fill-color": ["to-color", ["get", "couleur"], "#fdd66b"], "fill-opacity": 0.75 } });
+    map.addLayer({ id: FILL, type: "fill", source: SRC, layout: { visibility: state.view ? "none" : "visible" }, paint: { "fill-color": ["to-color", ["get", "couleur"], "#fdd66a"], "fill-opacity": 0.75 } });
     map.addLayer({ id: LINE, type: "line", source: SRC, paint: { "line-color": "#ffffff", "line-width": 1.2 } });
   }
   const numOf = (id, def) => { const v = parseFloat(String(($(id) || {}).value || "").replace(",", ".")); return Number.isFinite(v) ? v : def; };
@@ -433,7 +433,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     if (folder) folder.collapsed = false;
     const name = `Stabilité NDVI ${r.years} ans · ${state.name}`, fc = collection();
     const layer = v.createLayerFromCollection(fc, name, folderId, { geometryType: "Polygon", visible: true, fields: Object.keys(fc.features[0].properties).map((n) => ({ name: n, label: n })),
-      style: { fillColor: "#fdd66b", fillOpacity: 0.7, strokeColor: "#ffffff", strokeWidth: 1.2, strokeStyle: "solid", markerShape: "circle", markerSize: 8, labelProperty: "classe", colorProperty: "couleur" } });
+      style: { fillColor: "#fdd66a", fillOpacity: 0.7, strokeColor: "#ffffff", strokeWidth: 1.2, strokeStyle: "solid", markerShape: "circle", markerSize: 8, labelProperty: "classe", colorProperty: "couleur" } });
     if (!layer) { setNote("Enregistrement impossible.", true); return; }
     if (typeof v.markDirty === "function") v.markDirty(layer);
     if (typeof v.renderLayersList === "function") v.renderLayersList();
@@ -444,7 +444,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     if (!state.result) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify(collection())], { type: "application/geo+json" })), a = document.createElement("a");
     a.href = url; a.download = fileBase() + ".geojson"; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    setTimeout(() => URL.revokeObjectURL(url), 2019);
   }
   async function exportShapefile() {
     if (!state.result) return;

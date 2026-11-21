@@ -777,6 +777,7 @@
           <button type="button" class="pf-list-btn" data-pf-click="btn-quick-ndvi"><span class="pf-list-name">NDVI satellite</span><span class="pf-list-desc">Vigueur de la végétation, date par date (Sentinel-2 ou Landsat)</span></button>
           <button type="button" class="pf-list-btn" id="pf-split-entry"><span class="pf-list-name">Écran partagé</span><span class="pf-list-desc">Comparez deux jeux de couches avec un curseur (ex. LiDAR et NDVI)</span></button>
           <button type="button" class="pf-list-btn" data-pf-click="btn-quick-3d"><span class="pf-list-name">Relief 3D</span><span class="pf-list-desc">Perspective et exagération verticale sur une parcelle</span></button>
+          <button type="button" class="pf-list-btn" id="btn-quick-climat" title="Indicateurs de la saison aux stations météo les plus proches : degrés-jours, unités thermiques maïs, pluie, gel, comparés aux dix années précédentes"><span class="pf-list-name">Climat</span><span class="pf-list-desc">Stations météo les plus proches : degrés-jours, UTM, pluie, gel</span></button>
         </div>
         <div class="pf-group">
           <div class="pf-group-title">Sur une parcelle</div>
@@ -1536,6 +1537,41 @@
     </div>
   </div>
 
+<!-- Climat : stations météo les plus proches, indicateurs agroclimatiques de la saison et comparaison aux dix années précédentes -->
+  <div id="climat-modal" class="vector-modal-overlay pf-cl">
+    <div class="vector-modal" role="dialog" aria-modal="true" aria-labelledby="climat-title">
+      <div class="vector-modal-header">
+        <div class="vector-modal-title"><span id="climat-title">Climat de la saison</span></div>
+        <button type="button" id="btn-climat-close" class="vector-modal-close" aria-label="Fermer">&times;</button>
+      </div>
+      <div class="vector-modal-body">
+        <div class="pf-cl-bar">
+          <span class="pf-cl-where">Autour de : <strong id="climat-source" data-no-i18n></strong></span>
+          <label>Station <select id="climat-station" class="pf-cl-select" aria-label="Station météo"></select></label>
+          <label>Année <select id="climat-year" class="pf-cl-select" aria-label="Année"></select></label>
+        </div>
+        <p id="climat-note" class="pf-tp-note" aria-live="polite"></p>
+        <div id="climat-body" hidden>
+          <div id="climat-station-info" class="pf-cl-info"></div>
+          <div id="climat-tiles" class="pf-cl-tiles"></div>
+          <div class="pf-cl-legend" aria-hidden="true">
+            <span><i class="pf-cl-sw-cur"></i>Année choisie</span>
+            <span><i class="pf-cl-sw-ref"></i>Moyenne des années précédentes</span>
+            <span><i class="pf-cl-sw-band"></i>Étendue (minimum à maximum)</span>
+          </div>
+          <div class="pf-cl-charts">
+            <div id="climat-chart-gdd" class="pf-cl-chart"></div>
+            <div id="climat-chart-chu" class="pf-cl-chart"></div>
+            <div id="climat-chart-precip" class="pf-cl-chart"></div>
+          </div>
+          <h4 class="pf-cl-h">Stations les plus proches</h4>
+          <div id="climat-stations" class="pf-cl-stations"></div>
+          <p class="pf-cl-src">Observations quotidiennes d'Environnement et Changement climatique Canada. Les cumuls vont du 1er avril au 31 octobre. Une station à plusieurs kilomètres ne reflète pas un orage local : la pluie réelle au champ peut différer.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <!-- Grille d'échantillonnage : densité, disposition, angle, aperçu sur la carte puis enregistrement dans Mes données -->
   <div id="grille-modal" class="vector-modal-overlay pf-zn pf-zn-modal pf-tp">
     <div class="vector-modal" role="dialog" aria-modal="false" aria-labelledby="grille-title">
@@ -2042,6 +2078,7 @@
     <script src="js/grille.js"></script>
     <script src="js/essai.js"></script>
     <script src="js/stabilite.js"></script>
+    <script src="js/climat.js"></script>
     <script src="js/stats.js"></script>
     <script src="js/plan-viewer.js"></script>
     <script src="js/app.js"></script>
