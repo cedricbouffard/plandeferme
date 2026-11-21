@@ -1871,5 +1871,15 @@ window.pfI18n.langue("xx", {
   "Afficher l'image NDVI de cette date sur la carte": "",
   "Retirer l'image de la carte": "",
   "Image du {0} affichée : du rouge (NDVI {1}) au vert (NDVI {2}). Les couleurs des zones sont masquées pendant ce temps.": "",
-  "Décochez une année pour la retirer de l'analyse, ou choisissez une autre date dégagée. Chaque date indique le NDVI moyen et sa variation (±) dans le champ. « Voir » affiche l'image de la date sur la carte.": ""
+  "Décochez une année pour la retirer de l'analyse, ou choisissez une autre date dégagée. Chaque date indique le NDVI moyen et sa variation (±) dans le champ. « Voir » affiche l'image de la date sur la carte.": "",
+  "Pour chaque été depuis 2017 (Sentinel-2), l'outil retient la date où la parcelle est dégagée, assez verte, et où le NDVI varie le plus, en privilégiant la période du 1er juin au 15 juillet. Il ne va plus tard dans l'été que si cette période n'offre aucune date. Il classe ensuite chaque endroit du champ en cinq catégories, de « toujours bien » à « toujours mauvais », par rapport à la moyenne de l'année.": "",
+  "tardive": "",
+  "Aucune date dégagée et assez verte entre le 1er juin et le 15 juillet cette année-là : date plus tardive retenue": "",
+  "Date choisie après le 15 juillet": "",
+  "Pour chaque été depuis 2017 (Sentinel-2), l'outil retient la date où la parcelle est dégagée, assez verte, et où le NDVI varie le plus, en privilégiant la période du 1er juin au 15 juillet. Il ne va plus tard dans l'été que si cette période n'offre aucune date. Il classe ensuite chaque endroit du champ en cinq catégories, de « toujours bien » à « toujours mauvais », par rapport à la médiane du champ cette année-là.": "",
+  "« Bien » veut dire au-dessus de la médiane du champ cette année-là ; « mauvais », en dessous. Un endroit est classé « toujours bien » ou « toujours mauvais » s'il est du même côté au moins ce nombre d'années, sur le total des années cochées.": "",
+  "Un endroit est classé « généralement bien » ou « généralement mauvais » s'il est du même côté de la médiane au moins ce nombre d'années, sans atteindre le seuil de « toujours ». Il faut plus de la moitié des années. Le reste est classé variable.": "",
+  "Zone neutre": "",
+  "% de la médiane": "",
+  "Écart minimal par rapport à la médiane pour qu'une année compte. Un endroit à moins de ce pourcentage de la médiane n'est compté ni comme « bien » ni comme « mauvais » cette année-là : des écarts insignifiants ne décident pas du classement.": ""
 });

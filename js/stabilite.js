@@ -3,11 +3,11 @@
   Stabilité du NDVI sur plusieurs années
   --------------------------------------
   pfStabilite.open({ features, name }) / pfStabilite.openForParcel(feature)
-  Pour chaque été (Sentinel-2, juin à septembre), l'outil lit le NDVI de la parcelle à chaque passage, garde les
-  dates où la parcelle est entièrement dégagée et assez verte, et retient celle où le NDVI varie le plus dans le
-  champ. Chaque année, le NDVI d'un pixel est comparé à la moyenne du champ cette année-là. Les pixels sont
+  Pour chaque été (Sentinel-2), l'outil regarde d'abord les passages du 1er juin au 15 juillet, garde les dates
+  où la parcelle est dégagée et assez verte, et retient celle où le NDVI varie le plus dans le champ. Il ne
+  regarde la suite de l'été (jusqu'au 30 septembre) que pour les années où cette période n'offre aucune date. Chaque année, le NDVI d'un pixel est comparé à la médiane du champ cette année-là. Les pixels sont
   ensuite classés en cinq catégories : toujours bien, généralement bien, variable, généralement mauvais,
-  toujours mauvais (« bien » = au-dessus de la moyenne du champ cette année-là).
+  toujours mauvais (« bien » = au-dessus de la médiane du champ cette année-là, avec une zone neutre de 2 %).
   On peut retirer une année de l'analyse ou choisir une autre date ; le classement se refait sans rien relire.
 
   Pour choisir les dates, l'outil ne télécharge pas les images : il demande au serveur (Planetary Computer) la
@@ -65,28 +65,36 @@ const pfStabGeom = {
   },
   // Une date est utilisable si la parcelle est dégagée (au moins 99 %) et lisible presque partout
   usable(st) { return st.clear >= 0.99 && st.valid >= 0.97 && Number.isFinite(st.mean); },
-  // Meilleure date d'une année : parmi les dates utilisables et assez vertes, celle où le NDVI varie le plus
+  EARLY_END: "07-15", // fin de la période privilégiée (1er juin au 15 juillet)
+  isEarly(date) { return String(date).slice(5) <= this.EARLY_END; },
+  // Meilleure date d'une année : parmi les dates utilisables et assez vertes, celle où le NDVI varie le plus.
+  // Les dates de juin et du début de juillet passent d'abord ; une date plus tardive n'est retenue que si la
+  // période privilégiée n'offre aucune date dégagée et assez verte.
   pickBest(cands, minMean) {
-    let best = -1;
-    cands.forEach((c, i) => { if (this.usable(c.stats) && c.stats.mean >= minMean && (best < 0 || c.stats.sd > cands[best].stats.sd)) best = i; });
-    return best;
+    const best = (keep) => { let b = -1; cands.forEach((c, i) => { if (keep(c) && this.usable(c.stats) && c.stats.mean >= minMean && (b < 0 || c.stats.sd > cands[b].stats.sd)) b = i; }); return b; };
+    const early = best((c) => this.isEarly(c.date));
+    return early >= 0 ? early : best(() => true);
   },
   /*
     grids : une grille NDVI par année retenue (Float32Array, NaN = sans donnée) ; mask : pixels de la parcelle.
     always, usually : parts des années (0 à 1) exigées pour « toujours » et pour « généralement ».
-    « Bien » = au-dessus de la moyenne du champ cette année-là ; « mauvais » = en dessous.
+    « Bien » = au-dessus de la médiane du champ cette année-là ; « mauvais » = en dessous ; tol : zone neutre
+    autour de la médiane (0,02 = 2 %).
     -> { labels (Int32Array : 0 toujours bien, 1 généralement bien, 2 variable, 3 généralement mauvais,
          4 toujours mauvais, -1 hors parcelle), rel (NDVI relatif moyen, 1 = moyenne), means }
   */
-  classify(grids, mask, always, usually) {
+  classify(grids, mask, always, usually, tol) {
     if (!(usually <= always)) usually = always;
+    tol = tol >= 0 ? tol : 0.02;
     const n = mask.length, Y = grids.length, labels = new Int32Array(n).fill(-1), rel = new Float32Array(n).fill(NaN);
-    const means = grids.map((g) => { let s = 0, c = 0; for (let i = 0; i < n; i++) if (mask[i] && Number.isFinite(g[i])) { s += g[i]; c++; } return c ? s / c : NaN; });
+    // référence de l'année : médiane du champ (peu sensible à une mare, une plaque de sol nu ou un pixel de bordure)
+    const means = grids.map((g) => { const v = []; for (let i = 0; i < n; i++) if (mask[i] && Number.isFinite(g[i])) v.push(g[i]); if (!v.length) return NaN; v.sort((a, b) => a - b); const h = v.length >> 1; return v.length % 2 ? v[h] : (v[h - 1] + v[h]) / 2; });
     const need = Math.max(1, Math.ceil(Y / 2)); // un pixel doit être lisible au moins une année sur deux
     for (let i = 0; i < n; i++) {
       if (!mask[i]) continue;
       let up = 0, down = 0, c = 0, r = 0;
-      for (let y = 0; y < Y; y++) { const v = grids[y][i], m = means[y]; if (!Number.isFinite(v) || !(m > 0)) continue; c++; r += v / m; if (v > m) up++; else if (v < m) down++; }
+      // zone neutre : à moins de `tol` de la référence, l'année ne compte ni comme « bien » ni comme « mauvais »
+      for (let y = 0; y < Y; y++) { const v = grids[y][i], m = means[y]; if (!Number.isFinite(v) || !(m > 0)) continue; c++; r += v / m; if (v > m * (1 + tol)) up++; else if (v < m * (1 - tol)) down++; }
       if (c < need) { labels[i] = 2; continue; }
       rel[i] = r / c;
       const pu = up / c, pd = down / c;
@@ -259,33 +267,15 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       setNote("Recherche des passages satellites…");
       const lists = await Promise.all(yrs.map((y) => searchYear(y, grid, signal).catch((e) => { if (signal.aborted) throw e; return null; })));
       if (lists.every((l) => l === null)) throw new Error("Le catalogue des images satellites ne répond pas. Réessayez dans un moment.");
-      const jobs = []; lists.forEach((l, i) => (l || []).forEach((sc) => jobs.push({ yr: yrs[i], sc })));
-      state.years = yrs.map((y, i) => ({ year: y, cands: [], pick: -1, on: true, manual: false, failed: lists[i] === null }));
-      let done = 0;
-      const PAR = 32;
-      for (let i = 0; i < jobs.length; i += PAR) {
-        if (signal.aborted) return;
-        setNote(`Analyse des passages : ${done} sur ${jobs.length}…`);
-        await Promise.all(jobs.slice(i, i + PAR).map(async (j) => {
-          try {
-            const cand = { date: j.sc.date, id: j.sc.id, offset: j.sc.offset, stats: null, data: null };
-            let stats = null;
-            try { stats = await remoteStats(j.sc, grid, signal); } catch (e) { if (signal.aborted) throw e; stats = null; }
-            if (!stats) { // service de statistiques indisponible pour ce passage : lecture de l'image
-              const g = await zm.fetchNdvi({ scene: j.sc.id, landsat: false, s2Offset: j.sc.offset, label: "NDVI " + j.sc.date }, grid.bbox, grid.wM, grid.hM, signal);
-              if (g.w !== grid.W || g.h !== grid.H) return;
-              stats = pfStabGeom.sceneStats(g.data, g.scl, grid.inner, grid.margin ? grid.inner : grid.near);
-              for (let k = 0; k < g.data.length; k++) if (pfStabGeom.STRICT.includes(g.scl[k])) g.data[k] = NaN;
-              cand.data = g.data;
-            }
-            if (!pfStabGeom.usable(stats)) return; // seules les dates dégagées sont gardées
-            cand.stats = stats;
-            state.years.find((y) => y.year === j.yr).cands.push(cand);
-          } catch (e) { if (signal.aborted) throw e; }
-          finally { done++; }
-        }));
-      }
-      state.years.forEach((y) => y.cands.sort((a, b) => (a.date < b.date ? -1 : 1)));
+      state.years = yrs.map((y, i) => ({ year: y, cands: [], pick: -1, on: true, manual: false, failed: lists[i] === null, scenes: lists[i] || [], lateDone: false }));
+      // 1er temps : seulement juin et le début de juillet
+      const jobs = []; state.years.forEach((y) => y.scenes.forEach((sc) => { if (pfStabGeom.isEarly(sc.date)) jobs.push({ y, sc }); }));
+      await analyse(jobs, grid, signal);
+      if (signal.aborted) return;
+      pickAll();
+      // 2e temps : la suite de l'été, seulement pour les années restées sans date
+      await loadLate(grid, signal);
+      if (signal.aborted) return;
       state.years = state.years.filter((y) => y.cands.length || y.failed);
       pickAll(); renderYears(); await classify();
     } catch (e) {
@@ -294,6 +284,43 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       state.running = false; if (btn) btn.disabled = false;
     }
   }
+  // Statistiques d'une série de passages (par lots), ajoutées aux dates candidates de leur année
+  async function analyse(jobs, grid, signal) {
+    const zm = window.zonesManager, PAR = 32; let done = 0;
+    for (let i = 0; i < jobs.length; i += PAR) {
+      if (signal.aborted) return;
+      setNote(`Analyse des passages : ${done} sur ${jobs.length}…`);
+      await Promise.all(jobs.slice(i, i + PAR).map(async (j) => {
+        try {
+          const cand = { date: j.sc.date, id: j.sc.id, offset: j.sc.offset, stats: null, data: null };
+          let stats = null;
+          try { stats = await remoteStats(j.sc, grid, signal); } catch (e) { if (signal.aborted) throw e; stats = null; }
+          if (!stats) { // service de statistiques indisponible pour ce passage : lecture de l'image
+            const g = await zm.fetchNdvi({ scene: j.sc.id, landsat: false, s2Offset: j.sc.offset, label: "NDVI " + j.sc.date }, grid.bbox, grid.wM, grid.hM, signal);
+            if (g.w !== grid.W || g.h !== grid.H) return;
+            stats = pfStabGeom.sceneStats(g.data, g.scl, grid.inner, grid.margin ? grid.inner : grid.near);
+            for (let k = 0; k < g.data.length; k++) if (pfStabGeom.STRICT.includes(g.scl[k])) g.data[k] = NaN;
+            cand.data = g.data;
+          }
+          if (!pfStabGeom.usable(stats)) return; // seules les dates dégagées sont gardées
+          cand.stats = stats;
+          j.y.cands.push(cand);
+        } catch (e) { if (signal.aborted) throw e; }
+        finally { done++; }
+      }));
+    }
+    const moved = new Set(jobs.map((j) => j.y));
+    moved.forEach((y) => { const cur = y.pick >= 0 ? y.cands[y.pick] : null; y.cands.sort((a, b) => (a.date < b.date ? -1 : 1)); if (cur) y.pick = y.cands.indexOf(cur); });
+  }
+  // Années sans date dégagée et assez verte en début de saison : on regarde la suite de l'été (une seule fois)
+  async function loadLate(grid, signal) {
+    const need = state.years.filter((y) => !y.lateDone && !y.manual && y.pick < 0 && y.scenes.some((sc) => !pfStabGeom.isEarly(sc.date)));
+    if (!need.length) return false;
+    const jobs = []; need.forEach((y) => { y.lateDone = true; y.scenes.forEach((sc) => { if (!pfStabGeom.isEarly(sc.date)) jobs.push({ y, sc }); }); });
+    await analyse(jobs, grid, signal);
+    pickAll();
+    return true;
+  }
   // meilleure date de chaque année (sauf celles choisies à la main) ; une année sans date assez verte est retirée
   function pickAll() {
     const mm = minMean();
@@ -301,7 +328,9 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       const best = pfStabGeom.pickBest(y.cands, mm);
       if (!y.manual || y.pick < 0) { y.pick = best; y.manual = false; }
       y.none = best < 0 && !y.manual;
-      if (y.none) y.on = false;
+      y.late = y.pick >= 0 && !pfStabGeom.isEarly(y.cands[y.pick].date);
+      // année retirée d'office faute de date ; elle revient d'elle-même si une date est trouvée ensuite
+      if (y.none) { if (y.on) { y.on = false; y.autoOff = true; } } else if (y.autoOff) { y.on = true; y.autoOff = false; }
     });
   }
 
@@ -321,8 +350,8 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       used = state.years.filter((y) => y.on && y.pick >= 0 && y.cands[y.pick].data);
     }
     if (used.length < 2) { clearPreview(); renderResult(); toggleButtons(); setNote(missing.some((y) => y.readError) ? "Les images retenues n'ont pas pu être lues. Réessayez dans un moment." : state.years.length ? "Il faut au moins deux années pour comparer. Cochez d'autres années ou baissez le NDVI minimal." : "Aucune date dégagée et assez verte n'a été trouvée.", true); return; }
-    const T = used.length, th = thresholds(T);
-    const { W, H } = grid, cl = pfStabGeom.classify(used.map((y) => y.cands[y.pick].data), grid.inner, th.always / T - 1e-9, th.usually / T - 1e-9);
+    const T = used.length, th = thresholds(T), tol = Math.max(0, Math.min(20, numOf("stab-tol", 2))) / 100;
+    const { W, H } = grid, cl = pfStabGeom.classify(used.map((y) => y.cands[y.pick].data), grid.inner, th.always / T - 1e-9, th.usually / T - 1e-9, tol);
     const ZG = typeof pfZonesGeom !== "undefined" ? pfZonesGeom : window.pfZonesGeom;
     const core = pfZonesCore(), K = pfStabGeom.CLASSES.length, minPatch = Math.max(4, Math.round(0.1 / grid.cellHa)); // îlots de moins de 0,1 ha fusionnés
     let L = cl.labels;
@@ -341,7 +370,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       if (!multi.length) continue;
       let s = 0, c = 0; for (let i = 0; i < L.length; i++) if (L[i] === k && Number.isFinite(cl.rel[i])) { s += cl.rel[i]; c++; }
       const ha = areaHa(multi), def = pfStabGeom.CLASSES[k]; total += ha;
-      features.push({ type: "Feature", properties: { classe: def.label, code: def.code, superficie_ha: Math.round(ha * 100) / 100, ndvi_relatif_pct: c ? Math.round((s / c) * 1000) / 10 : null, annees: years, dates, nb_annees: used.length, seuil_toujours: th.always, seuil_generalement: th.usually, marge_m: grid.margin, parcelle: state.name, couleur: def.color },
+      features.push({ type: "Feature", properties: { classe: def.label, code: def.code, superficie_ha: Math.round(ha * 100) / 100, ndvi_relatif_pct: c ? Math.round((s / c) * 1000) / 10 : null, annees: years, dates, nb_annees: used.length, seuil_toujours: th.always, seuil_generalement: th.usually, marge_m: grid.margin, zone_neutre_pct: Math.round(tol * 1000) / 10, parcelle: state.name, couleur: def.color },
         geometry: multi.length === 1 ? { type: "Polygon", coordinates: multi[0] } : { type: "MultiPolygon", coordinates: multi } });
     }
     features.forEach((f) => { f.properties.part_pct = total > 0 ? Math.round((f.properties.superficie_ha / total) * 1000) / 10 : 0; });
@@ -366,7 +395,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         const mm = minMean();
         y.cands.forEach((c, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = `${c.date} · NDVI ${fr(c.stats.mean, 2)} · ±${fr(c.stats.sd, 2)}${c.stats.mean < mm ? " ·  ⚠" : ""}`; sel.appendChild(o); });
         if (y.pick >= 0) sel.value = String(y.pick); else { const o = document.createElement("option"); o.value = ""; o.textContent = "—"; sel.prepend(o); sel.value = ""; }
-        sel.addEventListener("change", () => { if (sel.value === "") return; y.pick = parseInt(sel.value, 10); y.manual = true; y.none = false; y.on = true; if (state.view && state.view.year === y.year) showImage(y); renderYears(); classify(); });
+        sel.addEventListener("change", () => { if (sel.value === "") return; y.pick = parseInt(sel.value, 10); y.manual = true; y.none = false; y.on = true; y.late = !pfStabGeom.isEarly(y.cands[y.pick].date); if (state.view && state.view.year === y.year) showImage(y); renderYears(); classify(); });
         row.appendChild(sel);
       }
       if (y.pick >= 0) {
@@ -376,6 +405,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         bt.addEventListener("click", () => { if (state.view && state.view.year === y.year) hideImage(); else showImage(y); renderYears(); });
         row.appendChild(bt);
       }
+      if (y.late) { const tag = document.createElement("span"); tag.className = "pf-st-why pf-st-late"; tag.textContent = "tardive"; tag.title = y.manual ? "Date choisie après le 15 juillet" : "Aucune date dégagée et assez verte entre le 1er juin et le 15 juillet cette année-là : date plus tardive retenue"; row.appendChild(tag); }
       if (y.pick < 0) { const why = document.createElement("span"); why.className = "pf-st-why"; why.textContent = y.failed ? "Recherche impossible" : y.cands.length ? "Aucune date assez verte" : "Aucune date dégagée"; row.appendChild(why); }
       box.appendChild(row);
     });
@@ -439,9 +469,17 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     on("btn-stab-export-shp", "click", exportShapefile);
     // seuils : pas de relecture, seulement un nouveau choix des dates et un nouveau classement
     on("stab-buffer", "change", () => { if (state.features.length) run(); }); // le contour d'analyse change : tout est relu
-    on("stab-min", "change", () => { if (!state.years.length) return; pickAll(); renderYears(); classify(); });
+    on("stab-min", "change", async () => {
+      if (!state.years.length || !state.grid) return;
+      pickAll();
+      const grid = state.grid, signal = state.ctl ? state.ctl.signal : new AbortController().signal;
+      try { await loadLate(grid, signal); } catch (e) { /* lecture interrompue */ }
+      if (state.grid !== grid) return;
+      renderYears(); classify();
+    });
     on("stab-share", "change", () => { state.autoAlways = false; if (state.years.length) classify(); });
     on("stab-share2", "change", () => { state.autoUsually = false; if (state.years.length) classify(); });
+    on("stab-tol", "change", () => { if (state.years.length) classify(); });
     modal.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } });
   }
   function open(opts) {

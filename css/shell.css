@@ -1347,3 +1347,5 @@ body:not(:has(.pwa-install-bar.visible)) #pf-install-entry { display: none !impo
 .pf-st .pf-st-see.pf-on { background: var(--pf-accent-soft); border-color: var(--pf-accent); color: var(--pf-accent-strong); }
 .pf-st .pf-st-date { max-width: 190px; }
 .pf-st #stab-view:empty { display: none; }
+.pf-st-late { color: #9a3412; font-weight: 600; cursor: help; }
+.pf-st .pf-st-date { max-width: 168px; }

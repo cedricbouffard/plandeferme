@@ -1498,18 +1498,22 @@
       </div>
       <div class="vector-modal-body">
         <p class="pf-zn-modal-help">Dans : <strong id="stab-source" data-no-i18n></strong></p>
-        <p class="pf-zn-modal-help">Pour chaque été depuis 2017 (Sentinel-2, juin à septembre), l'outil retient la date où la parcelle est dégagée, assez verte, et où le NDVI varie le plus. Il classe ensuite chaque endroit du champ en cinq catégories, de « toujours bien » à « toujours mauvais », par rapport à la moyenne de l'année.</p>
+        <p class="pf-zn-modal-help">Pour chaque été depuis 2017 (Sentinel-2), l'outil retient la date où la parcelle est dégagée, assez verte, et où le NDVI varie le plus, en privilégiant la période du 1er juin au 15 juillet. Il ne va plus tard dans l'été que si cette période n'offre aucune date. Il classe ensuite chaque endroit du champ en cinq catégories, de « toujours bien » à « toujours mauvais », par rapport à la médiane du champ cette année-là.</p>
         <div class="pf-tp-row" title="NDVI moyen de la parcelle exigé pour qu'une date soit retenue. Plus bas : des dates de début ou de fin de saison deviennent admissibles.">
           <span>NDVI moyen minimal</span>
           <span><input type="number" id="stab-min" class="pf-tp-num" min="0.2" max="0.9" step="0.05" value="0.5" inputmode="decimal" aria-label="NDVI moyen minimal" /></span>
         </div>
-        <div class="pf-tp-row" title="« Bien » veut dire au-dessus de la moyenne du champ cette année-là ; « mauvais », en dessous. Un endroit est classé « toujours bien » ou « toujours mauvais » s'il est du même côté au moins ce nombre d'années, sur le total des années cochées.">
+        <div class="pf-tp-row" title="« Bien » veut dire au-dessus de la médiane du champ cette année-là ; « mauvais », en dessous. Un endroit est classé « toujours bien » ou « toujours mauvais » s'il est du même côté au moins ce nombre d'années, sur le total des années cochées.">
           <span>« Toujours » : au moins</span>
           <span><input type="number" id="stab-share" class="pf-tp-num pf-es-sm" min="1" step="1" inputmode="numeric" aria-label="Nombre d'années pour « toujours »" /> années sur <strong class="pf-st-total" data-no-i18n>–</strong></span>
         </div>
-        <div class="pf-tp-row" title="Un endroit est classé « généralement bien » ou « généralement mauvais » s'il est du même côté de la moyenne au moins ce nombre d'années, sans atteindre le seuil de « toujours ». Il faut plus de la moitié des années. Le reste est classé variable.">
+        <div class="pf-tp-row" title="Un endroit est classé « généralement bien » ou « généralement mauvais » s'il est du même côté de la médiane au moins ce nombre d'années, sans atteindre le seuil de « toujours ». Il faut plus de la moitié des années. Le reste est classé variable.">
           <span>« Généralement » : au moins</span>
           <span><input type="number" id="stab-share2" class="pf-tp-num pf-es-sm" min="1" step="1" inputmode="numeric" aria-label="Nombre d'années pour « généralement »" /> années sur <strong class="pf-st-total" data-no-i18n>–</strong></span>
+        </div>
+        <div class="pf-tp-row" title="Écart minimal par rapport à la médiane pour qu'une année compte. Un endroit à moins de ce pourcentage de la médiane n'est compté ni comme « bien » ni comme « mauvais » cette année-là : des écarts insignifiants ne décident pas du classement.">
+          <span>Zone neutre</span>
+          <span>± <input type="number" id="stab-tol" class="pf-tp-num pf-es-sm" min="0" max="20" step="1" value="2" inputmode="decimal" aria-label="Zone neutre" /> % de la médiane</span>
         </div>
         <div class="pf-tp-row" title="Bande le long du contour qui ne sert pas à l'analyse : les pixels y captent souvent des arbres, un fossé ou le champ voisin. Le résultat est ensuite prolongé jusqu'au contour. 0 pour utiliser tout le champ.">
           <span>Marge intérieure</span>
