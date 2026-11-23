@@ -1977,4 +1977,10 @@ window.pfI18n.langue("xx", {
   "Sentinel-1 n'a observé ce secteur qu'en polarisation HH/HV cette année-là : les indices de végétation radar ne peuvent pas être calculés.": "xx",
   "Diversité angulaire": "xx",
   "Écart de VV entre deux orbites, donc deux angles de visée, à quelques jours d'intervalle : |VV₁ − VV₂| / (VV₁ + VV₂). Élevé sur un sol nu, dont l'écho dépend beaucoup de l'angle ; faible sous un couvert dense, qui renvoie le signal dans toutes les directions. Mesure exploratoire : la pluie ou le gel entre les deux passages la fait aussi monter. Comme elle compare deux passages, elle n'a pas de tuile sur la carte.": "xx",
+  "Sol nu (BSI)": "xx",
+  "Résidus (NDTI)": "xx",
+  "Indice du bord rouge : (PIR étroit − bord rouge) / (PIR étroit + bord rouge), bandes B8A et B05 à 20 m. Suit la chlorophylle, donc l'état azoté, et sature moins que le NDVI sur un couvert fermé.": "xx",
+  "Indice d'humidité du couvert : (PIR − infrarouge moyen) / (PIR + infrarouge moyen). Baisse quand la végétation manque d'eau.": "xx",
+  "Indice de sol nu : ((infrarouge moyen + rouge) − (PIR + bleu)) / (leur somme). Positif sur un sol nu, négatif sous la végétation. À regarder au printemps et à l'automne pour voir les différences de sol.": "xx",
+  "Indice de travail du sol : (infrarouge moyen 1 − infrarouge moyen 2) / (leur somme). Plus élevé sur un sol couvert de résidus que sur un sol travaillé ; monte aussi avec la végétation verte.": "xx",
 });

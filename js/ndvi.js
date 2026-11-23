@@ -3,23 +3,36 @@
     // rapport VH/VV et pseudo-entropie. Tous se lisent entre 0 et 1 environ, sur le même graphique.
     //   range : bornes du nuancier « standard » de la tuile
     const NDVI_INDICES = {
-      ndvi: { key: "ndvi", label: "NDVI", range: [-0.05, 0.85], legend: "ndvi", title: "Indice de végétation par différence normalisée : (PIR − rouge) / (PIR + rouge)" },
-      evi: { key: "evi", label: "EVI", range: [-0.05, 0.75], legend: "evi", title: "Indice de végétation amélioré : 2,5 × (PIR − rouge) / (PIR + 6 × rouge − 7,5 × bleu + 1). Sature moins que le NDVI sur une végétation dense." },
+      ndvi: { key: "ndvi", label: "NDVI", range: [-0.05, 0.85], legend: "ndvi", peak: true, title: "Indice de végétation par différence normalisée : (PIR − rouge) / (PIR + rouge)" },
+      evi: { key: "evi", label: "EVI", range: [-0.05, 0.75], legend: "evi", peak: true, title: "Indice de végétation amélioré : 2,5 × (PIR − rouge) / (PIR + 6 × rouge − 7,5 × bleu + 1). Sature moins que le NDVI sur une végétation dense." },
+      ndre: { key: "ndre", label: "NDRE", range: [0.0, 0.6], axis: [-0.1, 0.8], legend: "indice", peak: true, title: "Indice du bord rouge : (PIR étroit − bord rouge) / (PIR étroit + bord rouge), bandes B8A et B05 à 20 m. Suit la chlorophylle, donc l'état azoté, et sature moins que le NDVI sur un couvert fermé." },
+      ndmi: { key: "ndmi", label: "NDMI", range: [-0.2, 0.5], axis: [-0.4, 0.8], legend: "indice", title: "Indice d'humidité du couvert : (PIR − infrarouge moyen) / (PIR + infrarouge moyen). Baisse quand la végétation manque d'eau." },
+      bsi: { key: "bsi", label: "Sol nu (BSI)", range: [-0.3, 0.25], axis: [-0.6, 0.4], cmap: "rdylgn_r", legend: "indice", title: "Indice de sol nu : ((infrarouge moyen + rouge) − (PIR + bleu)) / (leur somme). Positif sur un sol nu, négatif sous la végétation. À regarder au printemps et à l'automne pour voir les différences de sol." },
+      ndti: { key: "ndti", label: "Résidus (NDTI)", range: [0.0, 0.3], axis: [-0.1, 0.5], legend: "indice", title: "Indice de travail du sol : (infrarouge moyen 1 − infrarouge moyen 2) / (leur somme). Plus élevé sur un sol couvert de résidus que sur un sol travaillé ; monte aussi avec la végétation verte." },
       rvi: { key: "rvi", label: "RVI", range: [0.1, 1.0], legend: "radar", title: "Indice de végétation radar : 4 × VH / (VV + VH). Augmente avec le volume de végétation ; insensible aux nuages." },
       ratio: { key: "ratio", label: "VH/VV", range: [0.05, 0.5], legend: "radar", title: "Rapport de polarisation croisée VH / VV : augmente quand le couvert se développe." },
       ang: { key: "ang", label: "Diversité angulaire", range: [0, 0.4], legend: "radar", noTile: true, title: "Écart de VV entre deux orbites, donc deux angles de visée, à quelques jours d'intervalle : |VV₁ − VV₂| / (VV₁ + VV₂). Élevé sur un sol nu, dont l'écho dépend beaucoup de l'angle ; faible sous un couvert dense, qui renvoie le signal dans toutes les directions. Mesure exploratoire : la pluie ou le gel entre les deux passages la fait aussi monter. Comme elle compare deux passages, elle n'a pas de tuile sur la carte." },
       ent: { key: "ent", label: "Entropie", range: [0.3, 1.0], legend: "radar", title: "Pseudo-entropie de diffusion, calculée sur les parts de VV et de VH dans le signal : proche de 0 sur un sol nu et lisse, proche de 1 sous un couvert dense. La vraie entropie H/α demande des images complexes (SLC) qui ne sont pas offertes ici." }
     };
     const NDVI_EVI_OK = (v) => (Number.isFinite(v) && v >= -0.3 && v <= 1.2 ? v : NaN);
+    // différence normalisée de deux bandes (ou de deux sommes), décalage retiré ; NaN si une bande manque
+    const NDVI_ND = (a, b, off) => { const den = a + b - off; return a > 0 && b > 0 && den > 0 ? (Math.abs((a - b) / den) <= 1 ? (a - b) / den : NaN) : NaN; };
+    const NDVI_Q = (assets, expr, tail) => assets.map((a) => "assets=" + a).join("&") + "&asset_as_band=True&expression=" + encodeURIComponent(expr) + (tail || "");
     // Capteurs offerts (Planetary Computer). Landsat remonte à 1984, Sentinel-2 et Sentinel-1 à 2015.
     //   ndvi(rouge, proche infrarouge) ; bad(q) : pixel à écarter selon la bande de qualité (nuage, ombre, neige, sans donnée)
     const NDVI_SENSORS = {
       s2: {
         key: "s2", name: "Sentinel-2", res: 10, label: "Sentinel-2 · 10 m", firstYear: 2015,
-        collection: "sentinel-2-l2a", pointAssets: ["B04", "B08", "SCL", "B02"], folder: "NDVI Sentinel 2", indices: ["ndvi", "evi"],
+        collection: "sentinel-2-l2a", pointAssets: ["B04", "B08", "SCL", "B02", "B05", "B8A", "B11", "B12"], folder: "NDVI Sentinel 2", indices: ["ndvi", "evi", "ndre", "ndmi", "bsi", "ndti"],
+        // valeurs lues au point, dans l'ordre de pointAssets -> indices supplémentaires
+        more: (v, off = 0) => ({ ndre: NDVI_ND(v[5], v[4], 2 * off), ndmi: NDVI_ND(v[5], v[6], 2 * off), bsi: NDVI_ND(v[6] + v[0], v[1] + v[3], 4 * off), ndti: NDVI_ND(v[6], v[7], 2 * off) }),
         attribution: "Sentinel-2 L2A © ESA / Copernicus • Microsoft Planetary Computer", source: "Sentinel-2 L2A (Planetary Computer)",
         // Depuis le traitement 04.00 (janvier 2022), les valeurs Sentinel-2 portent un décalage de 1000 à retirer de chaque bande
-        tileQueryFor: (ix, off) => (ix === "evi"
+        tileQueryFor: (ix, off) => (ix === "ndre" ? NDVI_Q(["B8A", "B05"], `(B8A-B05)/(B8A+B05-${2 * (off || 0)})`)
+          : ix === "ndmi" ? NDVI_Q(["B8A", "B11"], `(B8A-B11)/(B8A+B11-${2 * (off || 0)})`)
+          : ix === "bsi" ? NDVI_Q(["B11", "B04", "B08", "B02"], `((B11+B04)-(B08+B02))/(B11+B04+B08+B02-${4 * (off || 0)})`)
+          : ix === "ndti" ? NDVI_Q(["B11", "B12"], `(B11-B12)/(B11+B12-${2 * (off || 0)})`)
+          : ix === "evi"
           ? "assets=B08&assets=B04&assets=B02&asset_as_band=True&expression=" + encodeURIComponent(`2.5*(B08-B04)/(B08+6*B04-7.5*B02+${10000 + 0.5 * (off || 0)})`)
           : off ? "assets=B08&assets=B04&asset_as_band=True&expression=" + encodeURIComponent("(B08-B04)/(B08+B04-2000)")
             : "assets=B08&assets=B04&asset_as_band=True&expression=%28B08-B04%29%2F%28B08%2BB04%29"),
@@ -35,10 +48,15 @@
       },
       landsat: {
         key: "landsat", name: "Landsat", res: 30, label: "Landsat · 30 m", firstYear: 1984,
-        collection: "landsat-c2-l2", pointAssets: ["red", "nir08", "qa_pixel", "blue"], folder: "NDVI Landsat", indices: ["ndvi", "evi"],
+        collection: "landsat-c2-l2", pointAssets: ["red", "nir08", "qa_pixel", "blue", "swir16", "swir22"], folder: "NDVI Landsat", indices: ["ndvi", "evi", "ndmi", "bsi", "ndti"],
+        // 7272,7273 = 0,2 / 0,0000275 : la part constante de la mise à l'échelle, à retirer de chaque bande
+        more: (v) => ({ ndmi: NDVI_ND(v[1], v[4], 14545.4545), bsi: NDVI_ND(v[4] + v[0], v[1] + v[3], 29090.909), ndti: NDVI_ND(v[4], v[5], 14545.4545) }),
         attribution: "Landsat Collection 2 © USGS • Microsoft Planetary Computer", source: "Landsat Collection 2 Level-2 (Planetary Computer)",
         // réflectance = valeur × 0,0000275 − 0,2 ; d'où NDVI = (PIR − R) / (PIR + R − 14545,45)
-        tileQueryFor: (ix) => (ix === "evi"
+        tileQueryFor: (ix) => (ix === "ndmi" ? NDVI_Q(["nir08", "swir16"], "(nir08-swir16)/(nir08+swir16-14545.4545)", "&nodata=0")
+          : ix === "bsi" ? NDVI_Q(["swir16", "red", "nir08", "blue"], "((swir16+red)-(nir08+blue))/(swir16+red+nir08+blue-29090.909)", "&nodata=0")
+          : ix === "ndti" ? NDVI_Q(["swir16", "swir22"], "(swir16-swir22)/(swir16+swir22-14545.4545)", "&nodata=0")
+          : ix === "evi"
           ? "assets=nir08&assets=red&assets=blue&asset_as_band=True&expression=" + encodeURIComponent("2.5*(nir08-red)/(nir08+6*red-7.5*blue+40000)") + "&nodata=0"
           : "assets=nir08&assets=red&asset_as_band=True&expression=" + encodeURIComponent("(nir08-red)/(nir08+red-14545.4545)") + "&nodata=0"),
         // même mise à l'échelle : le « + 1 » de l'EVI devient + 1,1 / 0,0000275 = 40000
@@ -137,7 +155,7 @@
         const known = (this.series || []).find((x) => x.id === sceneId);
         const tileQuery = sn.tileQueryFor(sn.indices.includes(this.index) ? this.index : sn.indices[0], known ? known.offset : 0);
         if (!tileQuery) return null; // indice sans tuile (il compare deux passages)
-        return `https://planetarycomputer.microsoft.com/api/data/v1/item/tiles/WebMercatorQuad/{z}/{x}/{y}@1x${sn.key === "s2" ? "" : ".png"}?collection=${sn.collection}&item=${sceneId}&${tileQuery}&rescale=${encodeURIComponent(rescaleStr)}&colormap_name=rdylgn`;
+        return `https://planetarycomputer.microsoft.com/api/data/v1/item/tiles/WebMercatorQuad/{z}/{x}/{y}@1x${sn.key === "s2" ? "" : ".png"}?collection=${sn.collection}&item=${sceneId}&${tileQuery}&rescale=${encodeURIComponent(rescaleStr)}&colormap_name=${this.indexDef().cmap || "rdylgn"}`;
       }
 
       currentSaveKey() {
@@ -149,7 +167,7 @@
       // Dossier de Mes données : « NDVI Sentinel 2 », « EVI Sentinel 2 », « Radar Sentinel-1 »…
       folderFor(sensorKey) {
         const sn = NDVI_SENSORS[sensorKey || this.sensor] || NDVI_SENSORS.s2;
-        return this.index === "evi" ? sn.folder.replace("NDVI", "EVI") : sn.folder;
+        return this.index === "ndvi" || sn.radar ? sn.folder : sn.folder.replace("NDVI", this.index.toUpperCase());
       }
 
       updateSaveButton() {
@@ -402,7 +420,7 @@
               return {
                 cloudLocal,
                 id: scene.id, sensor: sn.key, offset, datetime: scene.properties.datetime, dateKey: scene.properties.datetime.split("T")[0],
-                bbox: scene.bbox || null, ndvi, vals: { ndvi, evi: typeof sn.evi === "function" && Number.isFinite(blue) ? sn.evi(red, nir, blue, offset) : NaN }, b4: red, b8: nir, scl: qa,
+                bbox: scene.bbox || null, ndvi, vals: Object.assign({ ndvi, evi: typeof sn.evi === "function" && Number.isFinite(blue) ? sn.evi(red, nir, blue, offset) : NaN }, typeof sn.more === "function" ? sn.more(vals, offset) : {}), b4: red, b8: nir, scl: qa,
                 cloud: scene.properties["eo:cloud_cover"] || 0, platform: scene.properties["platform"] || sn.name
               };
             } catch (e) {
@@ -419,7 +437,7 @@
       }
 
       setStretchRange(minVal, maxVal, preset = "custom") {
-        this.stretchMin = Math.max(-0.5, Math.min(0.9, minVal));
+        this.stretchMin = Math.max(-0.6, Math.min(0.9, minVal));
         this.stretchMax = Math.max(this.stretchMin + 0.05, Math.min(1.0, maxVal));
         this.stretchPreset = preset;
         this.syncStretchUi();
@@ -450,7 +468,7 @@
             this.stretchMax = 0.45;
             break;
           case "auto":
-            this.stretchMin = Math.max(-0.1, Math.round((currentSample - 0.18) * 20) / 20);
+            this.stretchMin = Math.max((this.indexDef().axis || [-0.1])[0], Math.round((currentSample - 0.18) * 20) / 20);
             this.stretchMax = Math.min(1.0, Math.round((currentSample + 0.18) * 20) / 20);
             if (this.stretchMax - this.stretchMin < 0.15) {
               this.stretchMax = Math.min(1.0, this.stretchMin + 0.20);
@@ -706,7 +724,7 @@
             <span class="stat-chip">Saison <strong>${run.yr}</strong></span>
             <span class="stat-chip" title="${run.fallback ? "Aucune date Sentinel-2 utilisable cette saison : passage automatique à Landsat" : "Capteur satellite et résolution des pixels"}">Capteur : <strong>${sn.label}</strong></span>
             <span class="stat-chip" title="${ix.title}">Indice : <strong>${ix.label}</strong></span>
-            <span class="stat-chip" style="background:#dcfce7; border-color:#86efac; color:#14532d;">${sn.radar ? "Maximum :" : "Pic estival :"} <strong>${maxVal.toFixed(2)}</strong> (${peakStr})</span>
+            <span class="stat-chip" style="background:#dcfce7; border-color:#86efac; color:#14532d;">${ix.peak ? "Pic estival :" : "Maximum :"} <strong>${maxVal.toFixed(2)}</strong> (${peakStr})</span>
             <span class="stat-chip">${this.index === "ndvi" ? "Dernier NDVI :" : "Dernière valeur :"} <strong>${latest.ndvi.toFixed(2)}</strong></span>
             ${sn.radar
               ? `<span class="stat-chip">Passages : <strong>${this.series.length} dates</strong></span>
@@ -755,7 +773,7 @@
 
         if (this.stretchPreset === "auto") {
           const currentSample = scene.ndvi;
-          this.stretchMin = Math.max(-0.1, Math.round((currentSample - 0.18) * 20) / 20);
+          this.stretchMin = Math.max((this.indexDef().axis || [-0.1])[0], Math.round((currentSample - 0.18) * 20) / 20);
           this.stretchMax = Math.min(1.0, Math.round((currentSample + 0.18) * 20) / 20);
           if (this.stretchMax - this.stretchMin < 0.15) {
             this.stretchMax = Math.min(1.0, this.stretchMin + 0.20);
@@ -863,9 +881,10 @@
         const seasonEnd = new Date(Date.UTC(this.selectedYear, 11, 1, 23, 59, 59)).getTime();
         const timeSpan = Math.max(1, seasonEnd - seasonStart);
 
+        const axis = this.indexDef().axis || [-0.1, 1.0]; // bornes de l'axe vertical
         const getY = (val) => {
-          const clamped = Math.max(-0.1, Math.min(1.0, val));
-          return pad.top + plotH * (1 - (clamped - (-0.1)) / 1.1);
+          const clamped = Math.max(axis[0], Math.min(axis[1], val));
+          return pad.top + plotH * (1 - (clamped - axis[0]) / (axis[1] - axis[0]));
         };
 
         const getX = (dtStr) => {
@@ -887,7 +906,7 @@
           <rect x="${pad.left}" y="${y0_2}" width="${plotW}" height="${y0_0 - y0_2}" fill="rgba(239, 68, 68, 0.10)" />
         `;
 
-        const yTicks = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
+        const yTicks = [-0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0].filter((v) => v >= axis[0] - 1e-9 && v <= axis[1] + 1e-9);
         let yAxisHtml = "";
         for (const tick of yTicks) {
           const ty = getY(tick);
