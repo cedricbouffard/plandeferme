@@ -720,6 +720,9 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
   const $ = (id) => document.getElementById(id);
   const fr = (v, d) => (Number.isFinite(v) ? v.toLocaleString("fr-CA", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–");
   // Case à cocher d'une couche et son poids (1 = poids normal)
+  // Tessera (expérimental) : une seule case, toutes les années ; les 128 dimensions par année sont résumées en quelques axes
+  const TESS = { key: "tessera", label: "Tessera", short: "Tessera", unit: "", digits: 2, tess: true, title: "Signature satellite de chaque année (modèle de fondation Tessera, pixels de 10 m), toutes les années disponibles, résumées en quelques axes. Expérimental : la lecture prend de 10 à 40 secondes." };
+  const TESS_MAX_PIXELS = 60000; // 600 ha d'emprise au plus : au-delà, neuf années ne tiennent plus en mémoire
   const layerItem = (l, text, checked, weight) => `<span class="pf-zn-item"><label class="pf-cf-check" title="${esc(l.title)}"><input type="checkbox" value="${esc(l.key)}"${checked ? " checked" : ""} /><span>${esc(text)}</span></label><input type="number" class="pf-zn-w" data-w="${esc(l.key)}" value="${weight || 1}" min="0.1" max="10" step="0.5" inputmode="decimal" aria-label="Poids de la couche ${esc(l.label)}" title="Poids de cette couche dans le calcul (1 = normal, 2 = compte double)"${checked ? "" : " disabled"} /></span>`;
   // Traduction d'un libellé inséré dans une phrase (le reste de l'interface est traduit par js/i18n.js)
   const tr = (s) => (window.pfI18n && typeof window.pfI18n.t === "function" ? window.pfI18n.t(s) : s);
@@ -765,6 +768,11 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       if (box && !box.children.length) {
         box.innerHTML = LAYERS.map((l) => layerItem(l, l.label, l.on, 1)).join("");
       }
+      const tbox = $("zones-tessera-layers");
+      if (tbox && !tbox.children.length) {
+        const T = window.pfTessera;
+        tbox.innerHTML = T ? layerItem(TESS, `Toutes les années (${T.FIRST_YEAR}–${T.LAST_YEAR})`, false, 1) : `<span class="pf-zn-empty">Lecteur Tessera indisponible.</span>`;
+      }
       // le poids n'est modifiable que pour une couche cochée ; Entrée relance le calcul
       // fenêtre « Couches et pondération »
       const modal = $("zones-layers-modal");
@@ -804,7 +812,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
 
     // Couches cochées et leur poids, lus dans la fenêtre
     readLayers() {
-      const layers = Array.from(document.querySelectorAll("#zones-layers input[type=checkbox]:checked, #zones-ndvi-layers input[type=checkbox]:checked")).map((i) => i.value);
+      const layers = Array.from(document.querySelectorAll("#zones-layers input[type=checkbox]:checked, #zones-ndvi-layers input[type=checkbox]:checked, #zones-tessera-layers input[type=checkbox]:checked")).map((i) => i.value);
       const weights = {};
       document.querySelectorAll("#zones-layers-modal .pf-zn-w").forEach((i) => {
         if (!layers.includes(i.dataset.w)) return;
@@ -846,7 +854,24 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
       return out.sort((a, c) => a.label.localeCompare(c.label));
     }
 
-    layerDefs() { return LAYERS.concat(this.ndviDefs || []); }
+    layerDefs() { return LAYERS.concat(this.ndviDefs || [], window.pfTessera ? [TESS] : []); }
+
+    /*
+      Tessera : lit toutes les années sur l'emprise, puis résume années × 128 dimensions en quelques axes, ajustés
+      sur les pixels de la parcelle. -> { comps, shares, explained, years, failed, width, height, bbox, res, toTess }
+    */
+    async fetchTessera(bboxWgs, signal, onProgress) {
+      const T = window.pfTessera, p4 = this.getProj4(), years = [];
+      for (let y = T.FIRST_YEAR; y <= T.LAST_YEAR; y++) years.push(y);
+      const got = await T.readYears(bboxWgs, years, { signal, concurrency: 3, onProgress });
+      if (!got.reads.length) throw new Error("Tessera : aucune année lisible pour cette parcelle (service lent ou secteur non couvert). Réessayez, ou décochez Tessera.");
+      await new Promise((r) => setTimeout(r, 0));
+      const R = got.reads[0], W = R.width, H = R.height, toParcel = p4(R.def, this.utmDef), mask = new Uint8Array(W * H);
+      for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (pfZonesGeom.inMulti(toParcel.forward([R.bbox[0] + (c + 0.5) * R.res, R.bbox[3] - (r + 0.5) * R.res]), this.parcelUtm)) mask[r * W + c] = 1;
+      const red = T.reduce(got.reads, mask, {});
+      if (red.covered < 0.5) throw new Error(`Tessera : ${fr((1 - red.covered) * 100, 0)} % de la parcelle est sans donnée. Décochez Tessera.`);
+      return Object.assign(red, { failed: got.failed, bbox: R.bbox, res: R.res, toTess: p4(this.utmDef, R.def) });
+    }
 
     renderNdviChoices() {
       const box = $("zones-ndvi-layers"); if (!box) return;
@@ -1074,6 +1099,16 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         if (ndviSel.length) this.setLoading(true, `Lecture de ${ndviSel.length} date${ndviSel.length > 1 ? "s" : ""} NDVI…`);
         const ndviGrids = await Promise.all(ndviSel.map((d) => this.fetchNdvi(d, bboxWgs, maxX - minX, maxY - minY, signal)));
         if (myRun !== this.runId) return;
+        // Tessera : toutes les années, résumées en quelques axes
+        let tess = null;
+        if (layers.includes("tessera")) {
+          if (!window.pfTessera) throw new Error("Lecteur Tessera indisponible.");
+          if (((maxX - minX) * (maxY - minY)) / 100 > TESS_MAX_PIXELS) throw new Error("Parcelle trop grande pour Tessera (plus de 600 ha d'emprise). Décochez Tessera.");
+          const nY = window.pfTessera.LAST_YEAR - window.pfTessera.FIRST_YEAR + 1;
+          this.setLoading(true, `Lecture de Tessera : 0 / ${nY} années…`);
+          tess = await this.fetchTessera(bboxWgs, signal, (a, b) => { if (myRun === this.runId) this.setLoading(true, a < b ? `Lecture de Tessera : ${a} / ${b} années…` : "Tessera : résumé des années…"); });
+          if (myRun !== this.runId) return;
+        }
 
         // rééchantillonnage bilinéaire du MNT sur la grille et masque de la parcelle
         this.setLoading(true, "Préparation de la grille…");
@@ -1085,6 +1120,8 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         const fwd = p4(this.utmDef, projDef), toGeo = p4(this.utmDef, "EPSG:4326");
         const extra = {}, ndviStats = ndviSel.map(() => ({ inside: 0, missing: 0, doubt: {} }));
         ndviSel.forEach((d) => { extra[d.key] = new Float32Array(W * H).fill(NaN); });
+        const tessKeys = tess ? tess.comps.map((_, q) => "tess:" + (q + 1)) : [];
+        tessKeys.forEach((key) => { extra[key] = new Float32Array(W * H).fill(NaN); });
         const spanX = sB[2] - sB[0], spanY = sB[3] - sB[1];
         for (let r = 0; r < H; r++) {
           const y = maxY - (r + 0.5) * res;
@@ -1098,6 +1135,20 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
             const v = (src[r0 * sw + c0] * (1 - fc) + src[r0 * sw + c1] * fc) * (1 - frr) + (src[r1 * sw + c0] * (1 - fc) + src[r1 * sw + c1] * fc) * frr;
             dem[i] = Number.isFinite(v) && v > -900 && v < 9000 ? v : NaN;
             if (pfZonesGeom.inMulti([x, y], this.parcelUtm)) inside[i] = 1;
+            if (tess) { // Tessera : moyenne bilinéaire des pixels de 10 m voisins qui ont une valeur
+              const tp = tess.toTess.forward([x, y]), nc = (tp[0] - tess.bbox[0]) / tess.res - 0.5, nr = (tess.bbox[3] - tp[1]) / tess.res - 0.5, tw = tess.width, th = tess.height;
+              if (nc > -1 && nr > -1 && nc < tw && nr < th) {
+                const a0 = Math.max(0, Math.min(tw - 1, Math.floor(nc))), b0 = Math.max(0, Math.min(th - 1, Math.floor(nr))), a1 = Math.min(tw - 1, a0 + 1), b1 = Math.min(th - 1, b0 + 1);
+                const fx = Math.max(0, Math.min(1, nc - a0)), fy = Math.max(0, Math.min(1, nr - b0));
+                const i00 = b0 * tw + a0, i10 = b0 * tw + a1, i01 = b1 * tw + a0, i11 = b1 * tw + a1, w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+                for (let q = 0; q < tessKeys.length; q++) {
+                  const g = tess.comps[q]; let sum = 0, wsum = 0;
+                  if (g[i00] === g[i00]) { sum += g[i00] * w00; wsum += w00; } if (g[i10] === g[i10]) { sum += g[i10] * w10; wsum += w10; }
+                  if (g[i01] === g[i01]) { sum += g[i01] * w01; wsum += w01; } if (g[i11] === g[i11]) { sum += g[i11] * w11; wsum += w11; }
+                  if (wsum > 0.25) extra[tessKeys[q]][i] = sum / wsum;
+                }
+              }
+            }
             if (ndviGrids.length) { // NDVI : moyenne bilinéaire des pixels valides voisins
               const g = toGeo.forward([x, y]);
               for (let t = 0; t < ndviGrids.length; t++) {
@@ -1127,6 +1178,17 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
           const st = ndviStats[t], doubt = Object.keys(st.doubt).map((c) => ({ name: SCL_DOUBT[c], part: st.doubt[c] / st.inside })).filter((x) => x.part > 0.01).sort((a, b) => b.part - a.part);
           if (doubt.reduce((a, x) => a + x.part, 0) > 0.05) cloudy.push(`${d.label} : toutes les valeurs sont utilisées, mais le masque de qualité du satellite classe une partie de la parcelle en ${doubt.map((x) => `${x.name} (${fr(x.part * 100, 0)} %)`).join(", ")}. Ce classement se trompe souvent sur un sol nu ou foncé ; si la tuile montre un vrai nuage ou son ombre, décochez cette date.`);
         });
+        // Tessera : la case unique devient autant de couches que d'axes retenus, pondérées par leur part de variance
+        let layersCalc = layers, weightsCalc = weights, defsCalc = defs, tessInfo = null;
+        if (tess) {
+          const wT = weights.tessera || 1, sumShare = tess.shares.reduce((a, b) => a + b, 0) || 1;
+          layersCalc = layers.filter((key) => key !== "tessera").concat(tessKeys);
+          weightsCalc = Object.assign({}, weights); delete weightsCalc.tessera;
+          tessKeys.forEach((key, q) => { weightsCalc[key] = Math.max(1e-4, (wT * tess.shares[q]) / sumShare); });
+          defsCalc = defs.filter((l) => !l.tess).concat(tessKeys.map((key, q) => ({ key, label: "Tessera axe " + (q + 1), short: "Tessera " + (q + 1), unit: "", digits: 2, hidden: true, tessAxis: true, title: "" })));
+          tessInfo = { years: tess.years, failed: tess.failed, axes: tessKeys.length, explained: tess.explained, weight: wT };
+          if (tess.failed.length) cloudy.push(`Tessera : ${tess.failed.length > 1 ? "années" : "année"} ${tess.failed.join(", ")} illisible${tess.failed.length > 1 ? "s" : ""} pour l'instant, non utilisée${tess.failed.length > 1 ? "s" : ""}.`);
+        }
         const cellHa = (res * res) / 10000;
         // retrait de la bordure : érosion du masque de la parcelle, cellule par cellule
         let calc = inside, ratio = 1;
@@ -1144,13 +1206,13 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
           else cloudy.push(`Marge intérieure de ${fr(bufM, 0)} m ignorée : la parcelle est trop étroite pour la retirer.`);
         }
         // les superficies demandées valent pour la parcelle entière : ramenées à la partie utilisée pour le calcul
-        const input = { dem, W, H, res, inside: calc, layers, extra, weights, method, k, smooth, margin: mc - 2, minCells: Math.max(1, Math.ceil((minHa / cellHa) * ratio)), maxCells: maxHa ? Math.max(1, Math.floor((maxHa / cellHa) * ratio)) : 0 };
+        const input = { dem, W, H, res, inside: calc, layers: layersCalc, extra, weights: weightsCalc, method, k, smooth, margin: mc - 2, minCells: Math.max(1, Math.ceil((minHa / cellHa) * ratio)), maxCells: maxHa ? Math.max(1, Math.floor((maxHa / cellHa) * ratio)) : 0 };
         const out = await this.computeInWorker(input, (text) => { if (myRun === this.runId) this.setLoading(true, text); });
         if (myRun !== this.runId) return;
 
         this.setLoading(true, "Découpage au contour de la parcelle…");
         await new Promise((r) => setTimeout(r, 0));
-        this.result = this.buildResult(out, { minX, maxY, res, layers, weights, method, defs, cloudy, k, minHa, maxHa, notice, source: region.demLabel || "LiDAR" });
+        this.result = this.buildResult(out, { minX, maxY, res, layers: layersCalc, weights: weightsCalc, method, defs: defsCalc, tessera: tessInfo, cloudy, k, minHa, maxHa, notice, source: region.demLabel || "LiDAR" });
         this.renderZones();
         this.renderTable();
         this.showResults(true);
@@ -1203,7 +1265,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         total += areaHa;
         const props = { zone: zn.zone, nom: `Zone ${zn.zone}`, superficie_ha: Math.round(areaHa * 100) / 100, couleur: COLORS[i % COLORS.length] };
         if (ctx.method === "kmeans") props.ilots = multi.length;
-        ctx.defs.forEach((l) => { if (zn.means[l.key] !== undefined) props[l.prop || (l.key === "elev" ? "elev_moy_m" : l.key === "slope" ? "pente_moy_pct" : l.key + "_moy")] = Math.round(zn.means[l.key] * 1000) / 1000; });
+        ctx.defs.forEach((l) => { if (!l.hidden && zn.means[l.key] !== undefined) props[l.prop || (l.key === "elev" ? "elev_moy_m" : l.key === "slope" ? "pente_moy_pct" : l.key + "_moy")] = Math.round(zn.means[l.key] * 1000) / 1000; });
         const coords = multi.map((poly) => poly.map((ring) => ring.map(toWgs)));
         features.push({ type: "Feature", properties: props, geometry: coords.length === 1 ? { type: "Polygon", coordinates: coords[0] } : { type: "MultiPolygon", coordinates: coords } });
         if (zn.anchor) points.push({ type: "Feature", properties: { label: String(zn.zone) }, geometry: { type: "Point", coordinates: toWgs([ctx.minX + zn.anchor[0] * ctx.res, ctx.maxY - zn.anchor[1] * ctx.res]) } });
@@ -1253,7 +1315,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     // ---- tableau et messages -----------------------------------------------------
     renderTable() {
       const r = this.result; if (!r) return;
-      const cols = r.defs.filter((l) => r.zones[0] && r.zones[0].means[l.key] !== undefined);
+      const cols = r.defs.filter((l) => !l.hidden && r.zones[0] && r.zones[0].means[l.key] !== undefined);
       const head = $("zones-thead"), body = $("zones-tbody"), sum = $("zones-summary");
       const km = r.method === "kmeans";
       if (head) head.innerHTML = `<tr><th>Zone</th><th>Superficie</th><th>Part</th>${km ? `<th title="Nombre d'îlots séparés qui composent la zone">Îlots</th>` : ""}${cols.map((l) => `<th title="${esc(l.title)}">${esc(l.short || l.label)}${l.unit ? ` (${l.unit})` : ""}${r.layers.includes(l.key) ? "" : " *"}</th>`).join("")}</tr>`;
@@ -1262,7 +1324,12 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         return `<tr><td><span class="pf-cf-dot" style="background:${p.couleur}"></span> Zone ${p.zone}</td><td>${fr(p.superficie_ha, 2)} ha</td><td>${fr(p.part_pct, 1)} %</td>${km ? `<td>${p.ilots}</td>` : ""}${cols.map((l) => `<td>${fr(zn.means[l.key], l.digits)}</td>`).join("")}</tr>`;
       }).join("");
       const wsum = r.layers.reduce((a, key) => a + (r.weights[key] || 1), 0);
-      const used = r.defs.filter((l) => r.layers.includes(l.key)).map((l) => (l.scene ? l.label : tr(l.label.toLowerCase())) + (r.layers.length > 1 ? ` ${fr(((r.weights[l.key] || 1) / wsum) * 100, 0)} %` : "")).join(", ");
+      const usedParts = r.defs.filter((l) => r.layers.includes(l.key) && !l.tessAxis).map((l) => (l.scene ? l.label : tr(l.label.toLowerCase())) + (r.layers.length > 1 ? ` ${fr(((r.weights[l.key] || 1) / wsum) * 100, 0)} %` : ""));
+      if (r.tessera) { // les axes Tessera comptent ensemble
+        const tw = r.defs.filter((l) => l.tessAxis).reduce((a, l) => a + (r.weights[l.key] || 0), 0), ys = r.tessera.years;
+        usedParts.push(`Tessera ${ys[0]}–${ys[ys.length - 1]} (${ys.length} années, ${r.tessera.axes} axes)` + (usedParts.length ? ` ${fr((tw / wsum) * 100, 0)} %` : ""));
+      }
+      const used = usedParts.join(", ");
       const star = cols.some((l) => !r.layers.includes(l.key)) ? " · * couche affichée pour information, non utilisée dans le calcul" : "";
       if (sum) { sum.textContent = ""; const b = document.createElement("strong"); b.textContent = km ? "K-means · zones non contiguës" : "SKATER · zones contiguës"; sum.appendChild(b); sum.appendChild(document.createTextNode(" · ")); }
       if (sum) sum.appendChild(document.createTextNode(`${r.features.length} zones · ${fr(r.totalHa, 1)} ha · grille de ${fr(r.res, 0)} m (${r.cells.toLocaleString("fr-CA")} cellules) · couches : ${used} · ${fr(r.explained * 100, 0)} % de la variance expliquée · zones numérotées de la plus basse à la plus haute${star}`));
@@ -1287,7 +1354,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     // ---- sorties -------------------------------------------------------------------
     collection() {
       const r = this.result; if (!r) return null;
-      return { type: "FeatureCollection", features: r.features.map((f) => ({ type: "Feature", properties: Object.assign({}, f.properties, { methode: r.method === "kmeans" ? "K-means" : "SKATER", resolution_m: r.res, couches: r.defs.filter((l) => r.layers.includes(l.key)).map((l) => (l.scene ? l.label.replace(" ", "_") : l.key) + ((r.weights[l.key] || 1) !== 1 ? "x" + r.weights[l.key] : "")).join("+") }), geometry: f.geometry })) };
+      return { type: "FeatureCollection", features: r.features.map((f) => ({ type: "Feature", properties: Object.assign({}, f.properties, { methode: r.method === "kmeans" ? "K-means" : "SKATER", resolution_m: r.res, couches: r.defs.filter((l) => r.layers.includes(l.key) && !l.tessAxis).map((l) => (l.scene ? l.label.replace(" ", "_") : l.key) + ((r.weights[l.key] || 1) !== 1 ? "x" + r.weights[l.key] : "")).concat(r.tessera ? ["tessera_" + r.tessera.years[0] + "-" + r.tessera.years[r.tessera.years.length - 1] + (r.tessera.weight !== 1 ? "x" + r.tessera.weight : "")] : []).join("+") }), geometry: f.geometry })) };
     }
 
     saveToLibrary() {

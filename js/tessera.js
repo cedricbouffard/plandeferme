@@ -106,11 +106,16 @@ const pfTessera = {
           for (let iy = Math.max(0, Math.floor((rw0 - top) / inner)); iy <= Math.min(per - 1, Math.floor((rw1 - 1 - top) / inner)); iy++)
             inner0.push(idx.range(iy * per + ixa, iy * per + ixb).then((entries) => Promise.all(entries.map((en, q) => {
               if (!en) return null; // bloc vide
-              return this._fetch(url, `bytes=${en[0]}-${en[0] + en[1] - 1}`, signal).then((buf) => {
+              // un bloc arrive parfois incomplet : on le redemande (jusqu'à trois essais) avant d'abandonner la lecture
+              const get = (attempt) => this._fetch(url, `bytes=${en[0]}-${en[0] + en[1] - 1}`, signal).then((buf) => {
                 const raw = blosc.decode(new Uint8Array(buf), zstd);
                 if (raw.length !== perPix * inner * inner) throw new Error("bloc de taille inattendue");
-                write(raw, top + iy * inner, left + (ixa + q) * inner);
+                return raw;
+              }).catch((e) => {
+                if (attempt >= 2 || (signal && signal.aborted) || (e && e.status === 404)) throw e;
+                return new Promise((ok) => setTimeout(ok, 400 * (attempt + 1))).then(() => get(attempt + 1));
               });
+              return get(0).then((raw) => write(raw, top + iy * inner, left + (ixa + q) * inner));
             }))));
           return Promise.all(inner0);
         }));
@@ -135,6 +140,82 @@ const pfTessera = {
     return { width: W, height: H, dims: D, res: m.res, zone, def, year, bbox: [m.x0 + c0 * m.res, m.y0 - rw1 * m.res, m.x0 + c1 * m.res, m.y0 - rw0 * m.res],
       data, scales, valid, value: (d, i) => data[d * W * H + i] * scales[i],
       requests: this.stats.requests - r0, bytes: this.stats.bytes - b0, ms: Date.now() - t0 };
+  },
+  /*
+    Plusieurs années sur la même emprise, quelques-unes à la fois. Une année illisible est écartée, pas fatale.
+    -> { reads: [lecture, …] (années lues, en ordre), failed: [année, …] }
+  */
+  async readYears(bboxWgs, years, opts) {
+    opts = opts || {};
+    const reads = [], failed = [], queue = years.slice(); let done = 0;
+    const worker = async () => {
+      while (queue.length) {
+        const y = queue.shift();
+        try {
+          let r; try { r = await this.read(bboxWgs, y, opts); } catch (e) { if (opts.signal && opts.signal.aborted) throw e; r = await this.read(bboxWgs, y, opts); }
+          if (r.valid > 0) reads.push(r); else failed.push(y);
+        } catch (e) { if (opts.signal && opts.signal.aborted) throw e; failed.push(y); }
+        done++; if (opts.onProgress) opts.onProgress(done, years.length);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(opts.concurrency || 3, years.length)) }, worker));
+    reads.sort((a, b) => a.year - b.year); failed.sort((a, b) => a - b);
+    return { reads, failed };
+  },
+  /*
+    Résume les 128 dimensions de chaque année en quelques axes (analyse en composantes principales sur
+    l'ensemble années × dimensions). Les axes sont ajustés sur un échantillon de pixels du masque (la parcelle),
+    puis calculés pour tous les pixels valides.
+    reads : lectures de même emprise ; mask : Uint8Array [y][x] facultatif ; opts : { max: 6, target: 0.8, sample: 2500 }
+    -> { width, height, comps: [Float32Array, …] (NaN hors données), shares: [part de variance par axe], explained,
+         years, used (pixels de l'échantillon), covered (part du masque avec données) }
+  */
+  reduce(reads, mask, opts) {
+    opts = opts || {};
+    if (!reads || !reads.length) throw new Error("aucune année lisible");
+    const W = reads[0].width, H = reads[0].height, P = W * H, Y = reads.length, D0 = reads[0].dims, D = D0 * Y;
+    if (reads.some((r) => r.width !== W || r.height !== H || r.dims !== D0)) throw new Error("lectures d'emprises différentes");
+    const ok = new Uint8Array(P); let inMask = 0, inMaskOk = 0; const pool = [];
+    for (let i = 0; i < P; i++) {
+      let v = 1; for (let y = 0; y < Y; y++) if (!Number.isFinite(reads[y].scales[i])) { v = 0; break; }
+      ok[i] = v;
+      if (!mask || mask[i]) { inMask++; if (v) { inMaskOk++; pool.push(i); } }
+    }
+    if (pool.length < 20) throw new Error("trop peu de pixels avec données");
+    const maxN = opts.sample || 2500, step = Math.max(1, pool.length / maxN), idx = [];
+    for (let k = 0; k < pool.length && idx.length < maxN; k = Math.floor((idx.length + 1) * step)) idx.push(pool[k]);
+    const n = idx.length, X = new Float32Array(n * D), mean = new Float64Array(D);
+    const fill = (i, out, o) => { for (let y = 0; y < Y; y++) { const r = reads[y], sc = r.scales[i], base = y * D0; for (let d = 0; d < D0; d++) out[o + base + d] = r.data[d * P + i] * sc; } };
+    for (let j = 0; j < n; j++) fill(idx[j], X, j * D);
+    for (let j = 0; j < n; j++) for (let d = 0; d < D; d++) mean[d] += X[j * D + d];
+    for (let d = 0; d < D; d++) mean[d] /= n;
+    let total = 0; for (let j = 0; j < n; j++) for (let d = 0; d < D; d++) { const v = X[j * D + d] - mean[d]; X[j * D + d] = v; total += v * v; }
+    if (!(total > 0)) throw new Error("valeurs constantes sur la parcelle");
+    // itération orthogonale : K vecteurs propres dominants de XᵀX sans former la matrice
+    const K = Math.max(1, Math.min(opts.max || 6, D, n - 1)), Q = new Float64Array(D * K), Z = new Float64Array(n * K);
+    let seed = 20261123; const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 - 0.5; };
+    for (let i = 0; i < Q.length; i++) Q[i] = rnd();
+    const ortho = () => { for (let k = 0; k < K; k++) { for (let p = 0; p < k; p++) { let dot = 0; for (let d = 0; d < D; d++) dot += Q[d * K + k] * Q[d * K + p]; for (let d = 0; d < D; d++) Q[d * K + k] -= dot * Q[d * K + p]; } let nr = 0; for (let d = 0; d < D; d++) nr += Q[d * K + k] * Q[d * K + k]; nr = Math.sqrt(nr) || 1; for (let d = 0; d < D; d++) Q[d * K + k] /= nr; } };
+    const project = () => { Z.fill(0); for (let j = 0; j < n; j++) { const o = j * D; for (let d = 0; d < D; d++) { const x = X[o + d]; if (x !== 0) { const q = d * K; for (let k = 0; k < K; k++) Z[j * K + k] += x * Q[q + k]; } } } };
+    ortho();
+    for (let it = 0; it < (opts.iterations || 24); it++) {
+      project(); Q.fill(0);
+      for (let j = 0; j < n; j++) { const o = j * D; for (let d = 0; d < D; d++) { const x = X[o + d]; if (x !== 0) { const q = d * K; for (let k = 0; k < K; k++) Q[q + k] += x * Z[j * K + k]; } } }
+      ortho();
+    }
+    project();
+    const lam = new Float64Array(K); for (let j = 0; j < n; j++) for (let k = 0; k < K; k++) lam[k] += Z[j * K + k] * Z[j * K + k];
+    const order = Array.from({ length: K }, (_, k) => k).sort((a, b) => lam[b] - lam[a]);
+    // on garde les axes jusqu'à la part de variance visée (au moins deux)
+    const target = opts.target || 0.8, keep = []; let cum = 0;
+    for (const k of order) { if (keep.length >= 2 && cum >= target) break; if (lam[k] / total < 1e-4 && keep.length) break; keep.push(k); cum += lam[k] / total; }
+    const comps = keep.map(() => new Float32Array(P).fill(NaN)), row = new Float32Array(D);
+    for (let i = 0; i < P; i++) {
+      if (!ok[i]) continue;
+      fill(i, row, 0);
+      for (let c = 0; c < keep.length; c++) { const k = keep[c]; let s = 0; for (let d = 0; d < D; d++) s += (row[d] - mean[d]) * Q[d * K + k]; comps[c][i] = s; }
+    }
+    return { width: W, height: H, comps, shares: keep.map((k) => lam[k] / total), explained: cum, years: reads.map((r) => r.year), used: n, covered: inMask ? inMaskOk / inMask : 0 };
   }
 };
 if (typeof module !== "undefined" && module.exports) module.exports = { pfTessera };
