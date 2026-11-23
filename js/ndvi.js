@@ -7,6 +7,7 @@
       evi: { key: "evi", label: "EVI", range: [-0.05, 0.75], legend: "evi", title: "Indice de végétation amélioré : 2,5 × (PIR − rouge) / (PIR + 6 × rouge − 7,5 × bleu + 1). Sature moins que le NDVI sur une végétation dense." },
       rvi: { key: "rvi", label: "RVI", range: [0.1, 1.0], legend: "radar", title: "Indice de végétation radar : 4 × VH / (VV + VH). Augmente avec le volume de végétation ; insensible aux nuages." },
       ratio: { key: "ratio", label: "VH/VV", range: [0.05, 0.5], legend: "radar", title: "Rapport de polarisation croisée VH / VV : augmente quand le couvert se développe." },
+      ang: { key: "ang", label: "Diversité angulaire", range: [0, 0.4], legend: "radar", noTile: true, title: "Écart de VV entre deux orbites, donc deux angles de visée, à quelques jours d'intervalle : |VV₁ − VV₂| / (VV₁ + VV₂). Élevé sur un sol nu, dont l'écho dépend beaucoup de l'angle ; faible sous un couvert dense, qui renvoie le signal dans toutes les directions. Mesure exploratoire : la pluie ou le gel entre les deux passages la fait aussi monter. Comme elle compare deux passages, elle n'a pas de tuile sur la carte." },
       ent: { key: "ent", label: "Entropie", range: [0.3, 1.0], legend: "radar", title: "Pseudo-entropie de diffusion, calculée sur les parts de VV et de VH dans le signal : proche de 0 sur un sol nu et lisse, proche de 1 sous un couvert dense. La vraie entropie H/α demande des images complexes (SLC) qui ne sont pas offertes ici." }
     };
     const NDVI_EVI_OK = (v) => (Number.isFinite(v) && v >= -0.3 && v <= 1.2 ? v : NaN);
@@ -51,14 +52,17 @@
       // Radar en bande C, rétrodiffusion corrigée du relief (gamma0, valeurs linéaires). Traverse les nuages.
       s1: {
         key: "s1", name: "Sentinel-1", res: 10, label: "Sentinel-1 radar · 10 m", firstYear: 2015, radar: true,
-        collection: "sentinel-1-rtc", folder: "Radar Sentinel-1", indices: ["rvi", "ratio", "ent"],
+        collection: "sentinel-1-rtc", folder: "Radar Sentinel-1", indices: ["rvi", "ratio", "ent", "ang"],
         attribution: "Sentinel-1 RTC © ESA / Copernicus • Microsoft Planetary Computer", source: "Sentinel-1 RTC (Planetary Computer)",
-        tileQueryFor: (ix) => "assets=vv&assets=vh&asset_as_band=True&expression=" + encodeURIComponent(
-          ix === "ratio" ? "vh/vv" : ix === "ent" ? "-(vv/(vv+vh))*log(vv/(vv+vh))/0.693147-(vh/(vv+vh))*log(vh/(vv+vh))/0.693147" : "4*vh/(vv+vh)"),
+        // resampling=average et maxzoom 12 : chaque pixel affiché moyenne plusieurs pixels radar, ce qui atténue le chatoiement
+        tileMaxZoom: 12,
+        tileQueryFor: (ix) => (ix === "ang" ? null : "assets=vv&assets=vh&asset_as_band=True&resampling=average&expression=" + encodeURIComponent(
+          ix === "ratio" ? "vh/vv" : ix === "ent" ? "-(vv/(vv+vh))*log(vv/(vv+vh))/0.693147-(vh/(vv+vh))*log(vh/(vv+vh))/0.693147" : "4*vh/(vv+vh)")),
         // moyennes de VV et VH (linéaires) sur la fenêtre -> les trois indices
         measures: (vv, vh) => { const p = vv / (vv + vh), q = 1 - p; return { rvi: (4 * vh) / (vv + vh), ratio: vh / vv, ent: p > 0 && q > 0 ? -(p * Math.log2(p) + q * Math.log2(q)) : 0 }; }
       }
     };
+    const NDVI_RADAR_PAIR_DAYS = 4; // diversité angulaire : écart maximal entre les deux passages comparés
     const NDVI_RADAR_HALF_M = 40; // demi-côté de la fenêtre moyennée autour du point : le radar est trop bruité pixel par pixel
     window.NDVI_SENSORS = NDVI_SENSORS;
     // Un passage est écarté si plus de cette part du voisinage du point est sous les nuages ou leur ombre :
@@ -132,6 +136,7 @@
         const sn = NDVI_SENSORS[sensorKey || this.sensor] || NDVI_SENSORS.s2;
         const known = (this.series || []).find((x) => x.id === sceneId);
         const tileQuery = sn.tileQueryFor(sn.indices.includes(this.index) ? this.index : sn.indices[0], known ? known.offset : 0);
+        if (!tileQuery) return null; // indice sans tuile (il compare deux passages)
         return `https://planetarycomputer.microsoft.com/api/data/v1/item/tiles/WebMercatorQuad/{z}/{x}/{y}@1x${sn.key === "s2" ? "" : ".png"}?collection=${sn.collection}&item=${sceneId}&${tileQuery}&rescale=${encodeURIComponent(rescaleStr)}&colormap_name=rdylgn`;
       }
 
@@ -152,6 +157,7 @@
         if (!btn) return;
         const vm = window.vectorManager;
         const key = this.currentSaveKey();
+        btn.disabled = !!this.indexDef().noTile;
         const saved = !!(key && vm && typeof vm.findRasterLink === "function" && vm.findRasterLink(key));
         btn.classList.toggle("saved", saved);
         btn.setAttribute("aria-pressed", saved ? "true" : "false");
@@ -165,7 +171,7 @@
       saveCurrentTile() {
         const scene = this.series[this.selectedIndex];
         const vm = window.vectorManager;
-        if (!scene || !vm || typeof vm.addRasterLink !== "function") return;
+        if (!scene || !vm || typeof vm.addRasterLink !== "function" || this.indexDef().noTile) return;
         const key = this.currentSaveKey();
         const existing = vm.findRasterLink(key);
         if (existing) {
@@ -260,51 +266,71 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ collections: [sn.collection], intersects: { type: "Point", coordinates: [lngLat.lng, lngLat.lat] }, datetime: dtStr, limit: 400, sortby: [{ field: "datetime", direction: "asc" }],
-            fields: { include: ["id", "bbox", "properties.datetime", "properties.platform", "properties.sat:orbit_state", "properties.sat:relative_orbit"], exclude: ["links", "assets", "geometry"] } }),
+            fields: { include: ["id", "bbox", "properties.datetime", "properties.platform", "properties.sat:orbit_state", "properties.sat:relative_orbit", "properties.sar:polarizations"], exclude: ["links", "assets", "geometry"] } }),
           signal
         });
         if (!stacResp.ok) throw new Error(`Erreur STAC (${stacResp.status})`);
-        const items = (await stacResp.json()).features || [];
+        // Au Canada, une partie des passages est acquise en HH/HV (suivi des glaces) : seuls les passages VV/VH servent ici
+        const all = (await stacResp.json()).features || [];
+        const items = all.filter((it) => { const pol = it.properties["sar:polarizations"]; return !Array.isArray(pol) || (pol.includes("VV") && pol.includes("VH")); });
+        const otherPol = all.length - items.length;
         // orbite la plus fréquente ; à égalité, l'ascendante (passage de fin de journée, sans rosée)
         const groups = new Map();
         items.forEach((it) => { const k = `${it.properties["sat:orbit_state"] || "?"}|${it.properties["sat:relative_orbit"] || "?"}`; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); });
         let best = null;
         groups.forEach((list, k) => { if (!best || list.length > best.list.length || (list.length === best.list.length && /^asc/.test(k) && !/^asc/.test(best.k))) best = { k, list }; });
-        if (!best) return { sampled: [], cloudFilteredCount: 0, candidates: 0 };
+        if (!best) return { sampled: [], cloudFilteredCount: 0, candidates: 0, otherPol };
         const byDate = new Map(); best.list.forEach((it) => { const d = it.properties.datetime.split("T")[0]; if (!byDate.has(d)) byDate.set(d, it); });
         const unique = Array.from(byDate.values()), parts = best.k.split("|");
         const orbit = `${/^asc/.test(parts[0]) ? "ascendante" : /^desc/.test(parts[0]) ? "descendante" : parts[0]} ${parts[1]}`;
         const h = NDVI_RADAR_HALF_M, dLat = h / 111132, dLng = h / (111320 * Math.max(0.1, Math.cos((lngLat.lat * Math.PI) / 180)));
         const bbox = [lngLat.lng - dLng, lngLat.lat - dLat, lngLat.lng + dLng, lngLat.lat + dLat].map((v) => v.toFixed(6)).join(","), px = Math.round((2 * h) / sn.res);
-        const sampled = []; let completed = 0;
-        const progress = () => { if (statsBar) statsBar.innerHTML = `<span class="stat-chip">${sn.name} : lecture des passages (${Math.min(completed, unique.length)}/${unique.length})...</span>`; };
+        // seconde orbite (autre angle de visée), pour la diversité angulaire : la plus fréquente parmi les autres
+        let second = null;
+        groups.forEach((list, k) => { if (k !== best.k && (!second || list.length > second.list.length)) second = { k, list }; });
+        const byDate2 = new Map(); if (second) second.list.forEach((it) => { const d = it.properties.datetime.split("T")[0]; if (!byDate2.has(d)) byDate2.set(d, it); });
+        const unique2 = Array.from(byDate2.values()), jobs = unique.map((it) => ({ it, main: true })).concat(unique2.map((it) => ({ it, main: false })));
+        const sampled = [], pairs = []; let completed = 0;
+        const progress = () => { if (statsBar) statsBar.innerHTML = `<span class="stat-chip">${sn.name} : lecture des passages (${Math.min(completed, jobs.length)}/${jobs.length})...</span>`; };
         progress();
-        const PAR = 24;
-        for (let i = 0; i < unique.length; i += PAR) {
+        const readMeans = async (scene) => {
+          const resp = await ndviFetch(`https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/${bbox}/${px}x${px}.npy?collection=${sn.collection}&item=${encodeURIComponent(scene.id)}&assets=vv&assets=vh`, signal);
+          if (!resp.ok) return null;
+          const npy = ndviParseNpy(await resp.arrayBuffer()), n = npy.w * npy.h;
+          if (npy.bands < 2) return null;
+          let sv = 0, sh = 0, k = 0;
+          for (let j = 0; j < n; j++) { const a = npy.data[j], b = npy.data[n + j]; if (a > 0 && b > 0 && (npy.bands < 3 || npy.data[2 * n + j] !== 0)) { sv += a; sh += b; k++; } }
+          return k < n / 4 ? null : { vv: sv / k, vh: sh / k }; // moins du quart de la fenêtre : bord de fauchée
+        };
+        const PAR = 32;
+        for (let i = 0; i < jobs.length; i += PAR) {
           if (signal.aborted) return null;
-          const batch = unique.slice(i, i + PAR);
-          const results = await Promise.all(batch.map(async (scene) => {
+          const batch = jobs.slice(i, i + PAR);
+          const results = await Promise.all(batch.map(async ({ it: scene, main }) => {
             try {
-              const resp = await ndviFetch(`https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/${bbox}/${px}x${px}.npy?collection=${sn.collection}&item=${encodeURIComponent(scene.id)}&assets=vv&assets=vh`, signal);
-              if (!resp.ok) return null;
-              const npy = ndviParseNpy(await resp.arrayBuffer()), n = npy.w * npy.h;
-              if (npy.bands < 2) return null;
-              let sv = 0, sh = 0, k = 0;
-              for (let j = 0; j < n; j++) { const a = npy.data[j], b = npy.data[n + j]; if (a > 0 && b > 0 && (npy.bands < 3 || npy.data[2 * n + j] !== 0)) { sv += a; sh += b; k++; } }
-              if (k < n / 4) return null; // bord de fauchée
-              const vv = sv / k, vh = sh / k, vals = sn.measures(vv, vh);
+              const m = await readMeans(scene);
+              if (!m) return null;
+              if (!main) return { pair: true, t: new Date(scene.properties.datetime).getTime(), dateKey: scene.properties.datetime.split("T")[0], vv: m.vv };
               return { id: scene.id, sensor: sn.key, offset: 0, datetime: scene.properties.datetime, dateKey: scene.properties.datetime.split("T")[0], bbox: scene.bbox || null,
-                vals, ndvi: NaN, b4: vv, b8: vh, scl: null, cloud: 0, cloudLocal: null, platform: scene.properties.platform || sn.name, orbit };
+                vals: sn.measures(m.vv, m.vh), ndvi: NaN, b4: m.vv, b8: m.vh, scl: null, cloud: 0, cloudLocal: null, platform: scene.properties.platform || sn.name, orbit };
             } catch (e) {
               if (e.name === "AbortError") throw e;
               return null;
             }
           }));
-          results.forEach((r) => { if (r) sampled.push(r); });
+          results.forEach((r) => { if (r) (r.pair ? pairs : sampled).push(r); });
           completed += batch.length; progress();
         }
+        // diversité angulaire : chaque passage est comparé au passage de l'autre orbite le plus proche dans le temps
+        sampled.forEach((s) => {
+          const t = new Date(s.datetime).getTime(); let near = null;
+          pairs.forEach((p) => { if (!near || Math.abs(p.t - t) < Math.abs(near.t - t)) near = p; });
+          if (near && Math.abs(near.t - t) <= NDVI_RADAR_PAIR_DAYS * 86400000) { s.vals.ang = Math.abs(s.b4 - near.vv) / (s.b4 + near.vv); s.pair = { dateKey: near.dateKey, db: 10 * Math.log10(s.b4 / near.vv) }; }
+          else s.vals.ang = NaN;
+        });
+        const p2 = second ? second.k.split("|") : null, orbit2 = p2 ? `${/^asc/.test(p2[0]) ? "ascendante" : /^desc/.test(p2[0]) ? "descendante" : p2[0]} ${p2[1]}` : "";
         sampled.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
-        return { sampled, cloudFilteredCount: 0, candidates: unique.length, orbit, otherOrbits: items.length - best.list.length };
+        return { sampled, cloudFilteredCount: 0, candidates: unique.length, orbit, orbit2, otherOrbits: items.length - best.list.length, otherPol };
       }
 
       // Couverture nuageuse dans un carré de 500 m de demi-côté autour du point (bande de qualité de la scène).
@@ -614,7 +640,7 @@
             if (!res || signal.aborted) return;
             this.sensor = order[t];
             sampled = res.sampled; cloudFilteredCount = res.cloudFilteredCount; candidates = res.candidates;
-            radar = NDVI_SENSORS[order[t]].radar ? { orbit: res.orbit, others: res.otherOrbits || 0 } : null;
+            radar = NDVI_SENSORS[order[t]].radar ? { orbit: res.orbit, orbit2: res.orbit2 || "", others: res.otherOrbits || 0, otherPol: res.otherPol || 0 } : null;
             if (sampled.length) { fallback = this.sensorAuto && t > 0; break; }
           }
           const sn = NDVI_SENSORS[this.sensor];
@@ -626,6 +652,11 @@
           this.updateTitle();
           this.lastRun = { yr, fallback, cloudFilteredCount, radar };
 
+          if (candidates === 0 && radar && radar.otherPol) {
+            if (statsBar) statsBar.innerHTML = `<span class="stat-chip" style="color:#b91c1c;">Aucun passage radar en VV/VH pour la saison ${yr} (${radar.otherPol} passages en HH/HV seulement).</span>`;
+            if (container) container.innerHTML = `<div style="text-align:center; padding:40px; color:#64748b;">Sentinel-1 n'a observé ce secteur qu'en polarisation HH/HV cette année-là : les indices de végétation radar ne peuvent pas être calculés.</div>`;
+            return;
+          }
           if (candidates === 0) {
             if (statsBar) statsBar.innerHTML = `<span class="stat-chip" style="color:#b91c1c;">Aucune scène ${this.sensorAuto ? "satellite" : sn.name} trouvée pour la saison ${yr} (mars à déc.).</span>`;
             if (container) container.innerHTML = `<div style="text-align:center; padding:40px; color:#64748b;">Aucune donnée satellite disponible pour cette année. Essayez une autre année ou un autre capteur dans les menus ci-dessus.</div>`;
@@ -679,7 +710,7 @@
             <span class="stat-chip">${this.index === "ndvi" ? "Dernier NDVI :" : "Dernière valeur :"} <strong>${latest.ndvi.toFixed(2)}</strong></span>
             ${sn.radar
               ? `<span class="stat-chip">Passages : <strong>${this.series.length} dates</strong></span>
-                 <span class="stat-chip" style="color:#64748b;" title="Une seule orbite est gardée pour que l'angle de visée reste le même d'une date à l'autre${run.radar && run.radar.others ? ` (${run.radar.others} passages d'autres orbites écartés)` : ""}. Valeurs moyennées sur un carré de ${2 * NDVI_RADAR_HALF_M} m autour du point. La pluie, la rosée, le gel et le travail du sol font aussi varier le signal radar.">Orbite ${run.radar ? run.radar.orbit : ""}</span>`
+                 <span class="stat-chip" style="color:#64748b;" title="${ix.noTile ? `Chaque passage est comparé au passage de l'orbite ${run.radar ? run.radar.orbit2 : ""} le plus proche, à ${NDVI_RADAR_PAIR_DAYS} jours ou moins.` : `Une seule orbite est gardée pour que l'angle de visée reste le même d'une date à l'autre${run.radar && run.radar.others ? ` (${run.radar.others} passages d'autres orbites écartés)` : ""}.`}${run.radar && run.radar.otherPol ? ` ${run.radar.otherPol} passages en polarisation HH/HV écartés : les indices demandent VV et VH.` : ""} Valeurs moyennées sur un carré de ${2 * NDVI_RADAR_HALF_M} m autour du point. La pluie, la rosée, le gel et le travail du sol font aussi varier le signal radar.">Orbite ${run.radar ? run.radar.orbit : ""}</span>`
               : `<span class="stat-chip">Observations claires : <strong>${this.series.length} dates</strong></span>
                  ${cloudN > 0 ? `<span class="stat-chip" style="color:#64748b;" title="Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)">${cloudN} nuageux filtrés</span>` : ""}`}
           `;
@@ -748,11 +779,13 @@
         if (this.map.getSource("sentinel2-ndvi-source")) {
           this.map.removeSource("sentinel2-ndvi-source");
         }
+        if (!tileUrl) return; // indice sans tuile : la carte reste sans couche satellite
 
         this.map.addSource("sentinel2-ndvi-source", {
           type: "raster",
           tiles: [tileUrl],
           tileSize: 256,
+          ...((NDVI_SENSORS[this.sensor] || {}).tileMaxZoom ? { maxzoom: NDVI_SENSORS[this.sensor].tileMaxZoom } : {}),
           attribution: (NDVI_SENSORS[this.sensor] || NDVI_SENSORS.s2).attribution
         });
 
@@ -954,7 +987,7 @@
             const item = this.series[idx];
             if (hoverInfo) {
               hoverInfo.innerHTML = item.sensor === "s1"
-                ? `<strong>${item.dateKey}</strong> &bull; ${this.indexDef().label} : <strong>${item.ndvi.toFixed(3)}</strong> &bull; VV : <strong>${(10 * Math.log10(item.b4)).toFixed(1)} dB</strong> &bull; VH : <strong>${(10 * Math.log10(item.b8)).toFixed(1)} dB</strong> &bull; Cliquez pour afficher la tuile satellite sur la carte`
+                ? `<strong>${item.dateKey}</strong> &bull; ${this.indexDef().label} : <strong>${item.ndvi.toFixed(3)}</strong> &bull; VV : <strong>${(10 * Math.log10(item.b4)).toFixed(1)} dB</strong> &bull; VH : <strong>${(10 * Math.log10(item.b8)).toFixed(1)} dB</strong>${this.indexDef().noTile && item.pair ? ` &bull; comparé au ${item.pair.dateKey} : <strong>${item.pair.db >= 0 ? "+" : "−"}${Math.abs(item.pair.db).toFixed(1)} dB</strong>` : " &bull; Cliquez pour afficher la tuile satellite sur la carte"}`
                 : `<strong>${item.dateKey}</strong> &bull; ${this.indexDef().label} : <strong>${item.ndvi.toFixed(3)}</strong> &bull; Qualité : <strong>${this.getSclLabel(item.scl)}</strong> &bull; ${Number.isFinite(item.cloudLocal) ? `Nuages à moins de 500 m : ${(100 * item.cloudLocal).toFixed(0)}% (scène : ${item.cloud.toFixed(0)}%)` : `Nuages scène : ${item.cloud.toFixed(1)}%`} &bull; Cliquez pour afficher la tuile satellite sur la carte`;
             }
           });

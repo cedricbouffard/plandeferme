@@ -1387,7 +1387,7 @@
       tiles: r.tiles, key: String(r.key || r.tiles).slice(0, 400), bounds, center,
       opacity: Math.max(0, Math.min(1, num(r.opacity, 0.85))),
       attribution: String(r.attribution || "").slice(0, 200),
-      legend: { kind: "ndvi", min: num(lg.min, -0.05), max: num(lg.max, 0.85), colormap: "rdylgn" },
+      legend: { kind: ["ndvi", "evi", "radar"].includes(lg.kind) ? lg.kind : "ndvi", min: num(lg.min, -0.05), max: num(lg.max, 0.85), colormap: "rdylgn" },
       meta
     };
   }
