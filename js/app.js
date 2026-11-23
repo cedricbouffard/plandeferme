@@ -1519,7 +1519,7 @@
           if (btnNdviInPopup) {
             btnNdviInPopup.addEventListener("click", () => {
               popup.remove();
-              if (ndviManager) ndviManager.analyzeLocation(e.lngLat, parcelProps);
+              if (ndviManager) { ndviManager.nextParcelGeom = parcelGeom || null; ndviManager.analyzeLocation(e.lngLat, parcelProps); }
             });
           }
 

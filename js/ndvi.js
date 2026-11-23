@@ -81,6 +81,7 @@
       }
     };
     const NDVI_RADAR_PAIR_DAYS = 4; // diversité angulaire : écart maximal entre les deux passages comparés
+    const NDVI_RADAR_MARGIN_M = 15; // parcelle connue : marge intérieure retirée avant de moyenner (arbres, fossés, voisin)
     const NDVI_RADAR_HALF_M = 40; // demi-côté de la fenêtre moyennée autour du point : le radar est trop bruité pixel par pixel
     window.NDVI_SENSORS = NDVI_SENSORS;
     // Un passage est écarté si plus de cette part du voisinage du point est sous les nuages ou leur ombre :
@@ -295,8 +296,35 @@
 
       // Radar Sentinel-1 : VV et VH moyennés sur une petite fenêtre, pour les deux orbites principales ; une seule est
       // affichée à la fois (même angle de visée d'une date à l'autre), au choix dans le menu « Orbite »
-      async fetchRadarSeries(lngLat, yr, dtStr, signal, statsBar) {
+      // Contour complet de la parcelle sous le point (les tuiles vectorielles la livrent en morceaux), ou null
+      resolveParcelGeom(lngLat) {
+        try {
+          const layers = ["parcelles-fill", "parcelles-hit-layer"].filter((l) => this.map.getLayer(l));
+          if (!layers.length) return null;
+          const hits = this.map.queryRenderedFeatures(this.map.project([lngLat.lng, lngLat.lat]), { layers });
+          if (!hits || !hits.length) return null;
+          const t3 = window.terrain3DManager, f = t3 && typeof t3.assembleParcelFeature === "function" ? t3.assembleParcelFeature(hits[0]) : hits[0];
+          return f && f.geometry && /Polygon$/.test(f.geometry.type) ? f.geometry : null;
+        } catch (e) { return null; }
+      }
+      // Contour envoyé au service pour moyenner le radar : la parcelle moins une marge intérieure (ou entière si elle est trop étroite)
+      radarStatFeature(geom) {
+        if (!geom) return null;
+        let out = geom;
+        try {
+          const T = window.pfTampon && window.pfTampon.geom, C = window.ClipperLib, p4 = window.proj4 || (window.GeoLibreContour && window.GeoLibreContour.proj4);
+          const res = T && C && p4 ? T.buffer(C, p4, [{ type: "Feature", properties: {}, geometry: geom }], NDVI_RADAR_MARGIN_M, { side: "in" }) : [];
+          const polys = []; (res || []).forEach((f) => { const g = f.geometry; if (g.type === "Polygon") polys.push(g.coordinates); else if (g.type === "MultiPolygon") g.coordinates.forEach((c) => polys.push(c)); });
+          if (polys.length) out = { type: "MultiPolygon", coordinates: polys };
+        } catch (e) { out = geom; }
+        return { type: "Feature", properties: {}, geometry: out, shrunk: out !== geom };
+      }
+
+      async fetchRadarSeries(lngLat, yr, dtStr, signal, statsBar, parcelGeom) {
         const sn = NDVI_SENSORS.s1;
+        const statFeature = this.radarStatFeature ? this.radarStatFeature(parcelGeom) : null;
+        const statBody = statFeature ? JSON.stringify({ type: "Feature", properties: {}, geometry: statFeature.geometry }) : null;
+        let pixels = 0, usedParcel = false;
         const stacResp = await fetch("https://planetarycomputer.microsoft.com/api/stac/v1/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -324,6 +352,17 @@
         const progress = () => { if (statsBar) statsBar.innerHTML = `<span class="stat-chip">${sn.name} : lecture des passages (${Math.min(completed, jobs.length)}/${jobs.length})...</span>`; };
         progress();
         const readMeans = async (scene) => {
+          if (statBody) { // parcelle connue : moyenne de tous ses pixels, calculée par le service
+            try {
+              let resp = await fetch(`https://planetarycomputer.microsoft.com/api/data/v1/item/statistics?collection=${sn.collection}&item=${encodeURIComponent(scene.id)}&assets=vv&assets=vh&max_size=512`, { method: "POST", headers: { "Content-Type": "application/json" }, body: statBody, signal });
+              if (resp.status === 429 || resp.status >= 500) { await new Promise((r) => setTimeout(r, 500)); resp = await fetch(`https://planetarycomputer.microsoft.com/api/data/v1/item/statistics?collection=${sn.collection}&item=${encodeURIComponent(scene.id)}&assets=vv&assets=vh&max_size=512`, { method: "POST", headers: { "Content-Type": "application/json" }, body: statBody, signal }); }
+              if (resp.ok) {
+                const st = ((await resp.json()).properties || {}).statistics || {}, a = st.vv_b1 || st.vv, b = st.vh_b1 || st.vh;
+                if (a && b && a.count >= 16 && a.mean > 0 && b.mean > 0) { pixels = Math.max(pixels, a.count); usedParcel = true; return { vv: a.mean, vh: b.mean }; }
+                if (a && b) return null; // parcelle hors de la fauchée ce jour-là
+              }
+            } catch (e) { if (e.name === "AbortError") throw e; }
+          }
           const resp = await ndviFetch(`https://planetarycomputer.microsoft.com/api/data/v1/item/bbox/${bbox}/${px}x${px}.npy?collection=${sn.collection}&item=${encodeURIComponent(scene.id)}&assets=vv&assets=vh`, signal);
           if (!resp.ok) return null;
           const npy = ndviParseNpy(await resp.arrayBuffer()), n = npy.w * npy.h;
@@ -359,7 +398,8 @@
         });
         sampled.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
         const orbits = ranked.map((g) => ({ key: g.k, label: labelOf(g.k), count: sampled.filter((x) => x.orbitKey === g.k).length })).filter((o) => o.count > 0);
-        return { sampled, cloudFilteredCount: 0, candidates: jobs.length, orbits, otherOrbits: items.length - ranked.reduce((a, g) => a + g.list.length, 0), otherPol };
+        return { sampled, cloudFilteredCount: 0, candidates: jobs.length, orbits, otherOrbits: items.length - ranked.reduce((a, g) => a + g.list.length, 0), otherPol,
+          area: usedParcel ? { parcel: true, pixels, margin: statFeature.shrunk ? NDVI_RADAR_MARGIN_M : 0 } : { parcel: false } };
       }
 
       // Couverture nuageuse dans un carré de 500 m de demi-côté autour du point (bande de qualité de la scène).
@@ -598,6 +638,9 @@
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
 
+        // contour de la parcelle : gardé quand seuls l'année, le capteur ou l'indice changent
+        if (this.currentLocation !== lngLat) { this.currentGeom = this.nextParcelGeom || (parcelProps ? this.resolveParcelGeom(lngLat) : null); }
+        this.nextParcelGeom = null;
         this.currentLocation = lngLat;
         this.currentParcel = parcelProps;
         this.series = [];
@@ -665,11 +708,11 @@
           const order = this.sensorAuto ? ["s2", "landsat"].filter((k) => yr >= NDVI_SENSORS[k].firstYear) : [this.sensor];
           let sampled = [], cloudFilteredCount = 0, candidates = 0, fallback = false, radar = null;
           for (let t = 0; t < order.length; t++) {
-            const res = NDVI_SENSORS[order[t]].radar ? await this.fetchRadarSeries(lngLat, yr, dtStr, signal, statsBar) : await this.fetchSeries(order[t], lngLat, yr, dtStr, signal, statsBar);
+            const res = NDVI_SENSORS[order[t]].radar ? await this.fetchRadarSeries(lngLat, yr, dtStr, signal, statsBar, this.currentGeom) : await this.fetchSeries(order[t], lngLat, yr, dtStr, signal, statsBar);
             if (!res || signal.aborted) return;
             this.sensor = order[t];
             sampled = res.sampled; cloudFilteredCount = res.cloudFilteredCount; candidates = res.candidates;
-            radar = NDVI_SENSORS[order[t]].radar ? { orbits: res.orbits || [], others: res.otherOrbits || 0, otherPol: res.otherPol || 0 } : null;
+            radar = NDVI_SENSORS[order[t]].radar ? { orbits: res.orbits || [], area: res.area || { parcel: false }, others: res.otherOrbits || 0, otherPol: res.otherPol || 0 } : null;
             if (sampled.length) { fallback = this.sensorAuto && t > 0; break; }
           }
           const sn = NDVI_SENSORS[this.sensor];
@@ -743,7 +786,8 @@
             <span class="stat-chip">${this.index === "ndvi" ? "Dernier NDVI :" : "Dernière valeur :"} <strong>${latest.ndvi.toFixed(2)}</strong></span>
             ${sn.radar
               ? `<span class="stat-chip">Passages : <strong>${this.series.length} dates</strong></span>
-                 <span class="stat-chip" style="color:#64748b;" title="${ix.noTile ? `Chaque passage est comparé au passage de l'orbite ${orbOther ? orbOther.label : ""} le plus proche, à ${NDVI_RADAR_PAIR_DAYS} jours ou moins.` : `Une seule orbite est affichée à la fois pour que l'angle de visée reste le même d'une date à l'autre ; l'autre se choisit dans le menu « Orbite »${run.radar && run.radar.others ? ` (${run.radar.others} passages d'orbites plus rares écartés)` : ""}.`}${run.radar && run.radar.otherPol ? ` ${run.radar.otherPol} passages en polarisation HH/HV écartés : les indices demandent VV et VH.` : ""} Valeurs moyennées sur un carré de ${2 * NDVI_RADAR_HALF_M} m autour du point. La pluie, la rosée, le gel et le travail du sol font aussi varier le signal radar.">Orbite ${orbNow ? orbNow.label : ""}</span>`
+                 <span class="stat-chip" style="color:#64748b;">${run.radar && run.radar.area && run.radar.area.parcel ? "Moyenne sur la parcelle" : `Moyenne sur ${2 * NDVI_RADAR_HALF_M} m`}</span>
+                 <span class="stat-chip" style="color:#64748b;" title="${ix.noTile ? `Chaque passage est comparé au passage de l'orbite ${orbOther ? orbOther.label : ""} le plus proche, à ${NDVI_RADAR_PAIR_DAYS} jours ou moins.` : `Une seule orbite est affichée à la fois pour que l'angle de visée reste le même d'une date à l'autre ; l'autre se choisit dans le menu « Orbite »${run.radar && run.radar.others ? ` (${run.radar.others} passages d'orbites plus rares écartés)` : ""}.`}${run.radar && run.radar.otherPol ? ` ${run.radar.otherPol} passages en polarisation HH/HV écartés : les indices demandent VV et VH.` : ""} ${run.radar && run.radar.area && run.radar.area.parcel ? `Valeurs moyennées sur la parcelle (${run.radar.area.pixels.toLocaleString("fr-CA")} pixels${run.radar.area.margin ? `, marge intérieure de ${run.radar.area.margin} m` : ""}).` : `Valeurs moyennées sur un carré de ${2 * NDVI_RADAR_HALF_M} m autour du point.`} La pluie, la rosée, le gel et le travail du sol font aussi varier le signal radar.">Orbite ${orbNow ? orbNow.label : ""}</span>`
               : `<span class="stat-chip">Observations claires : <strong>${this.series.length} dates</strong></span>
                  ${cloudN > 0 ? `<span class="stat-chip" style="color:#64748b;" title="Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)">${cloudN} nuageux filtrés</span>` : ""}`}
           `;

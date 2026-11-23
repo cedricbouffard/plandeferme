@@ -1987,4 +1987,6 @@ window.pfI18n.langue("en", {
   "Orbite descendante {0} ({1})": "Descending orbit {0} ({1})",
   "Orbite du radar": "Radar orbit",
   "Orbite du radar : ascendante (passage de fin de journée) ou descendante (passage du petit matin). Une seule est affichée à la fois.": "Radar orbit: ascending (late-day pass) or descending (early-morning pass). Only one is shown at a time.",
+  "Moyenne sur la parcelle": "Field average",
+  "Moyenne sur {0} m": "Average over {0} m",
 });

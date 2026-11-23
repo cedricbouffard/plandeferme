@@ -1987,4 +1987,6 @@ window.pfI18n.langue("xx", {
   "Orbite descendante {0} ({1})": "xx",
   "Orbite du radar": "xx",
   "Orbite du radar : ascendante (passage de fin de journée) ou descendante (passage du petit matin). Une seule est affichée à la fois.": "xx",
+  "Moyenne sur la parcelle": "xx",
+  "Moyenne sur {0} m": "xx",
 });
