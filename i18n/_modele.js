@@ -1983,4 +1983,8 @@ window.pfI18n.langue("xx", {
   "Indice d'humidité du couvert : (PIR − infrarouge moyen) / (PIR + infrarouge moyen). Baisse quand la végétation manque d'eau.": "xx",
   "Indice de sol nu : ((infrarouge moyen + rouge) − (PIR + bleu)) / (leur somme). Positif sur un sol nu, négatif sous la végétation. À regarder au printemps et à l'automne pour voir les différences de sol.": "xx",
   "Indice de travail du sol : (infrarouge moyen 1 − infrarouge moyen 2) / (leur somme). Plus élevé sur un sol couvert de résidus que sur un sol travaillé ; monte aussi avec la végétation verte.": "xx",
+  "Orbite ascendante {0} ({1})": "xx",
+  "Orbite descendante {0} ({1})": "xx",
+  "Orbite du radar": "xx",
+  "Orbite du radar : ascendante (passage de fin de journée) ou descendante (passage du petit matin). Une seule est affichée à la fois.": "xx",
 });

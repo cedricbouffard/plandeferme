@@ -1983,4 +1983,8 @@ window.pfI18n.langue("en", {
   "Indice d'humidité du couvert : (PIR − infrarouge moyen) / (PIR + infrarouge moyen). Baisse quand la végétation manque d'eau.": "Canopy moisture index: (NIR − shortwave infrared) / (NIR + shortwave infrared). Drops when vegetation lacks water.",
   "Indice de sol nu : ((infrarouge moyen + rouge) − (PIR + bleu)) / (leur somme). Positif sur un sol nu, négatif sous la végétation. À regarder au printemps et à l'automne pour voir les différences de sol.": "Bare soil index: ((shortwave infrared + red) − (NIR + blue)) / (their sum). Positive over bare soil, negative under vegetation. Best viewed in spring and fall to see soil differences.",
   "Indice de travail du sol : (infrarouge moyen 1 − infrarouge moyen 2) / (leur somme). Plus élevé sur un sol couvert de résidus que sur un sol travaillé ; monte aussi avec la végétation verte.": "Tillage index: (shortwave infrared 1 − shortwave infrared 2) / (their sum). Higher over residue-covered soil than over tilled soil; also rises with green vegetation.",
+  "Orbite ascendante {0} ({1})": "Ascending orbit {0} ({1})",
+  "Orbite descendante {0} ({1})": "Descending orbit {0} ({1})",
+  "Orbite du radar": "Radar orbit",
+  "Orbite du radar : ascendante (passage de fin de journée) ou descendante (passage du petit matin). Une seule est affichée à la fois.": "Radar orbit: ascending (late-day pass) or descending (early-morning pass). Only one is shown at a time.",
 });

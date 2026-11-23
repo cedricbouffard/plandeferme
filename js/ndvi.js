@@ -134,6 +134,8 @@
         this.sensor = "s2";        // capteur affiché
         this.sensorAuto = true;    // tant que l'utilisateur n'a pas choisi : Sentinel-2 s'il y en a, sinon Landsat
         this.index = "ndvi";       // indice affiché (NDVI ou EVI en optique ; RVI, VH/VV ou entropie au radar)
+        this.orbit = null;         // radar : orbite affichée (clé « ascending|135 »)
+        this.radarOrbits = [];     // radar : orbites lues { key, label, count }
         this.allSeries = [];       // toutes les dates lues ; this.series = celles qui ont une valeur pour l'indice affiché
         this.tileOpacity = 0.85;
         this.stretchMin = -0.05;
@@ -242,6 +244,7 @@
           this.sensor = NDVI_SENSORS[select.value] ? select.value : "s2";
           this.sensorAuto = false;
           this.syncIndexSelect();
+          this.syncOrbitSelect();
           if (this.currentLocation) this.analyzeLocation(this.currentLocation, this.currentParcel, this.selectedYear);
         });
         this.syncIndexSelect();
@@ -262,6 +265,19 @@
         }
         select.value = this.index; select.title = this.indexDef().title;
       }
+      // Menu de l'orbite (radar seulement) : ascendante ou descendante ; les deux sont déjà lues
+      syncOrbitSelect() {
+        const select = document.getElementById("ndvi-orbit-select"); if (!select) return;
+        const list = (NDVI_SENSORS[this.sensor] || {}).radar ? (this.radarOrbits || []) : [];
+        if (!select.__pfBound) {
+          select.__pfBound = true;
+          select.addEventListener("change", () => { this.orbit = select.value; if (this.allSeries.length) this.showSeries(null, this.series[this.selectedIndex] ? this.series[this.selectedIndex].datetime : null); });
+        }
+        select.style.display = list.length ? "" : "none";
+        select.innerHTML = "";
+        list.forEach((o) => { const opt = document.createElement("option"); opt.value = o.key; opt.textContent = `Orbite ${o.label} (${o.count})`; select.appendChild(opt); });
+        if (list.length) select.value = this.orbit;
+      }
       resetStretch() { const r = this.indexDef().range; this.stretchMin = r[0]; this.stretchMax = r[1]; this.stretchPreset = "standard"; }
       setIndex(key) {
         const sn = NDVI_SENSORS[this.sensor] || NDVI_SENSORS.s2;
@@ -273,11 +289,12 @@
       // this.series : les dates qui ont une valeur pour l'indice affiché (la valeur est recopiée dans .ndvi, que lit tout le reste)
       applyIndex() {
         const ix = this.index;
-        this.series = this.allSeries.filter((s) => s.vals && Number.isFinite(s.vals[ix]));
+        this.series = this.allSeries.filter((s) => s.vals && Number.isFinite(s.vals[ix]) && (!s.orbitKey || !this.orbit || s.orbitKey === this.orbit));
         this.series.forEach((s) => { s.ndvi = s.vals[ix]; });
       }
 
-      // Radar Sentinel-1 : une seule orbite (même angle de visée d'une date à l'autre), VV et VH moyennés sur une petite fenêtre
+      // Radar Sentinel-1 : VV et VH moyennés sur une petite fenêtre, pour les deux orbites principales ; une seule est
+      // affichée à la fois (même angle de visée d'une date à l'autre), au choix dans le menu « Orbite »
       async fetchRadarSeries(lngLat, yr, dtStr, signal, statsBar) {
         const sn = NDVI_SENSORS.s1;
         const stacResp = await fetch("https://planetarycomputer.microsoft.com/api/stac/v1/search", {
@@ -292,23 +309,18 @@
         const all = (await stacResp.json()).features || [];
         const items = all.filter((it) => { const pol = it.properties["sar:polarizations"]; return !Array.isArray(pol) || (pol.includes("VV") && pol.includes("VH")); });
         const otherPol = all.length - items.length;
-        // orbite la plus fréquente ; à égalité, l'ascendante (passage de fin de journée, sans rosée)
+        // les deux orbites les plus fréquentes sont lues (en général une ascendante, en fin de journée, et une descendante,
+        // au petit matin) ; à égalité, l'ascendante passe devant (pas de rosée)
         const groups = new Map();
         items.forEach((it) => { const k = `${it.properties["sat:orbit_state"] || "?"}|${it.properties["sat:relative_orbit"] || "?"}`; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); });
-        let best = null;
-        groups.forEach((list, k) => { if (!best || list.length > best.list.length || (list.length === best.list.length && /^asc/.test(k) && !/^asc/.test(best.k))) best = { k, list }; });
-        if (!best) return { sampled: [], cloudFilteredCount: 0, candidates: 0, otherPol };
-        const byDate = new Map(); best.list.forEach((it) => { const d = it.properties.datetime.split("T")[0]; if (!byDate.has(d)) byDate.set(d, it); });
-        const unique = Array.from(byDate.values()), parts = best.k.split("|");
-        const orbit = `${/^asc/.test(parts[0]) ? "ascendante" : /^desc/.test(parts[0]) ? "descendante" : parts[0]} ${parts[1]}`;
+        const ranked = Array.from(groups.entries()).map(([k, list]) => ({ k, list })).sort((a, b) => b.list.length - a.list.length || (/^asc/.test(b.k) ? 1 : 0) - (/^asc/.test(a.k) ? 1 : 0)).slice(0, 2);
+        if (!ranked.length) return { sampled: [], cloudFilteredCount: 0, candidates: 0, otherPol, orbits: [] };
+        const labelOf = (k) => { const p = k.split("|"); return `${/^asc/.test(p[0]) ? "ascendante" : /^desc/.test(p[0]) ? "descendante" : p[0]} ${p[1]}`; };
+        const jobs = [];
+        ranked.forEach((g) => { const seen = new Set(); g.list.forEach((it) => { const d = it.properties.datetime.split("T")[0]; if (!seen.has(d)) { seen.add(d); jobs.push({ it, k: g.k }); } }); });
         const h = NDVI_RADAR_HALF_M, dLat = h / 111132, dLng = h / (111320 * Math.max(0.1, Math.cos((lngLat.lat * Math.PI) / 180)));
         const bbox = [lngLat.lng - dLng, lngLat.lat - dLat, lngLat.lng + dLng, lngLat.lat + dLat].map((v) => v.toFixed(6)).join(","), px = Math.round((2 * h) / sn.res);
-        // seconde orbite (autre angle de visée), pour la diversité angulaire : la plus fréquente parmi les autres
-        let second = null;
-        groups.forEach((list, k) => { if (k !== best.k && (!second || list.length > second.list.length)) second = { k, list }; });
-        const byDate2 = new Map(); if (second) second.list.forEach((it) => { const d = it.properties.datetime.split("T")[0]; if (!byDate2.has(d)) byDate2.set(d, it); });
-        const unique2 = Array.from(byDate2.values()), jobs = unique.map((it) => ({ it, main: true })).concat(unique2.map((it) => ({ it, main: false })));
-        const sampled = [], pairs = []; let completed = 0;
+        const sampled = []; let completed = 0;
         const progress = () => { if (statsBar) statsBar.innerHTML = `<span class="stat-chip">${sn.name} : lecture des passages (${Math.min(completed, jobs.length)}/${jobs.length})...</span>`; };
         progress();
         const readMeans = async (scene) => {
@@ -324,31 +336,30 @@
         for (let i = 0; i < jobs.length; i += PAR) {
           if (signal.aborted) return null;
           const batch = jobs.slice(i, i + PAR);
-          const results = await Promise.all(batch.map(async ({ it: scene, main }) => {
+          const results = await Promise.all(batch.map(async ({ it: scene, k }) => {
             try {
               const m = await readMeans(scene);
               if (!m) return null;
-              if (!main) return { pair: true, t: new Date(scene.properties.datetime).getTime(), dateKey: scene.properties.datetime.split("T")[0], vv: m.vv };
               return { id: scene.id, sensor: sn.key, offset: 0, datetime: scene.properties.datetime, dateKey: scene.properties.datetime.split("T")[0], bbox: scene.bbox || null,
-                vals: sn.measures(m.vv, m.vh), ndvi: NaN, b4: m.vv, b8: m.vh, scl: null, cloud: 0, cloudLocal: null, platform: scene.properties.platform || sn.name, orbit };
+                vals: sn.measures(m.vv, m.vh), ndvi: NaN, b4: m.vv, b8: m.vh, scl: null, cloud: 0, cloudLocal: null, platform: scene.properties.platform || sn.name, orbitKey: k, orbit: labelOf(k) };
             } catch (e) {
               if (e.name === "AbortError") throw e;
               return null;
             }
           }));
-          results.forEach((r) => { if (r) (r.pair ? pairs : sampled).push(r); });
+          results.forEach((r) => { if (r) sampled.push(r); });
           completed += batch.length; progress();
         }
         // diversité angulaire : chaque passage est comparé au passage de l'autre orbite le plus proche dans le temps
         sampled.forEach((s) => {
-          const t = new Date(s.datetime).getTime(); let near = null;
-          pairs.forEach((p) => { if (!near || Math.abs(p.t - t) < Math.abs(near.t - t)) near = p; });
-          if (near && Math.abs(near.t - t) <= NDVI_RADAR_PAIR_DAYS * 86400000) { s.vals.ang = Math.abs(s.b4 - near.vv) / (s.b4 + near.vv); s.pair = { dateKey: near.dateKey, db: 10 * Math.log10(s.b4 / near.vv) }; }
+          const t = new Date(s.datetime).getTime(); let near = null, gap = Infinity;
+          sampled.forEach((p) => { if (p.orbitKey === s.orbitKey) return; const g = Math.abs(new Date(p.datetime).getTime() - t); if (g < gap) { gap = g; near = p; } });
+          if (near && gap <= NDVI_RADAR_PAIR_DAYS * 86400000) { s.vals.ang = Math.abs(s.b4 - near.b4) / (s.b4 + near.b4); s.pair = { dateKey: near.dateKey, db: 10 * Math.log10(s.b4 / near.b4) }; }
           else s.vals.ang = NaN;
         });
-        const p2 = second ? second.k.split("|") : null, orbit2 = p2 ? `${/^asc/.test(p2[0]) ? "ascendante" : /^desc/.test(p2[0]) ? "descendante" : p2[0]} ${p2[1]}` : "";
         sampled.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
-        return { sampled, cloudFilteredCount: 0, candidates: unique.length, orbit, orbit2, otherOrbits: items.length - best.list.length, otherPol };
+        const orbits = ranked.map((g) => ({ key: g.k, label: labelOf(g.k), count: sampled.filter((x) => x.orbitKey === g.k).length })).filter((o) => o.count > 0);
+        return { sampled, cloudFilteredCount: 0, candidates: jobs.length, orbits, otherOrbits: items.length - ranked.reduce((a, g) => a + g.list.length, 0), otherPol };
       }
 
       // Couverture nuageuse dans un carré de 500 m de demi-côté autour du point (bande de qualité de la scène).
@@ -658,13 +669,16 @@
             if (!res || signal.aborted) return;
             this.sensor = order[t];
             sampled = res.sampled; cloudFilteredCount = res.cloudFilteredCount; candidates = res.candidates;
-            radar = NDVI_SENSORS[order[t]].radar ? { orbit: res.orbit, orbit2: res.orbit2 || "", others: res.otherOrbits || 0, otherPol: res.otherPol || 0 } : null;
+            radar = NDVI_SENSORS[order[t]].radar ? { orbits: res.orbits || [], others: res.otherOrbits || 0, otherPol: res.otherPol || 0 } : null;
             if (sampled.length) { fallback = this.sensorAuto && t > 0; break; }
           }
           const sn = NDVI_SENSORS[this.sensor];
           const sensorSelect = document.getElementById("ndvi-sensor-select");
           if (sensorSelect) sensorSelect.value = this.sensor;
           this.allSeries = sampled;
+          this.radarOrbits = radar ? radar.orbits : [];
+          if (!this.radarOrbits.some((o) => o.key === this.orbit)) this.orbit = this.radarOrbits.length ? this.radarOrbits[0].key : null;
+          this.syncOrbitSelect();
           this.syncIndexSelect();
           this.applyIndex();
           this.updateTitle();
@@ -702,9 +716,10 @@
       }
 
       // Bandeau, graphique et date choisie pour l'indice affiché (les valeurs sont déjà lues)
-      showSeries(keepId) {
+      showSeries(keepId, nearTime) {
         const statsBar = document.getElementById("ndvi-stats-bar"), container = document.getElementById("ndvi-chart-container");
         const run = this.lastRun || {}, sn = NDVI_SENSORS[this.sensor] || NDVI_SENSORS.s2, ix = this.indexDef();
+        const orbNow = (this.radarOrbits || []).find((o) => o.key === this.orbit), orbOther = (this.radarOrbits || []).find((o) => o.key !== this.orbit);
         this.applyIndex();
         this.updateTitle();
         if (!this.series.length) {
@@ -728,12 +743,16 @@
             <span class="stat-chip">${this.index === "ndvi" ? "Dernier NDVI :" : "Dernière valeur :"} <strong>${latest.ndvi.toFixed(2)}</strong></span>
             ${sn.radar
               ? `<span class="stat-chip">Passages : <strong>${this.series.length} dates</strong></span>
-                 <span class="stat-chip" style="color:#64748b;" title="${ix.noTile ? `Chaque passage est comparé au passage de l'orbite ${run.radar ? run.radar.orbit2 : ""} le plus proche, à ${NDVI_RADAR_PAIR_DAYS} jours ou moins.` : `Une seule orbite est gardée pour que l'angle de visée reste le même d'une date à l'autre${run.radar && run.radar.others ? ` (${run.radar.others} passages d'autres orbites écartés)` : ""}.`}${run.radar && run.radar.otherPol ? ` ${run.radar.otherPol} passages en polarisation HH/HV écartés : les indices demandent VV et VH.` : ""} Valeurs moyennées sur un carré de ${2 * NDVI_RADAR_HALF_M} m autour du point. La pluie, la rosée, le gel et le travail du sol font aussi varier le signal radar.">Orbite ${run.radar ? run.radar.orbit : ""}</span>`
+                 <span class="stat-chip" style="color:#64748b;" title="${ix.noTile ? `Chaque passage est comparé au passage de l'orbite ${orbOther ? orbOther.label : ""} le plus proche, à ${NDVI_RADAR_PAIR_DAYS} jours ou moins.` : `Une seule orbite est affichée à la fois pour que l'angle de visée reste le même d'une date à l'autre ; l'autre se choisit dans le menu « Orbite »${run.radar && run.radar.others ? ` (${run.radar.others} passages d'orbites plus rares écartés)` : ""}.`}${run.radar && run.radar.otherPol ? ` ${run.radar.otherPol} passages en polarisation HH/HV écartés : les indices demandent VV et VH.` : ""} Valeurs moyennées sur un carré de ${2 * NDVI_RADAR_HALF_M} m autour du point. La pluie, la rosée, le gel et le travail du sol font aussi varier le signal radar.">Orbite ${orbNow ? orbNow.label : ""}</span>`
               : `<span class="stat-chip">Observations claires : <strong>${this.series.length} dates</strong></span>
                  ${cloudN > 0 ? `<span class="stat-chip" style="color:#64748b;" title="Passages éliminés car sous un nuage, une ombre ou de la neige, ou entourés de nuages (plus de 25 % dans un rayon de 500 m)">${cloudN} nuageux filtrés</span>` : ""}`}
           `;
         }
         let pick = keepId ? this.series.findIndex((s) => s.id === keepId) : -1;
+        if (pick < 0 && nearTime) { // changement d'orbite : la date la plus proche de celle qui était affichée
+          const t0 = new Date(nearTime).getTime(); let gap = Infinity;
+          this.series.forEach((s, i) => { const g = Math.abs(new Date(s.datetime).getTime() - t0); if (g < gap) { gap = g; pick = i; } });
+        }
         if (pick < 0) pick = peakIdx >= 0 ? peakIdx : this.series.length - 1;
         this.renderChart(pick);
         this.selectDate(pick);

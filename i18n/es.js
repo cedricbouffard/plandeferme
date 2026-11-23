@@ -1983,4 +1983,8 @@ window.pfI18n.langue("es", {
   "Indice d'humidité du couvert : (PIR − infrarouge moyen) / (PIR + infrarouge moyen). Baisse quand la végétation manque d'eau.": "Índice de humedad de la cubierta: (NIR − infrarrojo medio) / (NIR + infrarrojo medio). Baja cuando a la vegetación le falta agua.",
   "Indice de sol nu : ((infrarouge moyen + rouge) − (PIR + bleu)) / (leur somme). Positif sur un sol nu, négatif sous la végétation. À regarder au printemps et à l'automne pour voir les différences de sol.": "Índice de suelo desnudo: ((infrarrojo medio + rojo) − (NIR + azul)) / (su suma). Positivo sobre suelo desnudo, negativo bajo vegetación. Conviene verlo en primavera y otoño para apreciar las diferencias de suelo.",
   "Indice de travail du sol : (infrarouge moyen 1 − infrarouge moyen 2) / (leur somme). Plus élevé sur un sol couvert de résidus que sur un sol travaillé ; monte aussi avec la végétation verte.": "Índice de labranza: (infrarrojo medio 1 − infrarrojo medio 2) / (su suma). Más alto sobre suelo cubierto de residuos que sobre suelo labrado; también sube con la vegetación verde.",
+  "Orbite ascendante {0} ({1})": "Órbita ascendente {0} ({1})",
+  "Orbite descendante {0} ({1})": "Órbita descendente {0} ({1})",
+  "Orbite du radar": "Órbita del radar",
+  "Orbite du radar : ascendante (passage de fin de journée) ou descendante (passage du petit matin). Une seule est affichée à la fois.": "Órbita del radar: ascendente (pasada al final del día) o descendente (pasada de madrugada). Solo se muestra una a la vez.",
 });
