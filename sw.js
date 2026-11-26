@@ -1,4 +1,4 @@
-const CACHE_NAME = "plandeferme-v77";
+const CACHE_NAME = "plandeferme-v90";
 
 const ASSETS = [
   "/",
@@ -7,6 +7,7 @@ const ASSETS = [
   "/geolibre-contour.css",
   "/css/composer.css",
   "/css/shell.css",
+  "/css/rapport.css",
   "/geolibre-contour.js",
   "/flatgeobuf-geojson.min.js",
   "/marked.min.js",
@@ -42,6 +43,7 @@ const ASSETS = [
   "/js/essai.js",
   "/js/stabilite.js",
   "/js/climat.js",
+  "/js/rapport.js",
   "/js/stats.js",
   "/js/plan-viewer.js",
   "/js/app.js",

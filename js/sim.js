@@ -1967,6 +1967,8 @@
     }
   }
 
+  // Accès sans interface, pour le rapport de parcelle (lecture du relief de la parcelle, coins de la grille, tables du modèle)
+  root.pfSim = { loadParcelDem, getGridCorners, estimateRFactor, RUSLE_CLASSES, SOIL_TYPES, CROP_FACTORS };
   root.ParcelRainManager = ParcelRainManager;
   root.ParcelErosionManager = ParcelErosionManager;
   root.ParcelSimulationManager = ParcelSimulationManager;

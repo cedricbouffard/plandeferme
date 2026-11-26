@@ -1319,6 +1319,9 @@
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-stab" title="Comparer le NDVI de plusieurs étés : zones toujours bonnes, généralement bonnes, variables, généralement mauvaises ou toujours mauvaises">
                   <span class="pf-act-name">Stabilité du NDVI</span><span class="pf-act-desc">Zones stables sur plusieurs années</span>
                 </button>
+                <button type="button" class="btn-popup-parcel-action btn-popup-action-rapport" title="Rapport de parcelle : relief, sols, végétation, climat et historique des cultures, avec le croisement de la stabilité du NDVI et des autres couches. À lire à l'écran, à imprimer ou à enregistrer en PDF.">
+                  <span class="pf-act-name">Rapport de parcelle</span><span class="pf-act-desc">Relief, sols, végétation, climat, cultures</span>
+                </button>
                 <button type="button" class="btn-popup-parcel-action btn-popup-action-trial" title="Planifier un essai à la ferme : parcelles d'essai alignées sur les passages, selon les largeurs d'équipement et les traitements">
                   <span class="pf-act-name">Essai à la ferme</span><span class="pf-act-desc">Parcelles et traitements</span>
                 </button>
@@ -1476,6 +1479,13 @@
             btnActionStab.addEventListener("click", () => {
               popup.remove();
               if (window.pfStabilite) window.pfStabilite.openForParcel(targetP);
+            });
+          }
+          const btnActionRapport = popupDom.querySelector(".btn-popup-action-rapport");
+          if (btnActionRapport) {
+            btnActionRapport.addEventListener("click", () => {
+              popup.remove();
+              if (window.pfRapport) window.pfRapport.openForParcel(targetP);
             });
           }
           const btnActionTrial = popupDom.querySelector(".btn-popup-action-trial");

@@ -374,7 +374,8 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
         geometry: multi.length === 1 ? { type: "Polygon", coordinates: multi[0] } : { type: "MultiPolygon", coordinates: multi } });
     }
     features.forEach((f) => { f.properties.part_pct = total > 0 ? Math.round((f.properties.superficie_ha / total) * 1000) / 10 : 0; });
-    state.result = { features, years: used.length, totalHa: total };
+    // rel : écart relatif moyen à la médiane du champ, pixel par pixel (NaN hors de la parcelle) ; sert au rapport de parcelle
+    state.result = { features, years: used.length, totalHa: total, rel: cl.rel, grid: { bbox: grid.bbox.slice(), W, H } };
     showPreview(features); renderResult(); toggleButtons();
     setNote(`Classement sur ${T} années, ${fr(total, 1)} ha. « Toujours » : au moins ${th.always} années sur ${T} ; « généralement » : au moins ${th.usually}.` + (grid.marginAsked > 0 && !grid.margin ? " Marge intérieure ignorée : la parcelle est trop étroite." : ""), T < 3);
   }

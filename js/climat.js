@@ -282,7 +282,32 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function 
     if (c) open({ lng: c[0], lat: c[1], name: name || p.nom || p.name || (pid ? `Parcelle nº ${pid}` : lot ? `Lot nº ${lot}` : "") });
   }
   function openAtMapCentre() { const map = window.map; if (!map || typeof map.getCenter !== "function") return; const c = map.getCenter(); open({ lng: c.lng, lat: c.lat, name: "" }); }
+  /*
+    Lecture sans interface, pour les autres modules (rapport de diagnostic) :
+    -> { year, station, stations, cur, ref, refYears } ; lève une erreur si aucune station ou aucune observation
+  */
+  async function loadFor(opts) {
+    const keep = { lng: state.lng, lat: state.lat };
+    let list; state.lng = opts.lng; state.lat = opts.lat;
+    try { list = await findStations(opts.signal); } finally { state.lng = keep.lng; state.lat = keep.lat; }
+    if (!list.length) throw new Error("Aucune station météo d'Environnement Canada en activité à proximité.");
+    const now = new Date(); let lastErr = null;
+    for (const st of list.slice(0, 3)) { // la plus proche qui a des observations utilisables
+      for (const year of opts.year ? [opts.year] : [now.getFullYear(), now.getFullYear() - 1]) {
+        try {
+          const first = parseInt(st.first.slice(0, 4), 10) || year, refYears = []; for (let y = year - 10; y < year; y++) if (y >= first) refYears.push(y);
+          const all = await Promise.all([year].concat(refYears).map((y) => loadYear(st, y, opts.signal).catch(() => null)));
+          if (!all[0]) continue;
+          const cur = C.indicators(year, all[0]);
+          if (cur.last < C.doy(year, 5, 15) || (cur.seasonDays && cur.missT / cur.seasonDays > 0.3)) continue; // saison à peine commencée ou station trouée
+          const okYears = [], refs = []; all.slice(1).forEach((d, i) => { if (!d) return; const r = C.indicators(refYears[i], d); if (r.last >= C.doy(refYears[i], 9, 30) && r.seasonDays && r.missT / r.seasonDays < 0.2) { refs.push(r); okYears.push(refYears[i]); } });
+          return { year, station: st, stations: list, cur, ref: refs.length >= 3 ? C.reference(refs) : null, refYears: refs.length >= 3 ? okYears : [] };
+        } catch (e) { lastErr = e; if (opts.signal && opts.signal.aborted) throw e; }
+      }
+    }
+    throw lastErr || new Error("Aucune observation utilisable aux stations les plus proches.");
+  }
   const quick = $("btn-quick-climat"); if (quick) quick.addEventListener("click", openAtMapCentre);
-  window.pfClimat = { open, openForParcel, openAtMapCentre, close, core: C, _state: state };
+  window.pfClimat = { load: loadFor, open, openForParcel, openAtMapCentre, close, core: C, _state: state };
 })();
 if (typeof window !== "undefined") (window.pfModules = window.pfModules || {})["climat"] = "017f4811";

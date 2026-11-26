@@ -1989,4 +1989,7 @@ window.pfI18n.langue("en", {
   "Orbite du radar : ascendante (passage de fin de journée) ou descendante (passage du petit matin). Une seule est affichée à la fois.": "Radar orbit: ascending (late-day pass) or descending (early-morning pass). Only one is shown at a time.",
   "Moyenne sur la parcelle": "Field average",
   "Moyenne sur {0} m": "Average over {0} m",
+  "Relief, sols, végétation, climat, cultures": "Terrain, soils, vegetation, climate, crops",
+  "Rapport de parcelle": "Field report",
+  "Rapport de parcelle : relief, sols, végétation, climat et historique des cultures, avec le croisement de la stabilité du NDVI et des autres couches. À lire à l'écran, à imprimer ou à enregistrer en PDF.": "Field report: terrain, soils, vegetation, climate and crop history, with NDVI stability cross-referenced against the other layers. Read on screen, print or save as PDF.",
 });

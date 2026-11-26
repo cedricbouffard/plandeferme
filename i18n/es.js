@@ -1989,4 +1989,7 @@ window.pfI18n.langue("es", {
   "Orbite du radar : ascendante (passage de fin de journée) ou descendante (passage du petit matin). Une seule est affichée à la fois.": "Órbita del radar: ascendente (pasada al final del día) o descendente (pasada de madrugada). Solo se muestra una a la vez.",
   "Moyenne sur la parcelle": "Promedio de la parcela",
   "Moyenne sur {0} m": "Promedio sobre {0} m",
+  "Relief, sols, végétation, climat, cultures": "Relieve, suelos, vegetación, clima, cultivos",
+  "Rapport de parcelle": "Informe de parcela",
+  "Rapport de parcelle : relief, sols, végétation, climat et historique des cultures, avec le croisement de la stabilité du NDVI et des autres couches. À lire à l'écran, à imprimer ou à enregistrer en PDF.": "Informe de parcela: relieve, suelos, vegetación, clima e historial de cultivos, con el cruce de la estabilidad del NDVI y las demás capas. Para leer en pantalla, imprimir o guardar en PDF.",
 });

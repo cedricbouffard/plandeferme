@@ -1989,4 +1989,7 @@ window.pfI18n.langue("xx", {
   "Orbite du radar : ascendante (passage de fin de journée) ou descendante (passage du petit matin). Une seule est affichée à la fois.": "xx",
   "Moyenne sur la parcelle": "xx",
   "Moyenne sur {0} m": "xx",
+  "Relief, sols, végétation, climat, cultures": "xx",
+  "Rapport de parcelle": "xx",
+  "Rapport de parcelle : relief, sols, végétation, climat et historique des cultures, avec le croisement de la stabilité du NDVI et des autres couches. À lire à l'écran, à imprimer ou à enregistrer en PDF.": "xx",
 });
