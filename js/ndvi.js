@@ -145,6 +145,9 @@
         this.stretchDebounceTimer = null;
         this.abortController = null;
         this.marker = null;
+        this.compare = false;      // option : bande des champs voisins de même culture sur la courbe NDVI
+        this.neighbours = null;    // { key, state: "loading" | "done" | "error", data, message }
+        this.nbAbort = null;
         // Bouton « Enregistrer » : la tuile affichée devient un lien dans Mes données
         const saveBtn = document.getElementById("btn-ndvi-save");
         if (saveBtn) saveBtn.addEventListener("click", () => this.saveCurrentTile());
@@ -265,6 +268,43 @@
           sn.indices.forEach((k) => { const o = document.createElement("option"); o.value = k; o.textContent = NDVI_INDICES[k].label; o.title = NDVI_INDICES[k].title; select.appendChild(o); });
         }
         select.value = this.index; select.title = this.indexDef().title;
+        this.syncCompareToggle();
+      }
+      // Option « Champs voisins » : offerte pour le NDVI de Sentinel-2 seulement
+      compareAllowed() { return this.sensor === "s2" && this.index === "ndvi" && !!window.pfVoisins; }
+      syncCompareToggle() {
+        const wrap = document.getElementById("ndvi-compare-wrap"), box = document.getElementById("ndvi-compare-toggle"); if (!wrap || !box) return;
+        if (!box.__pfBound) { box.__pfBound = true; box.addEventListener("change", () => { this.compare = box.checked; if (!this.compare && this.nbAbort) this.nbAbort.abort(); if (this.series.length) { this.updateNeighbours(); this.renderChart(this.selectedIndex); this.neighboursChip(); } }); }
+        wrap.style.display = this.compareAllowed() ? "inline-flex" : "none"; box.checked = this.compare;
+      }
+      neighboursKey() { return this.currentLocation ? `${this.currentLocation.lng.toFixed(5)},${this.currentLocation.lat.toFixed(5)}|${this.selectedYear}|${this.allSeries.length}` : ""; }
+      // Données des voisins à afficher maintenant, ou null
+      neighboursNow() { const nb = this.neighbours; return this.compare && this.compareAllowed() && nb && nb.key === this.neighboursKey() && nb.data && nb.data.dates.length ? nb.data : null; }
+      // Lance (une seule fois par champ et par saison) la lecture des champs voisins ; le graphique se complète au fur et à mesure
+      updateNeighbours() {
+        if (!this.compare || !this.compareAllowed() || !this.allSeries.length || !this.currentLocation) return;
+        const key = this.neighboursKey(); if (this.neighbours && this.neighbours.key === key) return;
+        if (this.nbAbort) this.nbAbort.abort();
+        const ac = (this.nbAbort = new AbortController()), nb = (this.neighbours = { key, state: "loading", data: null, message: "Recherche des champs voisins…" });
+        const mine = () => this.neighbours === nb && !ac.signal.aborted, redraw = () => { if (!mine()) return; this.neighboursChip(); if (this.series.length && nb.key === this.neighboursKey()) this.renderChart(this.selectedIndex); };
+        this.neighboursChip();
+        window.pfVoisins.load({ lngLat: this.currentLocation, year: this.selectedYear, signal: ac.signal, scenes: this.allSeries.map((s) => ({ id: s.id, datetime: s.datetime, offset: s.offset || 0 })),
+          onProgress: (p) => { if (!mine() || !p.partial) return; nb.data = p.partial; nb.message = `Champs voisins : ${p.partial.done}/${p.partial.total} dates…`; redraw(); } })
+          .then((data) => { if (!mine()) return; nb.data = data; nb.state = "done"; nb.message = ""; redraw(); })
+          .catch((err) => { if (!mine() || (err && err.name === "AbortError")) { if (this.neighbours === nb) this.neighbours = null; return; } nb.state = "error"; nb.data = null; nb.message = (err && err.message) || "Champs voisins non disponibles."; redraw(); });
+      }
+      // Pastille d'état dans le bandeau : recherche en cours, nombre de champs comparés, ou raison de l'absence
+      neighboursChip() {
+        const bar = document.getElementById("ndvi-stats-bar"); if (!bar) return;
+        let chip = document.getElementById("ndvi-nb-chip");
+        const nb = this.neighbours, show = this.compare && this.compareAllowed() && nb && nb.key === this.neighboursKey();
+        if (!show) { if (chip) chip.remove(); return; }
+        if (!chip || chip.parentNode !== bar) { if (chip) chip.remove(); chip = document.createElement("span"); chip.id = "ndvi-nb-chip"; chip.className = "stat-chip"; bar.appendChild(chip); }
+        chip.style.color = nb.state === "error" ? "#b91c1c" : "#334155";
+        chip.title = "Champs déclarés avec la même culture cette année-là, les plus proches. NDVI moyen de chaque champ, sans ses bordures (15 m) et sans les nuages. La courbe du champ, elle, est lue au point cliqué.";
+        chip.textContent = nb.state === "done" && nb.data
+          ? `Voisins : ${nb.data.fields} champs de ${nb.data.crop} en ${this.selectedYear}, à ${nb.data.radiusKm.toFixed(1).replace(".", ",")} km ou moins`
+          : nb.message || "";
       }
       // Menu de l'orbite (radar seulement) : ascendante ou descendante ; les deux sont déjà lues
       syncOrbitSelect() {
@@ -620,11 +660,21 @@
         this.setMode(!this.isActiveMode);
       }
 
+      yearCropKey() { return this.currentLocation ? `${this.currentLocation.lng.toFixed(5)},${this.currentLocation.lat.toFixed(5)}|${this.selectedYear}` : ""; }
+      // Culture déclarée pour l'année choisie, à l'endroit cliqué : lue une fois par champ et par année, le titre se met à jour à l'arrivée
+      loadYearCrop() {
+        if (!this.currentLocation || !this.currentParcel || !window.pfVoisins || typeof window.pfVoisins.cropAt !== "function") { this.yearCrop = null; return; }
+        const key = this.yearCropKey(); if (this.yearCrop && this.yearCrop.key === key) return;
+        const yc = (this.yearCrop = { key, state: "loading", crop: "" });
+        window.pfVoisins.cropAt(this.currentLocation, this.selectedYear).then((crop) => { yc.crop = crop || ""; yc.state = "done"; }).catch(() => { yc.state = "error"; }).then(() => { if (this.yearCrop === yc) this.updateTitle(); });
+      }
       updateTitle() {
         const titleEl = document.getElementById("ndvi-dock-title"), lngLat = this.currentLocation, parcelProps = this.currentParcel;
         if (!titleEl || !lngLat) return;
         const pid = parcelProps ? (parcelProps.IDPAR || parcelProps.idpar || "") : "";
-        const crop = parcelProps ? (parcelProps.DESCODPR1 || parcelProps.descodpr1 || "") : "";
+        // culture : celle déclarée pour la saison affichée (lue à part) ; celle de la couche des parcelles seulement si cette lecture est impossible
+        const yc = this.yearCrop && this.yearCrop.key === this.yearCropKey() ? this.yearCrop : null;
+        const crop = yc && yc.state === "done" ? (yc.crop ? `${yc.crop} en ${this.selectedYear}` : "") : yc && yc.state === "loading" ? "" : parcelProps ? (parcelProps.DESCODPR1 || parcelProps.descodpr1 || "") : "";
         const ix = this.indexDef().label;
         titleEl.textContent = pid
           ? `Série ${ix} ${this.selectedYear} (mars–déc.) — Parcelle nº ${pid}${crop ? ` (${crop})` : ''}`
@@ -643,6 +693,8 @@
         this.nextParcelGeom = null;
         this.currentLocation = lngLat;
         this.currentParcel = parcelProps;
+        if (this.nbAbort) this.nbAbort.abort(); // la comparaison avec les voisins repart de zéro
+        this.neighbours = null;
         this.series = [];
         this.allSeries = [];
         this.selectedIndex = -1;
@@ -680,6 +732,7 @@
 
 
         this.syncIndexSelect();
+        this.loadYearCrop();
         this.updateTitle();
 
         if (statsBar) {
@@ -800,6 +853,8 @@
         if (pick < 0) pick = peakIdx >= 0 ? peakIdx : this.series.length - 1;
         this.renderChart(pick);
         this.selectDate(pick);
+        this.updateNeighbours();
+        this.neighboursChip();
       }
 
       selectDate(index, skipRender = false) {
@@ -915,6 +970,7 @@
 
       closeDock() {
         if (this.abortController) this.abortController.abort();
+        if (this.nbAbort) this.nbAbort.abort();
         const dock = document.getElementById("ndvi-dock");
         if (dock) {
           dock.classList.remove("open");
@@ -1009,6 +1065,21 @@
           `;
         }
 
+        // Champs voisins de même culture (option) : bande du 10e au 90e centile et médiane, derrière la courbe du champ
+        let nbHtml = "";
+        const nbData = this.neighboursNow();
+        if (nbData) {
+          const pts = nbData.dates.map((q) => ({ x: getX(q.datetime), lo: getY(q.p10), mid: getY(q.p50), hi: getY(q.p90) }));
+          if (pts.length > 1) {
+            const band = pts.map((q, i) => `${i ? "L" : "M"} ${q.x.toFixed(1)} ${q.hi.toFixed(1)}`).join(" ") + " " + pts.slice().reverse().map((q) => `L ${q.x.toFixed(1)} ${q.lo.toFixed(1)}`).join(" ") + " Z";
+            const med = pts.map((q, i) => `${i ? "L" : "M"} ${q.x.toFixed(1)} ${q.mid.toFixed(1)}`).join(" ");
+            nbHtml = `<path d="${band}" fill="rgba(71, 85, 105, 0.20)" /><path d="${med}" fill="none" stroke="#475569" stroke-width="1.6" stroke-dasharray="5 3" stroke-linejoin="round" />`;
+          } else {
+            nbHtml = `<line x1="${pts[0].x.toFixed(1)}" y1="${pts[0].hi.toFixed(1)}" x2="${pts[0].x.toFixed(1)}" y2="${pts[0].lo.toFixed(1)}" stroke="#475569" stroke-width="3" opacity="0.5" />`;
+          }
+          nbHtml += `<rect x="${pad.left + 8}" y="${pad.top + 4}" width="14" height="8" fill="rgba(71, 85, 105, 0.20)" /><line x1="${pad.left + 8}" y1="${pad.top + 8}" x2="${pad.left + 22}" y2="${pad.top + 8}" stroke="#475569" stroke-width="1.6" stroke-dasharray="5 3" /><text x="${pad.left + 27}" y="${pad.top + 11.5}" fill="#475569" font-size="10" font-weight="600" font-family="sans-serif">Champs voisins de même culture : médiane et 10e–90e centiles</text>`;
+        }
+
         const coords = this.series.map(s => [getX(s.datetime), getY(s.ndvi)]);
         let pathD = `M ${coords[0][0].toFixed(1)} ${coords[0][1].toFixed(1)}`;
         for (let i = 1; i < coords.length; i++) {
@@ -1046,7 +1117,8 @@
             ${yAxisHtml}
             ${xAxisHtml}
             ${activeDateMarkerHtml}
-            <path d="${areaD}" fill="rgba(22, 163, 74, 0.12)" />
+            ${nbHtml}
+            <path d="${areaD}" fill="${nbData ? "none" : "rgba(22, 163, 74, 0.12)"}" />
             <path d="${pathD}" fill="none" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
             ${pointsHtml}
           </svg>
@@ -1072,6 +1144,11 @@
                 ? `<strong>${item.dateKey}</strong> &bull; ${this.indexDef().label} : <strong>${item.ndvi.toFixed(3)}</strong> &bull; VV : <strong>${(10 * Math.log10(item.b4)).toFixed(1)} dB</strong> &bull; VH : <strong>${(10 * Math.log10(item.b8)).toFixed(1)} dB</strong>${this.indexDef().noTile && item.pair ? ` &bull; comparé au ${item.pair.dateKey} : <strong>${item.pair.db >= 0 ? "+" : "−"}${Math.abs(item.pair.db).toFixed(1)} dB</strong>` : " &bull; Cliquez pour afficher la tuile satellite sur la carte"}`
                 : `<strong>${item.dateKey}</strong> &bull; ${this.indexDef().label} : <strong>${item.ndvi.toFixed(3)}</strong> &bull; Qualité : <strong>${this.getSclLabel(item.scl)}</strong> &bull; ${Number.isFinite(item.cloudLocal) ? `Nuages à moins de 500 m : ${(100 * item.cloudLocal).toFixed(0)}% (scène : ${item.cloud.toFixed(0)}%)` : `Nuages scène : ${item.cloud.toFixed(1)}%`} &bull; Cliquez pour afficher la tuile satellite sur la carte`;
             }
+          });
+
+          circle.addEventListener("mouseenter", () => { // même date chez les voisins
+            const item = this.series[parseInt(circle.dataset.idx, 10)], nbNow = this.neighboursNow(), q = nbNow && item ? nbNow.dates.find((x) => x.id === item.id) : null;
+            if (hoverInfo && q) hoverInfo.innerHTML += ` &bull; Voisins : médiane <strong>${q.p50.toFixed(2)}</strong> (${q.p10.toFixed(2)} à ${q.p90.toFixed(2)}, ${q.n} champs)`;
           });
 
           circle.addEventListener("mouseleave", () => {

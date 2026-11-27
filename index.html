@@ -986,6 +986,7 @@
           <option value="ndvi" selected>NDVI</option>
           <option value="evi">EVI</option>
         </select>
+        <label id="ndvi-compare-wrap" title="Comparer avec les champs voisins de même culture : médiane et 10e–90e centiles du NDVI des 50 champs les plus proches déclarés avec la même culture cette année-là, sans leurs bordures" style="display: none; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #334155; cursor: pointer; white-space: nowrap;"><input type="checkbox" id="ndvi-compare-toggle" style="margin: 0;" /> Champs voisins</label>
         <select id="ndvi-year-select" class="tool-select" title="Année de la saison de croissance au Québec" style="font-size: 11px; padding: 2px 6px;">
           <option value="2026" selected>2026</option>
           <option value="2025">2025</option>
@@ -2068,6 +2069,7 @@
     <script src="js/topo.js"></script>
     <script src="js/hydro.js"></script>
     <script src="js/ndvi.js"></script>
+    <script src="js/ndvi-voisins.js"></script>
     <script src="js/soil-ai.js"></script>
     <script src="js/wms.js"></script>
     <script src="jszip.min.js"></script>
